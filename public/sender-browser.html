@@ -73,13 +73,13 @@
 </head>
 <body>
   <form id="controls">
-    <input id="room" aria-label="room" autocomplete="off">
-    <input id="signal" aria-label="signal url" autocomplete="off">
-    <input id="inputBridge" aria-label="input bridge url" autocomplete="off">
+    <input id="room" aria-label="房间号" placeholder="房间号" autocomplete="off">
+    <input id="signal" aria-label="信令地址" placeholder="信令地址" autocomplete="off">
+    <input id="inputBridge" aria-label="输入桥地址" placeholder="输入桥地址" autocomplete="off">
     <label><input id="audio" type="checkbox"> 音频</label>
     <button type="submit">开始共享真实画面</button>
     <button id="stop" type="button">停止</button>
-    <span id="status">idle</span>
+    <span id="status">待机</span>
     <span id="inputStatus">输入桥：未连接</span>
   </form>
   <video id="preview" autoplay muted playsinline></video>
@@ -110,6 +110,17 @@
 
     function setStatus(text) {
       statusEl.textContent = text;
+    }
+
+    function formatConnectionState(state) {
+      return {
+        new: '新建连接',
+        connecting: '连接中',
+        connected: '已连接',
+        disconnected: '连接中断',
+        failed: '连接失败',
+        closed: '已关闭'
+      }[state] || state;
     }
 
     function setInputStatus(text) {
@@ -212,7 +223,7 @@
       pc.onicecandidate = event => {
         if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate });
       };
-      pc.onconnectionstatechange = () => setStatus(pc.connectionState);
+      pc.onconnectionstatechange = () => setStatus(formatConnectionState(pc.connectionState));
 
       inputChannel = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
       inputChannel.onopen = () => setStatus('输入通道已打开');
@@ -255,7 +266,7 @@
       inputBridge = null;
       localStream = null;
       preview.srcObject = null;
-      setStatus('idle');
+      setStatus('待机');
       setInputStatus('未连接');
     }
 

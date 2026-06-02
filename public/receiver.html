@@ -88,18 +88,18 @@
 <body>
   <video id="remoteVideo" autoplay playsinline muted></video>
   <form id="panel">
-    <input id="room" name="room" aria-label="room" placeholder="room" autocomplete="off">
-    <input id="signal" name="signal" aria-label="signal" placeholder="ws://PC:8080" autocomplete="off">
+    <input id="room" name="room" aria-label="房间号" placeholder="房间号" autocomplete="off">
+    <input id="signal" name="signal" aria-label="信令地址" placeholder="ws://电脑IP:8080" autocomplete="off">
     <button type="submit">连接</button>
-    <span id="status">idle</span>
+    <span id="status">待机</span>
   </form>
   <div id="metrics" aria-live="polite">
-    <div class="metric"><span>rtt</span><span id="metricRtt">--</span></div>
-    <div class="metric"><span>fps</span><span id="metricFps">--</span></div>
-    <div class="metric"><span>buffer</span><span id="metricBuffer">--</span></div>
-    <div class="metric"><span>jitter</span><span id="metricJitter">--</span></div>
-    <div class="metric"><span>decode</span><span id="metricDecode">--</span></div>
-    <div class="metric"><span>lost</span><span id="metricLost">--</span></div>
+    <div class="metric"><span>延迟</span><span id="metricRtt">--</span></div>
+    <div class="metric"><span>帧率</span><span id="metricFps">--</span></div>
+    <div class="metric"><span>缓冲</span><span id="metricBuffer">--</span></div>
+    <div class="metric"><span>抖动</span><span id="metricJitter">--</span></div>
+    <div class="metric"><span>解码</span><span id="metricDecode">--</span></div>
+    <div class="metric"><span>丢包</span><span id="metricLost">--</span></div>
   </div>
 
   <script src="/receiver-utils.js?v=2"></script>
@@ -144,6 +144,17 @@
 
     function setStatus(text) {
       statusEl.textContent = text;
+    }
+
+    function formatConnectionState(state) {
+      return {
+        new: '新建连接',
+        connecting: '连接中',
+        connected: '已连接',
+        disconnected: '连接中断',
+        failed: '连接失败',
+        closed: '已关闭'
+      }[state] || state;
     }
 
     function sendSignal(payload) {
@@ -293,12 +304,12 @@
         const stream = event.streams[0] || new MediaStream([event.track]);
         video.srcObject = stream;
         video.play().catch(() => {});
-        setStatus('video track');
+        setStatus('收到画面');
       };
       pc.ondatachannel = event => {
         controlChannel = event.channel;
         controlChannel.onopen = () => {
-          setStatus('control ready');
+          setStatus('控制已连接');
           startLatencyProbe();
         };
         controlChannel.onmessage = message => {
@@ -316,11 +327,11 @@
       pc.onicecandidate = event => {
         if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate });
       };
-      pc.onconnectionstatechange = () => setStatus(pc.connectionState);
+      pc.onconnectionstatechange = () => setStatus(formatConnectionState(pc.connectionState));
 
       ws = new WebSocket(signalUrl);
       ws.onopen = () => {
-        setStatus('signaling');
+        setStatus('信令已连接');
         sendSignal({ type: 'join', room, role: 'receiver' });
       };
       ws.onmessage = async event => {
@@ -334,7 +345,7 @@
           await pc.addIceCandidate(message.candidate).catch(console.warn);
         }
       };
-      ws.onclose = () => setStatus('signal closed');
+      ws.onclose = () => setStatus('信令已关闭');
 
       startInputCapture();
       startStatsProbe();
