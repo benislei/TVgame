@@ -38,6 +38,8 @@ Android TV 第一版会把遥控器和键盘按键事件发送到 PC 端 TCP 878
 
 PC 端还需要 relay 接入 InputBridge/SendInput，才能把这些 JSON 按键事件转换为 Windows 输入。relay 未实现不影响视频和声音验证；它只影响“输入回传到达 PC relay”这一项验收。
 
+当前 App 的 `onKeyDown`/`onKeyUp` 会继续返回 Android 系统默认处理结果，因此不会吞掉系统 BACK/HOME 行为。BACK 也可能被发给 PC relay，后续 relay 可以按需要过滤。
+
 ## Android 构建工具记录
 
 本地已尝试在 `android-tv-receiver` 目录运行：

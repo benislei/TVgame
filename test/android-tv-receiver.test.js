@@ -71,8 +71,14 @@ test('InputClient sends safe newline-delimited UTF-8 input JSON on a background 
 
   assert.match(source, /public\s+InputClient\(String\s+host,\s*int\s+port\)/);
   assert.match(source, /public\s+void\s+sendKey\(String\s+action,\s*int\s+keyCode\)/);
+  assert.match(source, /static\s+String\s+buildKeyJsonLine\(String\s+action,\s*int\s+keyCode\)/);
   assert.match(source, /public\s+void\s+(close|stop)\(\)/);
   assert.match(source, /ExecutorService/);
+  assert.match(source, /ThreadPoolExecutor/);
+  assert.match(source, /ArrayBlockingQueue<\s*Runnable\s*>/);
+  assert.match(source, /INPUT_QUEUE_CAPACITY\s*=\s*(16|32)/);
+  assert.match(source, /DiscardOldestPolicy|DiscardPolicy/);
+  assert.doesNotMatch(source, /newSingleThreadExecutor/);
   assert.match(source, /tvgame-input/);
   assert.match(source, /Socket/);
   assert.match(source, /connect\(.*CONNECT_TIMEOUT_MS\)/s);
@@ -82,8 +88,21 @@ test('InputClient sends safe newline-delimited UTF-8 input JSON on a background 
   assert.match(source, /\\"kind\\":\\"keyboard\\"/);
   assert.match(source, /\\n/);
   assert.match(source, /"down"\.equals\(action\)\s*\|\|\s*"up"\.equals\(action\)/);
+  assert.match(source, /keyCode\s*<\s*0/);
+  assert.match(source, /keyCode\s*>\s*MAX_KEY_CODE/);
+  assert.match(source, /IllegalArgumentException/);
   assert.match(source, /if\s*\(\s*closed/);
   assert.match(source, /catch\s*\(\s*IOException\s+\w+\s*\)/);
+});
+
+test('InputClient validates key JSON before enqueue and keeps the UI path bounded', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /if\s*\(\s*closed\s*\)\s*\{\s*return;\s*\}\s*final\s+String\s+line;\s*try\s*\{\s*line\s*=\s*buildKeyJsonLine\(action,\s*keyCode\)/s);
+  assert.match(source, /catch\s*\(\s*IllegalArgumentException\s+\w+\s*\)\s*\{\s*return;\s*\}/);
+  assert.match(source, /catch\s*\(\s*RejectedExecutionException\s+\w+\s*\)/);
+  assert.match(source, /new\s+ThreadPoolExecutor\(\s*1,\s*1,\s*0L,\s*TimeUnit\.MILLISECONDS/s);
+  assert.match(source, /new\s+ArrayBlockingQueue<\s*Runnable\s*>\(INPUT_QUEUE_CAPACITY\)/);
 });
 
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
@@ -210,6 +229,7 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /Android TV 第一版会把遥控器和键盘按键事件发送到 PC 端 TCP 8789/);
   assert.match(doc, /PC 端还需要 relay 接入 InputBridge\/SendInput/);
   assert.match(doc, /relay 未实现不影响视频和声音验证/);
+  assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /## 验收记录/);
   for (const item of [
     'App 启动中文状态面板',

@@ -5,14 +5,18 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public final class InputClient {
     private static final int CONNECT_TIMEOUT_MS = 250;
     private static final int SOCKET_TIMEOUT_MS = 250;
+    private static final int INPUT_QUEUE_CAPACITY = 16;
+    private static final int MAX_KEY_CODE = 10000;
 
     private final String host;
     private final int port;
@@ -22,29 +26,34 @@ public final class InputClient {
     public InputClient(String host, int port) {
         this.host = host;
         this.port = port;
-        this.executor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, "tvgame-input-sender");
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
+        this.executor = new ThreadPoolExecutor(
+            1,
+            1,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<Runnable>(INPUT_QUEUE_CAPACITY),
+            new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable runnable) {
+                    Thread thread = new Thread(runnable, "tvgame-input-sender");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            },
+            new ThreadPoolExecutor.DiscardOldestPolicy()
+        );
     }
 
     public void sendKey(String action, int keyCode) {
-        if (!("down".equals(action) || "up".equals(action))) {
-            return;
-        }
         if (closed) {
             return;
         }
-
-        final String line = "{\"type\":\"input\",\"kind\":\"keyboard\",\"action\":\""
-            + action
-            + "\",\"keyCode\":"
-            + keyCode
-            + "}\n";
+        final String line;
+        try {
+            line = buildKeyJsonLine(action, keyCode);
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
 
         try {
             executor.execute(new Runnable() {
@@ -61,6 +70,21 @@ public final class InputClient {
     public void close() {
         closed = true;
         executor.shutdownNow();
+    }
+
+    static String buildKeyJsonLine(String action, int keyCode) {
+        if (!("down".equals(action) || "up".equals(action))) {
+            throw new IllegalArgumentException("action must be down or up");
+        }
+        if (keyCode < 0 || keyCode > MAX_KEY_CODE) {
+            throw new IllegalArgumentException("keyCode out of range");
+        }
+
+        return "{\"type\":\"input\",\"kind\":\"keyboard\",\"action\":\""
+            + action
+            + "\",\"keyCode\":"
+            + keyCode
+            + "}\n";
     }
 
     private void sendLine(String line) {
