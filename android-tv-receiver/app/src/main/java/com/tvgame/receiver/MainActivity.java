@@ -13,7 +13,9 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
+    private static final long STOP_JOIN_MS = 400;
 
+    private final Object lifecycleLock = new Object();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final StatsModel stats = new StatsModel();
     private final Runnable updateOverlay = new Runnable() {
@@ -87,28 +89,59 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     private void startReceivers(Surface surface) {
-        if (videoThread != null && videoThread.isAlive()) {
-            return;
-        }
+        synchronized (lifecycleLock) {
+            if (hasRunningReceiverThreads()) {
+                return;
+            }
 
-        videoReceiver = new H264VideoReceiver(surface, stats);
-        audioReceiver = new L16AudioReceiver(stats);
-        videoThread = new Thread(videoReceiver, "RTP 视频接收");
-        audioThread = new Thread(audioReceiver, "RTP 音频接收");
-        videoThread.start();
-        audioThread.start();
+            videoReceiver = new H264VideoReceiver(surface, stats);
+            audioReceiver = new L16AudioReceiver(stats);
+            videoThread = new Thread(videoReceiver, "RTP 视频接收");
+            audioThread = new Thread(audioReceiver, "RTP 音频接收");
+            videoThread.start();
+            audioThread.start();
+        }
     }
 
     private void stopReceivers() {
-        if (videoReceiver != null) {
-            videoReceiver.stop();
+        synchronized (lifecycleLock) {
+            if (videoReceiver != null) {
+                videoReceiver.stop();
+            }
+            if (audioReceiver != null) {
+                audioReceiver.stop();
+            }
+
+            boolean videoStopped = waitForReceiverThread(videoThread);
+            boolean audioStopped = waitForReceiverThread(audioThread);
+
             videoReceiver = null;
-        }
-        if (audioReceiver != null) {
-            audioReceiver.stop();
             audioReceiver = null;
+            if (videoStopped) {
+                videoThread = null;
+            }
+            if (audioStopped) {
+                audioThread = null;
+            }
         }
-        videoThread = null;
-        audioThread = null;
+    }
+
+    private boolean hasRunningReceiverThreads() {
+        if (videoThread != null && videoThread.isAlive()) {
+            return true;
+        }
+        return audioThread != null && audioThread.isAlive();
+    }
+
+    private boolean waitForReceiverThread(Thread thread) {
+        if (thread == null) {
+            return true;
+        }
+        try {
+            thread.join(STOP_JOIN_MS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        return !thread.isAlive();
     }
 }

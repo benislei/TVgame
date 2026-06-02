@@ -7,9 +7,12 @@ import java.util.List;
 
 public final class H264RtpDepacketizer {
     private static final byte[] START_CODE = new byte[] { 0, 0, 0, 1 };
+    private static final int MAX_REASSEMBLED_NAL_SIZE = 2 * 1024 * 1024;
 
     private final ByteArrayOutputStream fragmentBuffer = new ByteArrayOutputStream(128 * 1024);
     private boolean fragmentStarted;
+    private int expectedSequenceNumber = -1;
+    private long fragmentTimestamp = -1;
 
     public List<byte[]> depacketize(RtpPacket packet) {
         if (packet == null || packet.payloadLength <= 0) {
@@ -19,23 +22,23 @@ public final class H264RtpDepacketizer {
         byte[] payload = packet.payload;
         int nalType = payload[0] & 0x1F;
         if (nalType >= 1 && nalType <= 23) {
-            fragmentBuffer.reset();
-            fragmentStarted = false;
+            resetFragment();
+            if (packet.payloadLength > MAX_REASSEMBLED_NAL_SIZE) {
+                return Collections.emptyList();
+            }
             return Collections.singletonList(withStartCode(payload, 0, packet.payloadLength));
         }
 
         if (nalType == 24) {
-            fragmentBuffer.reset();
-            fragmentStarted = false;
+            resetFragment();
             return unpackStapA(payload, packet.payloadLength);
         }
 
         if (nalType == 28) {
-            return unpackFuA(payload, packet.payloadLength);
+            return unpackFuA(packet, payload, packet.payloadLength);
         }
 
-        fragmentBuffer.reset();
-        fragmentStarted = false;
+        resetFragment();
         return Collections.emptyList();
     }
 
@@ -45,21 +48,26 @@ public final class H264RtpDepacketizer {
         while (offset + 2 <= payloadLength) {
             int nalLength = ((payload[offset] & 0xFF) << 8) | (payload[offset + 1] & 0xFF);
             offset += 2;
-            if (nalLength <= 0 || offset + nalLength > payloadLength) {
-                fragmentBuffer.reset();
-                fragmentStarted = false;
+            if (nalLength <= 0
+                || nalLength > MAX_REASSEMBLED_NAL_SIZE
+                || offset + nalLength > payloadLength) {
+                out.clear();
+                resetFragment();
                 break;
             }
             out.add(withStartCode(payload, offset, nalLength));
             offset += nalLength;
         }
+        if (offset != payloadLength) {
+            out.clear();
+            resetFragment();
+        }
         return out;
     }
 
-    private List<byte[]> unpackFuA(byte[] payload, int payloadLength) {
+    private List<byte[]> unpackFuA(RtpPacket packet, byte[] payload, int payloadLength) {
         if (payloadLength < 2) {
-            fragmentBuffer.reset();
-            fragmentStarted = false;
+            resetFragment();
             return Collections.emptyList();
         }
 
@@ -70,11 +78,26 @@ public final class H264RtpDepacketizer {
         int reconstructedHeader = (fuIndicator & 0xE0) | (fuHeader & 0x1F);
 
         if (startBit) {
-            fragmentBuffer.reset();
+            resetFragment();
             fragmentStarted = true;
+            fragmentTimestamp = packet.timestamp;
+            expectedSequenceNumber = nextSequenceNumber(packet.sequenceNumber);
             fragmentBuffer.write(START_CODE, 0, START_CODE.length);
             fragmentBuffer.write(reconstructedHeader);
-        } else if (!fragmentStarted) {
+        } else {
+            if (!fragmentStarted) {
+                return Collections.emptyList();
+            }
+            if (packet.timestamp != fragmentTimestamp
+                || packet.sequenceNumber != expectedSequenceNumber) {
+                resetFragment();
+                return Collections.emptyList();
+            }
+            expectedSequenceNumber = nextSequenceNumber(packet.sequenceNumber);
+        }
+
+        if (fragmentBuffer.size() + payloadLength - 2 > MAX_REASSEMBLED_NAL_SIZE) {
+            resetFragment();
             return Collections.emptyList();
         }
 
@@ -82,12 +105,22 @@ public final class H264RtpDepacketizer {
 
         if (endBit) {
             byte[] nal = fragmentBuffer.toByteArray();
-            fragmentBuffer.reset();
-            fragmentStarted = false;
+            resetFragment();
             return Collections.singletonList(nal);
         }
 
         return Collections.emptyList();
+    }
+
+    private static int nextSequenceNumber(int sequenceNumber) {
+        return (sequenceNumber + 1) & 0xFFFF;
+    }
+
+    private void resetFragment() {
+        fragmentBuffer.reset();
+        fragmentStarted = false;
+        expectedSequenceNumber = -1;
+        fragmentTimestamp = -1;
     }
 
     private static byte[] withStartCode(byte[] source, int offset, int length) {

@@ -69,11 +69,18 @@ test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
   const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
 
   assert.match(source, /public\s+static\s+RtpPacket\s+parse\(byte\[\]\s+buffer,\s*int\s+length\)/);
+  assert.match(source, /length\s*<\s*0\s*\|\|\s*length\s*>\s*buffer\.length/);
   assert.match(source, /version\s*!=\s*2/);
   assert.match(source, /IllegalArgumentException\("RTP/);
   assert.match(source, /csrcCount\s*\*\s*4/);
   assert.match(source, /12\s*\+\s*csrcCount\s*\*\s*4/);
-  assert.match(source, /Arrays\.copyOfRange\(buffer,\s*headerLength,\s*length\)/);
+  assert.match(source, /hasExtension/);
+  assert.match(source, /extensionWords/);
+  assert.match(source, /extensionBytes\s*=\s*extensionWords\s*\*\s*4/);
+  assert.match(source, /hasPadding/);
+  assert.match(source, /paddingLength/);
+  assert.match(source, /payloadEnd\s*-=\s*paddingLength/);
+  assert.match(source, /Arrays\.copyOfRange\(buffer,\s*payloadOffset,\s*payloadEnd\)/);
   assert.match(source, /payloadType/);
   assert.match(source, /sequenceNumber/);
   assert.match(source, /timestamp/);
@@ -84,13 +91,22 @@ test('H264 RTP depacketizer supports single NAL, STAP-A and FU-A safely', () => 
   const source = readProjectFile(`${javaRoot}/H264RtpDepacketizer.java`);
 
   assert.match(source, /START_CODE\s*=\s*new\s+byte\[\]\s*\{\s*0,\s*0,\s*0,\s*1\s*\}/);
+  assert.match(source, /MAX_REASSEMBLED_NAL_SIZE\s*=\s*2\s*\*\s*1024\s*\*\s*1024/);
   assert.match(source, /nalType\s*>=\s*1\s*&&\s*nalType\s*<=\s*23/);
   assert.match(source, /nalType\s*==\s*24/);
   assert.match(source, /nalType\s*==\s*28/);
   assert.match(source, /startBit/);
   assert.match(source, /endBit/);
+  assert.match(source, /expectedSequenceNumber/);
+  assert.match(source, /fragmentTimestamp/);
+  assert.match(source, /packet\.sequenceNumber/);
+  assert.match(source, /packet\.timestamp/);
+  assert.match(source, /nextSequenceNumber/);
   assert.match(source, /fragmentBuffer\.reset\(\)/);
   assert.match(source, /fragmentStarted/);
+  assert.match(source, /resetFragment\(\)/);
+  assert.match(source, /fragmentBuffer\.size\(\)\s*\+\s*payloadLength\s*-\s*2\s*>\s*MAX_REASSEMBLED_NAL_SIZE/);
+  assert.match(source, /out\.clear\(\)/);
 });
 
 test('video and audio receivers use required ports, codecs and stats', () => {
@@ -119,6 +135,7 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(audio, /stats\.lastAudioAtMs\s*=\s*System\.currentTimeMillis\(\)/);
   assert.match(audio, /littleEndian\[i\]\s*=\s*payload\[i\s*\+\s*1\]/);
   assert.match(audio, /littleEndian\[i\s*\+\s*1\]\s*=\s*payload\[i\]/);
+  assert.match(audio, /evenLength\s*=\s*payloadLength\s*&\s*~1/);
   assert.match(audio, /setSoTimeout\(/);
   assert.match(audio, /public\s+void\s+stop\(\)/);
   assert.match(audio, /socket\.close\(\)/);
@@ -133,7 +150,13 @@ test('MainActivity starts receivers once and stops them on surface or activity t
   assert.match(source, /void\s+surfaceCreated\(SurfaceHolder\s+holder\)/);
   assert.match(source, /void\s+surfaceDestroyed\(SurfaceHolder\s+holder\)/);
   assert.match(source, /startReceivers\(holder\.getSurface\(\)\)/);
+  assert.match(source, /lifecycleLock/);
+  assert.match(source, /synchronized\s*\(\s*lifecycleLock\s*\)/);
+  assert.match(source, /STOP_JOIN_MS/);
+  assert.match(source, /waitForReceiverThread/);
+  assert.match(source, /\.join\(STOP_JOIN_MS\)/);
   assert.match(source, /if\s*\(\s*videoThread\s*!=\s*null\s*&&\s*videoThread\.isAlive\(\)\s*\)/);
+  assert.match(source, /audioThread\s*!=\s*null\s*&&\s*audioThread\.isAlive\(\)/);
   assert.match(source, /stopReceivers\(\)/);
   assert.match(source, /videoReceiver\.stop\(\)/);
   assert.match(source, /audioReceiver\.stop\(\)/);

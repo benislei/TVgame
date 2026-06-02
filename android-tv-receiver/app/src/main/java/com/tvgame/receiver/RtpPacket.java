@@ -29,19 +29,53 @@ public final class RtpPacket {
         if (buffer == null) {
             throw new IllegalArgumentException("RTP 数据为空");
         }
+        if (length < 0 || length > buffer.length) {
+            throw new IllegalArgumentException("RTP 包长度越界");
+        }
         if (length < 12) {
             throw new IllegalArgumentException("RTP 包长度不足");
         }
 
+        boolean hasPadding = (buffer[0] & 0x20) != 0;
+        boolean hasExtension = (buffer[0] & 0x10) != 0;
         int version = (buffer[0] >> 6) & 0x03;
         if (version != 2) {
             throw new IllegalArgumentException("RTP 版本不正确");
         }
 
         int csrcCount = buffer[0] & 0x0F;
-        int headerLength = 12 + csrcCount * 4;
-        if (length < headerLength) {
+        int payloadOffset = 12 + csrcCount * 4;
+        if (length < payloadOffset) {
             throw new IllegalArgumentException("RTP CSRC 头长度不足");
+        }
+        if (hasExtension) {
+            if (length < payloadOffset + 4) {
+                throw new IllegalArgumentException("RTP 扩展头长度不足");
+            }
+            int extensionHeaderOffset = payloadOffset;
+            int extensionWords = ((buffer[extensionHeaderOffset + 2] & 0xFF) << 8)
+                | (buffer[extensionHeaderOffset + 3] & 0xFF);
+            int extensionBytes = extensionWords * 4;
+            payloadOffset += 4;
+            if (length < payloadOffset + extensionBytes) {
+                throw new IllegalArgumentException("RTP 扩展数据长度不足");
+            }
+            payloadOffset += extensionBytes;
+        }
+
+        int payloadEnd = length;
+        if (hasPadding) {
+            if (payloadEnd <= payloadOffset) {
+                throw new IllegalArgumentException("RTP 填充长度不足");
+            }
+            int paddingLength = buffer[payloadEnd - 1] & 0xFF;
+            if (paddingLength <= 0 || paddingLength > payloadEnd - payloadOffset) {
+                throw new IllegalArgumentException("RTP 填充长度不合法");
+            }
+            payloadEnd -= paddingLength;
+        }
+        if (payloadEnd < payloadOffset) {
+            throw new IllegalArgumentException("RTP 负载长度不合法");
         }
 
         boolean marker = (buffer[1] & 0x80) != 0;
@@ -51,7 +85,7 @@ public final class RtpPacket {
             | ((long) (buffer[5] & 0xFF) << 16)
             | ((long) (buffer[6] & 0xFF) << 8)
             | (long) (buffer[7] & 0xFF);
-        byte[] payload = Arrays.copyOfRange(buffer, headerLength, length);
+        byte[] payload = Arrays.copyOfRange(buffer, payloadOffset, payloadEnd);
 
         return new RtpPacket(payloadType, sequenceNumber, timestamp, marker, payload);
     }
