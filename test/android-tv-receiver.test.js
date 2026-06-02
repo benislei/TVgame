@@ -1,7 +1,9 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { execFileSync, spawnSync } = require('node:child_process');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -14,6 +16,12 @@ function readProjectFile(relativePath) {
 
 function assertFileExists(relativePath) {
   assert.equal(fs.existsSync(path.join(root, relativePath)), true, `${relativePath} should exist`);
+}
+
+function commandExists(command) {
+  const lookup = process.platform === 'win32' ? 'where.exe' : 'which';
+  const result = spawnSync(lookup, [command], { stdio: 'ignore' });
+  return result.status === 0;
 }
 
 test('Android TV receiver skeleton and RTP receiver files exist', () => {
@@ -103,6 +111,68 @@ test('InputClient validates key JSON before enqueue and keeps the UI path bounde
   assert.match(source, /catch\s*\(\s*RejectedExecutionException\s+\w+\s*\)/);
   assert.match(source, /new\s+ThreadPoolExecutor\(\s*1,\s*1,\s*0L,\s*TimeUnit\.MILLISECONDS/s);
   assert.match(source, /new\s+ArrayBlockingQueue<\s*Runnable\s*>\(INPUT_QUEUE_CAPACITY\)/);
+});
+
+test('InputClient.buildKeyJsonLine returns exact JSON lines and rejects invalid input', (t) => {
+  if (!commandExists('javac') || !commandExists('java')) {
+    t.skip('javac/java not available; keeping InputClient behavior covered by static checks in this environment');
+    return;
+  }
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tvgame-input-client-'));
+  const packageDir = path.join(tempRoot, 'com', 'tvgame', 'receiver');
+  const classDir = path.join(tempRoot, 'classes');
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.mkdirSync(classDir, { recursive: true });
+
+  const inputClientSource = path.join(root, `${javaRoot}/InputClient.java`);
+  const harnessSource = path.join(packageDir, 'InputClientHarness.java');
+  fs.writeFileSync(harnessSource, `
+package com.tvgame.receiver;
+
+public final class InputClientHarness {
+    public static void main(String[] args) {
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"down\\",\\"keyCode\\":66}\\n", InputClient.buildKeyJsonLine("down", 66));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"up\\",\\"keyCode\\":23}\\n", InputClient.buildKeyJsonLine("up", 23));
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                InputClient.buildKeyJsonLine("press", 1);
+            }
+        });
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                InputClient.buildKeyJsonLine("down", -1);
+            }
+        });
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                InputClient.buildKeyJsonLine("up", 10001);
+            }
+        });
+    }
+
+    private static void assertEquals(String expected, String actual) {
+        if (!expected.equals(actual)) {
+            throw new AssertionError("Expected [" + expected + "] but got [" + actual + "]");
+        }
+    }
+
+    private static void assertThrows(Runnable runnable) {
+        try {
+            runnable.run();
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+        throw new AssertionError("Expected IllegalArgumentException");
+    }
+}
+`, 'utf8');
+
+  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, inputClientSource, harnessSource], { stdio: 'pipe' });
+  execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.InputClientHarness'], { stdio: 'pipe' });
 });
 
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
