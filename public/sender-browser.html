@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LAN Browser Sender</title>
+  <title>电视游戏发送端</title>
   <style>
     html, body {
       margin: 0;
@@ -75,10 +75,12 @@
   <form id="controls">
     <input id="room" aria-label="room" autocomplete="off">
     <input id="signal" aria-label="signal url" autocomplete="off">
-    <label><input id="audio" type="checkbox"> audio</label>
-    <button type="submit">Start real screen</button>
-    <button id="stop" type="button">Stop</button>
+    <input id="inputBridge" aria-label="input bridge url" autocomplete="off">
+    <label><input id="audio" type="checkbox"> 音频</label>
+    <button type="submit">开始共享真实画面</button>
+    <button id="stop" type="button">停止</button>
     <span id="status">idle</span>
+    <span id="inputStatus">输入桥：未连接</span>
   </form>
   <video id="preview" autoplay muted playsinline></video>
 
@@ -86,23 +88,32 @@
     const params = new URLSearchParams(location.search);
     const roomInput = document.querySelector('#room');
     const signalInput = document.querySelector('#signal');
+    const inputBridgeInput = document.querySelector('#inputBridge');
     const audioInput = document.querySelector('#audio');
     const statusEl = document.querySelector('#status');
+    const inputStatusEl = document.querySelector('#inputStatus');
     const preview = document.querySelector('#preview');
     const form = document.querySelector('#controls');
     const stopButton = document.querySelector('#stop');
 
     roomInput.value = params.get('room') || 'game';
     signalInput.value = params.get('signal') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+    inputBridgeInput.value = params.get('inputBridge') || 'ws://127.0.0.1:8788/input';
     audioInput.checked = params.get('audio') === '1';
 
     let ws;
     let pc;
     let localStream;
     let inputChannel;
+    let inputBridge;
+    let inputBridgeRetryTimer;
 
     function setStatus(text) {
       statusEl.textContent = text;
+    }
+
+    function setInputStatus(text) {
+      inputStatusEl.textContent = `输入桥：${text}`;
     }
 
     function sendSignal(payload) {
@@ -127,7 +138,33 @@
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       sendSignal({ type: 'offer', description: pc.localDescription });
-      setStatus('offer sent');
+      setStatus('已发送协商');
+    }
+
+    function connectInputBridge() {
+      clearTimeout(inputBridgeRetryTimer);
+      inputBridge?.close();
+      inputBridge = null;
+
+      const url = inputBridgeInput.value.trim();
+      if (!url) {
+        setInputStatus('未配置');
+        return;
+      }
+
+      inputBridge = new WebSocket(url);
+      inputBridge.onopen = () => setInputStatus('已连接');
+      inputBridge.onclose = () => {
+        setInputStatus('断开，正在重连');
+        inputBridgeRetryTimer = setTimeout(connectInputBridge, 1500);
+      };
+      inputBridge.onerror = () => setInputStatus('连接失败');
+    }
+
+    function sendToInputBridge(input) {
+      if (inputBridge && inputBridge.readyState === WebSocket.OPEN) {
+        inputBridge.send(JSON.stringify(input));
+      }
     }
 
     function handleInput(message) {
@@ -142,9 +179,12 @@
           }));
           return;
         }
-        console.log('input from receiver', input);
+        sendToInputBridge(input);
+        if (input.kind === 'gamepad') {
+          console.log('收到手柄输入', input);
+        }
       } catch {
-        console.log('input from receiver', message.data);
+        console.log('收到输入消息', message.data);
       }
     }
 
@@ -154,7 +194,7 @@
       const signalUrl = signalInput.value.trim();
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        throw new Error('Screen capture requires localhost, HTTPS, or a browser that supports getDisplayMedia.');
+        throw new Error('屏幕捕获需要 localhost、HTTPS 或支持 getDisplayMedia 的浏览器。');
       }
 
       localStream = await navigator.mediaDevices.getDisplayMedia({
@@ -175,7 +215,7 @@
       pc.onconnectionstatechange = () => setStatus(pc.connectionState);
 
       inputChannel = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
-      inputChannel.onopen = () => setStatus('input channel open');
+      inputChannel.onopen = () => setStatus('输入通道已打开');
       inputChannel.onmessage = handleInput;
 
       for (const track of localStream.getTracks()) {
@@ -193,25 +233,30 @@
         if (message.type === 'answer') {
           if (pc.signalingState !== 'have-local-offer') return;
           await pc.setRemoteDescription(message.description || message.sdp);
-          setStatus('answer applied');
+          setStatus('已连接接收端');
         } else if (message.type === 'candidate' && message.candidate) {
           await pc.addIceCandidate(message.candidate).catch(console.warn);
         }
       };
-      ws.onclose = () => setStatus('signal closed');
+      ws.onclose = () => setStatus('信令已断开');
+      connectInputBridge();
     }
 
     function stop() {
       inputChannel?.close();
       pc?.close();
       ws?.close();
+      clearTimeout(inputBridgeRetryTimer);
+      inputBridge?.close();
       for (const track of localStream?.getTracks?.() || []) track.stop();
       inputChannel = null;
       pc = null;
       ws = null;
+      inputBridge = null;
       localStream = null;
       preview.srcObject = null;
       setStatus('idle');
+      setInputStatus('未连接');
     }
 
     form.addEventListener('submit', event => {

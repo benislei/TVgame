@@ -75,9 +75,23 @@ static string? FindOnPath(string executable)
 
 static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
-static string NpmCmd()
+static string NpmCmd() => FindOnPath("npm.cmd") ?? @"C:\Program Files\nodejs\npm.cmd";
+
+static string DotnetCmd() => FindOnPath("dotnet.exe") ?? "dotnet";
+
+static int RunAndWait(string fileName, string arguments, string workingDirectory)
 {
-    return FindOnPath("npm.cmd") ?? @"C:\Program Files\nodejs\npm.cmd";
+    var process = Process.Start(new ProcessStartInfo
+    {
+        FileName = fileName,
+        Arguments = arguments,
+        WorkingDirectory = workingDirectory,
+        UseShellExecute = false
+    });
+
+    if (process == null) return 1;
+    process.WaitForExit();
+    return process.ExitCode;
 }
 
 static int RunAndWaitNpm(string arguments, string workingDirectory)
@@ -89,17 +103,7 @@ static int RunAndWaitNpm(string arguments, string workingDirectory)
         return 1;
     }
 
-    var process = Process.Start(new ProcessStartInfo
-    {
-        FileName = "cmd.exe",
-        Arguments = $"/d /s /c \"{Quote(npm)} {arguments}\"",
-        WorkingDirectory = workingDirectory,
-        UseShellExecute = false
-    });
-
-    if (process == null) return 1;
-    process.WaitForExit();
-    return process.ExitCode;
+    return RunAndWait("cmd.exe", $"/d /s /c \"{Quote(npm)} {arguments}\"", workingDirectory);
 }
 
 static void StartCommandWindow(string title, string command, string workingDirectory)
@@ -119,22 +123,27 @@ static void StartCommandWindow(string title, string command, string workingDirec
 
 static bool HasNodeModules(string root) => Directory.Exists(Path.Combine(root, "node_modules"));
 
+static void OpenUrl(string url)
+{
+    Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+}
+
 static void PrintHeader(string root, string? lanIp)
 {
-    if (!Console.IsOutputRedirected)
-    {
-        Console.Clear();
-    }
+    if (!Console.IsOutputRedirected) Console.Clear();
 
-    Console.WriteLine("LAN Game Streaming Quick Verify");
-    Console.WriteLine("================================");
-    Console.WriteLine($"Project: {root}");
-    Console.WriteLine($"LAN IP : {lanIp ?? "未找到，请手动用 ipconfig 查看"}");
+    Console.WriteLine("电视游戏串流快速验证");
+    Console.WriteLine("====================");
+    Console.WriteLine($"项目目录：{root}");
+    Console.WriteLine($"局域网 IP：{lanIp ?? "未找到，请手动用 ipconfig 查看"}");
     Console.WriteLine();
-    Console.WriteLine("电视浏览器访问：");
+    Console.WriteLine("电视接收端地址：");
     Console.WriteLine(lanIp == null
         ? "  http://<电脑局域网IP>:8080/receiver.html?room=game"
         : $"  http://{lanIp}:8080/receiver.html?room=game");
+    Console.WriteLine();
+    Console.WriteLine("电脑发送端地址：");
+    Console.WriteLine("  http://127.0.0.1:8080/sender-browser.html?room=game");
     Console.WriteLine();
 }
 
@@ -147,9 +156,11 @@ while (true)
     Console.WriteLine("请选择：");
     Console.WriteLine("  1. 安装/更新 npm 依赖");
     Console.WriteLine("  2. 启动信令服务器");
-    Console.WriteLine("  3. 启动发送端测试画面");
-    Console.WriteLine("  4. 一键启动：安装依赖 + 信令 + 发送端");
-    Console.WriteLine("  5. 打开本机接收页用于测试");
+    Console.WriteLine("  3. 启动输入桥（让电视端键鼠控制电脑）");
+    Console.WriteLine("  4. 打开电脑发送端页面（真实屏幕共享）");
+    Console.WriteLine("  5. 打开本机接收端页面");
+    Console.WriteLine("  6. 启动 Node 测试画面发送端");
+    Console.WriteLine("  7. 一键启动：安装依赖 + 信令 + 输入桥 + 发送端页面");
     Console.WriteLine("  0. 退出");
     Console.WriteLine();
     Console.Write("> ");
@@ -159,7 +170,7 @@ while (true)
 
     if (choice == "0") break;
 
-    if (choice is "1" or "4")
+    if (choice is "1" or "7")
     {
         Console.WriteLine("正在运行 npm.cmd install ...");
         var exit = RunAndWaitNpm("install", root);
@@ -178,13 +189,31 @@ while (true)
         }
     }
 
-    if (choice is "2" or "4")
+    if (choice is "2" or "7")
     {
-        StartCommandWindow("LAN Stream Signaling", $"{Quote(NpmCmd())} run signal", root);
+        StartCommandWindow("电视游戏信令服务器", $"{Quote(NpmCmd())} run signal", root);
         Console.WriteLine("已打开信令服务器窗口。");
     }
 
-    if (choice is "3" or "4")
+    if (choice is "3" or "7")
+    {
+        StartCommandWindow("电视游戏输入桥", $"{Quote(DotnetCmd())} run --project InputBridge/InputBridge.csproj", root);
+        Console.WriteLine("已打开输入桥窗口。");
+    }
+
+    if (choice is "4" or "7")
+    {
+        OpenUrl("http://127.0.0.1:8080/sender-browser.html?room=game");
+        Console.WriteLine("已打开电脑发送端页面。");
+    }
+
+    if (choice == "5")
+    {
+        OpenUrl("http://127.0.0.1:8080/receiver.html?room=game");
+        Console.WriteLine("已打开本机接收端页面。");
+    }
+
+    if (choice == "6")
     {
         if (!HasNodeModules(root))
         {
@@ -193,21 +222,14 @@ while (true)
         else
         {
             StartCommandWindow(
-                "LAN Stream Sender",
+                "电视游戏测试画面发送端",
                 $"set SIGNAL=ws://127.0.0.1:8080&& set ROOM=game&& {Quote(NpmCmd())} run sender",
                 root);
-            Console.WriteLine("已打开发送端窗口。");
+            Console.WriteLine("已打开 Node 测试画面发送端窗口。");
         }
     }
 
-    if (choice == "5")
-    {
-        var url = "http://127.0.0.1:8080/receiver.html?room=game";
-        Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        Console.WriteLine($"已打开：{url}");
-    }
-
-    if (choice is not ("1" or "2" or "3" or "4" or "5"))
+    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7"))
     {
         Console.WriteLine("无效选择。");
     }
