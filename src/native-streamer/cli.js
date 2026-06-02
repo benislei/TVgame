@@ -12,6 +12,7 @@ const {
   buildPipelineDescription,
   listProfiles
 } = require('./pipeline');
+const { createStage2Report } = require('../stage2/tooling');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -60,6 +61,28 @@ function printReport(report) {
     for (const item of report.missing.pythonModules) console.log(`  - ${item}`);
     console.log('');
     console.log('可运行：npm run native:install');
+  }
+}
+
+function printStage2Report(report) {
+  console.log('阶段 2 发送端环境检测');
+  console.log('====================');
+  console.log(`GStreamer：${report.gstreamer.ready ? '通过' : '未就绪'}`);
+  console.log(`gst-launch-1.0：${report.gstreamer.gstLaunch || '未找到'}`);
+  console.log(`gst-inspect-1.0：${report.gstreamer.gstInspect || '未找到'}`);
+  console.log(`dotnet：${report.dotnet.ready ? report.dotnet.path : '未找到'}`);
+  console.log('');
+  console.log('插件：');
+  for (const [name, found] of Object.entries(report.plugins)) {
+    console.log(`  ${found ? '通过' : '缺失'} ${name}`);
+  }
+  console.log('');
+  console.log(report.ready ? '结果：阶段 2 RTP 发送端环境已就绪。' : '结果：阶段 2 RTP 发送端环境未就绪。');
+  if (!report.ready) {
+    console.log('');
+    console.log('缺失项：');
+    for (const item of report.missing.executables) console.log(`  - ${item}`);
+    for (const item of report.missing.plugins) console.log(`  - ${item}`);
   }
 }
 
@@ -153,6 +176,11 @@ function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'stage2-check') {
+    printStage2Report(createStage2Report());
+    return;
+  }
+
   if (command === 'install') {
     runInstallScript();
     return;
@@ -179,7 +207,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   console.error(`未知命令：${command}`);
-  console.error('可用命令：check, install, pipeline, profiles, urls, run');
+  console.error('可用命令：check, stage2-check, install, pipeline, profiles, urls, run');
   process.exitCode = 1;
 }
 
@@ -187,4 +215,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, main };
+module.exports = { parseArgs, main, printReport, printStage2Report };

@@ -16,9 +16,9 @@ const REQUIRED_PLUGINS = [
 
 function createStage2Report(options = {}) {
   const find = options.findExecutable || findExecutable;
-  const inspect = options.inspectPlugin || inspectPlugin;
   const gstLaunch = find('gst-launch-1.0');
   const gstInspect = find('gst-inspect-1.0');
+  const inspect = options.inspectPlugin || (plugin => inspectPlugin(plugin, gstInspect));
   const dotnet = find('dotnet');
   const plugins = Object.fromEntries(REQUIRED_PLUGINS.map(name => [name, inspect(name)]));
   const missingPlugins = REQUIRED_PLUGINS.filter(name => !plugins[name]);
