@@ -29,7 +29,7 @@ function buildVideoRtpPipeline(config) {
     '!',
     `video/x-raw(memory:D3D11Memory),format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
     '!',
-    `nvh264enc preset=low-latency-hq rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zero-reorder-delay=true`,
+    `nvh264enc preset=low-latency-hq rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
     '!',
     'h264parse config-interval=1',
     '!',

@@ -13,7 +13,6 @@
     "native:pipeline": "node src/native-streamer/cli.js pipeline",
     "native:profiles": "node src/native-streamer/cli.js profiles",
     "native:run": "node src/native-streamer/cli.js run",
-    "native:rtp": "node src/native-streamer/cli.js rtp",
     "stage2:check": "node src/native-streamer/cli.js stage2-check",
     "test": "node --test"
   },

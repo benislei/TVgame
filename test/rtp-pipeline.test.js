@@ -18,6 +18,8 @@ test('builds 1080p60 H264 RTP video pipeline for Android TV', () => {
   assert.match(pipeline, /nvh264enc/);
   assert.match(pipeline, /bframes=0/);
   assert.match(pipeline, /bitrate=25000/);
+  assert.match(pipeline, /zerolatency=true/);
+  assert.doesNotMatch(pipeline, /zero-reorder-delay/);
   assert.match(pipeline, /rtph264pay pt=96 config-interval=1/);
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false/);
 });
