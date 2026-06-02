@@ -14,6 +14,7 @@
 - 接收端：小米/海信/TCL 等 Android TV 原生 App
 - 输入：先支持键盘和鼠标，随后接入标准手柄映射
 - 指标：接收端实时显示 FPS、码率、RTT、解码耗时、丢帧、音频状态
+- 安装：发送端依赖必须开始收敛到一键检测/安装，避免用户手动配置复杂运行环境
 
 ## 非目标
 
@@ -21,6 +22,7 @@
 - 第一版不做跨公网串流，只服务同一局域网。
 - 第一版不做复杂账号、鉴权、云中继或多用户房间。
 - 第一版不把电视浏览器作为最终接收端。
+- 第一版不要求把所有底层依赖完全消灭，但用户侧不能依赖手动阅读文档逐项安装。
 
 ## 推荐架构
 
@@ -124,15 +126,42 @@ Android TV 接收端需要持续显示：
 
 这些指标用于判断每一轮优化是否真的改善游戏手感。
 
-## 自动化依赖
+## 发送端安装器与依赖收敛
 
-PC 端安装器需要检测并自动安装或提示：
+阶段 2 必须开始解决“发送端依赖复杂、普通用户装不起来”的问题。原型期可以继续使用 Node、.NET、GStreamer 等工具链，但用户侧应逐步收敛成一个 Host 安装器。
+
+推荐交付形态：
+
+```text
+TVGame-Host-Setup.exe
+```
+
+安装器需要检测并自动安装或提示：
 
 - Node.js
 - .NET 8 Runtime/SDK
 - GStreamer 1.24.13 MSVC x86_64 runtime/devel，优先支持安装到 C 或 D 盘
 - NVIDIA 驱动和 NVENC 可用性
+- VC++ Runtime
 - Android 调试环境：ADB，可选
+- Windows 防火墙放行规则
+- 输入桥运行权限
+
+阶段 2 的依赖收敛分两步：
+
+1. MVP 阶段：保留现有原型组件，但提供统一检测、下载、安装、环境变量配置和诊断日志。用户只运行一个安装入口。
+2. 后续产品化：把 PC 发送端收敛成 `TVGame Host.exe`，减少 Node、Python、GStreamer 等外部依赖在用户环境中的存在感。
+
+长期推荐架构：
+
+```text
+TVGame Host.exe
+  C# 管理外壳 / 托盘 / 设置 UI
+  Rust 或 C++ native core 负责捕获、编码、音频、网络
+  InputBridge 能力内置或作为随 Host 安装的本地服务
+```
+
+GStreamer 仍可用于阶段 2 验证和过渡，但不应成为最终用户必须手动安装的长期依赖。
 
 Android TV 端第一版可以提供 APK，让用户通过 U 盘或 ADB 安装。后续再做更友好的安装器。
 
@@ -147,6 +176,7 @@ Android TV 端第一版可以提供 APK，让用户通过 U 盘或 ADB 安装。
 5. 电视端键鼠输入能控制 PC。
 6. 接收端显示实时 FPS、RTT、解码耗时、丢帧和音频状态。
 7. 体感明显优于当前浏览器方案。
+8. 发送端提供统一依赖检测/安装入口，能明确报告缺失项和修复方式。
 
 ## 风险
 
@@ -154,13 +184,16 @@ Android TV 端第一版可以提供 APK，让用户通过 U 盘或 ADB 安装。
 - Opus 在 Android 端的低延迟接入可能比 AAC-LC 更复杂。
 - GStreamer Python 绑定在 Windows 上安装链路复杂，PC 发送端不应继续强依赖 Python GI。
 - 完整手柄注入需要虚拟手柄驱动，安装和权限处理要单独设计。
+- 如果发送端继续暴露过多开发期依赖，项目会难以被普通用户安装和复现。
 
 ## 推荐实施顺序
 
 1. 建立 Android TV App 工程骨架，中文界面，能显示连接状态和性能面板。
-2. PC 原生发送端改为不依赖 Python GI 的实现路线。
-3. 跑通 1080p60 H.264 视频到 Android MediaCodec。
-4. 加入 WASAPI 系统声音采集和 Android AudioTrack 播放。
-5. 接入键鼠输入回传和 InputBridge。
-6. 加入码率档位、GOP 档位、音视频缓冲配置。
-7. 做手柄映射和 ViGEm 注入。
+2. 建立发送端统一依赖检测/安装入口，覆盖 GStreamer、.NET、NVENC、VC++ Runtime、PATH 和防火墙。
+3. PC 原生发送端改为不依赖 Python GI 的实现路线。
+4. 跑通 1080p60 H.264 视频到 Android MediaCodec。
+5. 加入 WASAPI 系统声音采集和 Android AudioTrack 播放。
+6. 接入键鼠输入回传和 InputBridge。
+7. 加入码率档位、GOP 档位、音视频缓冲配置。
+8. 做手柄映射和 ViGEm 注入。
+9. 把发送端入口收敛为 `TVGame Host.exe` 或 `TVGame-Host-Setup.exe` 的第一版可验证形态。
