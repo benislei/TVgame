@@ -12,6 +12,7 @@ const {
   buildPipelineConfig,
   buildPipelineDescription
 } = require('../src/native-streamer/pipeline');
+const { parseArgs } = require('../src/native-streamer/cli');
 
 test('GStreamer download URLs point at official 64-bit MSVC installers', () => {
   const urls = buildGStreamerDownloadUrls();
@@ -112,4 +113,13 @@ test('pipeline description includes D3D11 capture, NVENC, RTP, and webrtcbin', (
   assert.match(description, /h264parse/);
   assert.match(description, /rtph264pay/);
   assert.match(description, /webrtcbin/);
+});
+
+test('parseArgs accepts Android TV RTP target options', () => {
+  const args = parseArgs(['rtp', '--host', '192.168.1.50', '--video-port', '5004', '--audio-port', '5006']);
+
+  assert.deepEqual(args._, ['rtp']);
+  assert.equal(args.host, '192.168.1.50');
+  assert.equal(args['video-port'], '5004');
+  assert.equal(args['audio-port'], '5006');
 });

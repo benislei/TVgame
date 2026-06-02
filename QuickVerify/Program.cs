@@ -164,6 +164,8 @@ while (true)
     Console.WriteLine("  8. 检测原生串流环境（GStreamer / NVENC）");
     Console.WriteLine("  9. 安装 GStreamer 原生串流依赖");
     Console.WriteLine(" 10. 启动原生 NVENC 发送端（1080p60）");
+    Console.WriteLine(" 11. 检测阶段 2 原生发送端环境");
+    Console.WriteLine(" 12. 启动阶段 2 RTP 发送端（需要填写电视 IP）");
     Console.WriteLine("  0. 退出");
     Console.WriteLine();
     Console.Write("> ");
@@ -260,7 +262,31 @@ while (true)
         }
     }
 
-    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10"))
+    if (choice == "11")
+    {
+        StartCommandWindow("阶段 2 环境检测", $"{Quote(NpmCmd())} run stage2:check", root);
+        Console.WriteLine("已打开阶段 2 环境检测窗口。");
+    }
+
+    if (choice == "12")
+    {
+        Console.Write("请输入 Android TV IP：");
+        var tvIp = Console.ReadLine()?.Trim();
+        if (string.IsNullOrWhiteSpace(tvIp))
+        {
+            Console.WriteLine("电视 IP 不能为空。");
+        }
+        else
+        {
+            StartCommandWindow(
+                "阶段 2 RTP 发送端",
+                $"{Quote(NpmCmd())} run native:rtp -- --host {tvIp}",
+                root);
+            Console.WriteLine("已打开阶段 2 RTP 发送端窗口。");
+        }
+    }
+
+    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10" or "11" or "12"))
     {
         Console.WriteLine("无效选择。");
     }

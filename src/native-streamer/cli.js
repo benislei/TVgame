@@ -13,6 +13,7 @@ const {
   listProfiles
 } = require('./pipeline');
 const { createStage2Report } = require('../stage2/tooling');
+const { buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -83,6 +84,55 @@ function printStage2Report(report) {
     console.log('缺失项：');
     for (const item of report.missing.executables) console.log(`  - ${item}`);
     for (const item of report.missing.plugins) console.log(`  - ${item}`);
+  }
+}
+
+function printRtpHelp() {
+  console.log('阶段 2 RTP 发送端');
+  console.log('================');
+  console.log('用法：node src/native-streamer/cli.js rtp --host <Android TV IP> [选项]');
+  console.log('');
+  console.log('选项：');
+  console.log('  --host <IP>           Android TV IP，默认 127.0.0.1');
+  console.log('  --video-port <端口>   视频 RTP UDP 端口，默认 5004');
+  console.log('  --audio-port <端口>   音频 RTP UDP 端口，默认 5006');
+  console.log('  --bitrate <kbps>      H.264 码率，默认 25000');
+  console.log('  --display <索引>      Windows 显示器索引，默认 0');
+}
+
+function runRtpSender(args) {
+  if (args.help) {
+    printRtpHelp();
+    return;
+  }
+
+  const report = createStage2Report();
+  if (!report.ready) {
+    printStage2Report(report);
+    process.exitCode = 1;
+    return;
+  }
+
+  const config = buildRtpConfig({
+    host: args.host,
+    videoPort: args['video-port'],
+    audioPort: args['audio-port'],
+    bitrateKbps: args.bitrate,
+    displayIndex: args.display
+  });
+  const commands = buildRtpLaunchCommands(config);
+  const children = commands.map(command => {
+    console.log(`启动：${command.title}`);
+    return childProcess.spawn(command.executable, command.args, {
+      stdio: 'inherit',
+      windowsHide: false
+    });
+  });
+
+  for (const child of children) {
+    child.on('exit', code => {
+      if (code && process.exitCode !== 1) process.exitCode = code;
+    });
   }
 }
 
@@ -181,6 +231,11 @@ function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'rtp') {
+    runRtpSender(args);
+    return;
+  }
+
   if (command === 'install') {
     runInstallScript();
     return;
@@ -207,7 +262,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   console.error(`未知命令：${command}`);
-  console.error('可用命令：check, stage2-check, install, pipeline, profiles, urls, run');
+  console.error('可用命令：check, stage2-check, install, pipeline, profiles, urls, run, rtp');
   process.exitCode = 1;
 }
 
@@ -215,4 +270,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, main, printReport, printStage2Report };
+module.exports = { parseArgs, main, printReport, printStage2Report, printRtpHelp, runRtpSender };
