@@ -1,0 +1,22 @@
+{
+  "name": "lan-game-streaming-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Low-latency LAN game streaming prototype using WebRTC, WebSocket signaling, and a DXGI capture module skeleton.",
+  "scripts": {
+    "signal": "node src/signaling-server.js",
+    "sender": "node src/sender.js",
+    "capture:preview": "node src/capture/preview-server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.17.1"
+  },
+  "optionalDependencies": {
+    "@roamhq/wrtc": "^0.10.0",
+    "wrtc": "^0.4.7",
+    "naudiodon": "^2.4.2"
+  },
+  "devDependencies": {}
+}

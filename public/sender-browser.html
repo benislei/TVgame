@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAN Browser Sender</title>
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #0b0d10;
+      color: #f4f6f8;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      background: #151a20;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+    }
+    input, button, label {
+      height: 34px;
+      box-sizing: border-box;
+      font: inherit;
+    }
+    input {
+      width: 220px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: #0f141a;
+      color: #f4f6f8;
+      padding: 0 10px;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: #1d6ee8;
+      color: #fff;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #c7d1dc;
+    }
+    #status {
+      min-width: 160px;
+      color: #c7d1dc;
+      font-size: 13px;
+    }
+    video {
+      width: 100%;
+      height: calc(100vh - 96px);
+      object-fit: contain;
+      background: #000;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+  </style>
+</head>
+<body>
+  <form id="controls">
+    <input id="room" aria-label="room" autocomplete="off">
+    <input id="signal" aria-label="signal url" autocomplete="off">
+    <label><input id="audio" type="checkbox"> audio</label>
+    <button type="submit">Start real screen</button>
+    <button id="stop" type="button">Stop</button>
+    <span id="status">idle</span>
+  </form>
+  <video id="preview" autoplay muted playsinline></video>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const roomInput = document.querySelector('#room');
+    const signalInput = document.querySelector('#signal');
+    const audioInput = document.querySelector('#audio');
+    const statusEl = document.querySelector('#status');
+    const preview = document.querySelector('#preview');
+    const form = document.querySelector('#controls');
+    const stopButton = document.querySelector('#stop');
+
+    roomInput.value = params.get('room') || 'game';
+    signalInput.value = params.get('signal') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+    audioInput.checked = params.get('audio') === '1';
+
+    let ws;
+    let pc;
+    let localStream;
+    let inputChannel;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function sendSignal(payload) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+      }
+    }
+
+    async function setPreferredParameters() {
+      for (const sender of pc.getSenders()) {
+        if (!sender.track || sender.track.kind !== 'video') continue;
+        const params = sender.getParameters();
+        params.encodings = params.encodings && params.encodings.length ? params.encodings : [{}];
+        params.encodings[0].maxBitrate = 20_000_000;
+        params.encodings[0].maxFramerate = 60;
+        params.degradationPreference = 'maintain-framerate';
+        await sender.setParameters(params).catch(error => console.warn('setParameters', error));
+      }
+    }
+
+    async function createOffer() {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendSignal({ type: 'offer', description: pc.localDescription });
+      setStatus('offer sent');
+    }
+
+    function handleInput(message) {
+      try {
+        const input = JSON.parse(message.data);
+        if (input.type === 'latency-ping' && inputChannel?.readyState === 'open') {
+          inputChannel.send(JSON.stringify({
+            type: 'latency-pong',
+            id: input.id,
+            sentAt: input.sentAt,
+            senderAt: performance.now()
+          }));
+          return;
+        }
+        console.log('input from receiver', input);
+      } catch {
+        console.log('input from receiver', message.data);
+      }
+    }
+
+    async function start() {
+      stop();
+      const room = roomInput.value.trim() || 'game';
+      const signalUrl = signalInput.value.trim();
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        throw new Error('Screen capture requires localhost, HTTPS, or a browser that supports getDisplayMedia.');
+      }
+
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: 60, max: 60 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: audioInput.checked
+      });
+      preview.srcObject = localStream;
+      localStream.getVideoTracks()[0].addEventListener('ended', stop);
+
+      pc = new RTCPeerConnection({ iceServers: [] });
+      pc.onicecandidate = event => {
+        if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate });
+      };
+      pc.onconnectionstatechange = () => setStatus(pc.connectionState);
+
+      inputChannel = pc.createDataChannel('input', { ordered: false, maxRetransmits: 0 });
+      inputChannel.onopen = () => setStatus('input channel open');
+      inputChannel.onmessage = handleInput;
+
+      for (const track of localStream.getTracks()) {
+        pc.addTrack(track, localStream);
+      }
+      await setPreferredParameters();
+
+      ws = new WebSocket(signalUrl);
+      ws.onopen = () => {
+        sendSignal({ type: 'join', room, role: 'browser-sender' });
+        createOffer().catch(error => setStatus(error.message));
+      };
+      ws.onmessage = async event => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'answer') {
+          if (pc.signalingState !== 'have-local-offer') return;
+          await pc.setRemoteDescription(message.description || message.sdp);
+          setStatus('answer applied');
+        } else if (message.type === 'candidate' && message.candidate) {
+          await pc.addIceCandidate(message.candidate).catch(console.warn);
+        }
+      };
+      ws.onclose = () => setStatus('signal closed');
+    }
+
+    function stop() {
+      inputChannel?.close();
+      pc?.close();
+      ws?.close();
+      for (const track of localStream?.getTracks?.() || []) track.stop();
+      inputChannel = null;
+      pc = null;
+      ws = null;
+      localStream = null;
+      preview.srcObject = null;
+      setStatus('idle');
+    }
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      start().catch(error => setStatus(error.message));
+    });
+    stopButton.addEventListener('click', stop);
+  </script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAN Game Receiver</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #050607;
+      color: #f5f7fa;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    #remoteVideo {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      background: #000;
+      display: block;
+    }
+    #panel {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      background: rgba(5, 6, 7, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+    }
+    input, button {
+      height: 34px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: #11161c;
+      color: #f5f7fa;
+      padding: 0 10px;
+      font: inherit;
+    }
+    button {
+      cursor: pointer;
+      background: #1d6ee8;
+      border-color: #1d6ee8;
+    }
+    #status {
+      min-width: 120px;
+      font-size: 13px;
+      color: #b6c2d1;
+    }
+    #metrics {
+      position: fixed;
+      right: 16px;
+      top: 16px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(74px, auto));
+      gap: 6px;
+      padding: 8px;
+      background: rgba(5, 6, 7, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      color: #dbe5ef;
+    }
+    .metric {
+      display: grid;
+      gap: 2px;
+      min-width: 74px;
+    }
+    .metric span:first-child {
+      color: #8292a6;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0;
+    }
+    .metric span:last-child {
+      font-variant-numeric: tabular-nums;
+      color: #f7fafc;
+    }
+  </style>
+</head>
+<body>
+  <video id="remoteVideo" autoplay playsinline muted></video>
+  <form id="panel">
+    <input id="room" name="room" aria-label="room" placeholder="room" autocomplete="off">
+    <input id="signal" name="signal" aria-label="signal" placeholder="ws://PC:8080" autocomplete="off">
+    <button type="submit">连接</button>
+    <span id="status">idle</span>
+  </form>
+  <div id="metrics" aria-live="polite">
+    <div class="metric"><span>rtt</span><span id="metricRtt">--</span></div>
+    <div class="metric"><span>fps</span><span id="metricFps">--</span></div>
+    <div class="metric"><span>buffer</span><span id="metricBuffer">--</span></div>
+    <div class="metric"><span>jitter</span><span id="metricJitter">--</span></div>
+    <div class="metric"><span>decode</span><span id="metricDecode">--</span></div>
+    <div class="metric"><span>lost</span><span id="metricLost">--</span></div>
+  </div>
+
+  <script src="/receiver-utils.js?v=2"></script>
+  <script>
+    const {
+      normalizeGamepad,
+      stableGamepadSignature,
+      createLatencyState,
+      makeLatencyPing,
+      applyLatencyPong,
+      formatMs,
+      formatNumber
+    } = ReceiverUtils;
+
+    const params = new URLSearchParams(location.search);
+    const roomInput = document.querySelector('#room');
+    const signalInput = document.querySelector('#signal');
+    const panel = document.querySelector('#panel');
+    const statusEl = document.querySelector('#status');
+    const video = document.querySelector('#remoteVideo');
+    const metrics = {
+      rtt: document.querySelector('#metricRtt'),
+      fps: document.querySelector('#metricFps'),
+      buffer: document.querySelector('#metricBuffer'),
+      jitter: document.querySelector('#metricJitter'),
+      decode: document.querySelector('#metricDecode'),
+      lost: document.querySelector('#metricLost')
+    };
+
+    roomInput.value = params.get('room') || 'game';
+    signalInput.value = params.get('signal') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+
+    let pc;
+    let ws;
+    let controlChannel;
+    let gamepadTimer;
+    let latencyTimer;
+    let statsTimer;
+    let latencyState = createLatencyState();
+    const lastGamepadSignature = new Map();
+    let lastInboundStats = null;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function sendSignal(payload) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+      }
+    }
+
+    function sendControl(payload) {
+      const message = JSON.stringify({ type: 'input', t: performance.now(), ...payload });
+      if (controlChannel && controlChannel.readyState === 'open') {
+        controlChannel.send(message);
+      } else {
+        sendSignal({ type: 'control', payload: JSON.parse(message) });
+      }
+    }
+
+    function updateLatencyMetrics() {
+      metrics.rtt.textContent = formatMs(latencyState.lastRttMs);
+    }
+
+    function startLatencyProbe() {
+      clearInterval(latencyTimer);
+      latencyState = createLatencyState();
+      latencyTimer = setInterval(() => {
+        if (!controlChannel || controlChannel.readyState !== 'open') return;
+        controlChannel.send(JSON.stringify(makeLatencyPing(latencyState, performance.now())));
+      }, 1000);
+    }
+
+    async function updateWebRtcStats() {
+      if (!pc) return;
+      const stats = await pc.getStats();
+      let inbound = null;
+
+      stats.forEach(report => {
+        if (report.type === 'inbound-rtp' && report.kind === 'video' && !report.isRemote) inbound = report;
+      });
+
+      if (!inbound) return;
+
+      const now = performance.now();
+      let fps = inbound.framesPerSecond;
+      let bufferMs = null;
+      let decodeMs = null;
+
+      if (lastInboundStats) {
+        const elapsedSec = Math.max(0.001, (now - lastInboundStats.now) / 1000);
+        if (!fps && inbound.framesDecoded != null && lastInboundStats.framesDecoded != null) {
+          fps = (inbound.framesDecoded - lastInboundStats.framesDecoded) / elapsedSec;
+        }
+
+        const emittedDelta = (inbound.jitterBufferEmittedCount || 0) - (lastInboundStats.jitterBufferEmittedCount || 0);
+        const bufferDelayDelta = (inbound.jitterBufferDelay || 0) - (lastInboundStats.jitterBufferDelay || 0);
+        if (emittedDelta > 0) bufferMs = (bufferDelayDelta / emittedDelta) * 1000;
+
+        const decodeFrameDelta = (inbound.framesDecoded || 0) - (lastInboundStats.framesDecoded || 0);
+        const decodeTimeDelta = (inbound.totalDecodeTime || 0) - (lastInboundStats.totalDecodeTime || 0);
+        if (decodeFrameDelta > 0) decodeMs = (decodeTimeDelta / decodeFrameDelta) * 1000;
+      }
+
+      metrics.fps.textContent = formatNumber(fps, 0);
+      metrics.buffer.textContent = formatMs(bufferMs);
+      metrics.jitter.textContent = formatMs((inbound.jitter || 0) * 1000);
+      metrics.decode.textContent = formatMs(decodeMs);
+      metrics.lost.textContent = String(inbound.packetsLost ?? 0);
+
+      lastInboundStats = {
+        now,
+        framesDecoded: inbound.framesDecoded,
+        jitterBufferEmittedCount: inbound.jitterBufferEmittedCount,
+        jitterBufferDelay: inbound.jitterBufferDelay,
+        totalDecodeTime: inbound.totalDecodeTime
+      };
+    }
+
+    function startStatsProbe() {
+      clearInterval(statsTimer);
+      lastInboundStats = null;
+      statsTimer = setInterval(() => updateWebRtcStats().catch(console.warn), 1000);
+    }
+
+    function startInputCapture() {
+      window.addEventListener('keydown', event => {
+        event.preventDefault();
+        sendControl({ kind: 'keyboard', action: 'down', code: event.code, key: event.key, repeat: event.repeat });
+      }, { passive: false });
+
+      window.addEventListener('keyup', event => {
+        event.preventDefault();
+        sendControl({ kind: 'keyboard', action: 'up', code: event.code, key: event.key });
+      }, { passive: false });
+
+      video.addEventListener('pointermove', event => {
+        sendControl({
+          kind: 'mouse',
+          action: 'move',
+          x: event.clientX / Math.max(1, innerWidth),
+          y: event.clientY / Math.max(1, innerHeight),
+          dx: event.movementX,
+          dy: event.movementY,
+          buttons: event.buttons
+        });
+      });
+
+      for (const type of ['pointerdown', 'pointerup']) {
+        video.addEventListener(type, event => {
+          event.preventDefault();
+          video.requestPointerLock?.();
+          sendControl({
+            kind: 'mouse',
+            action: type === 'pointerdown' ? 'down' : 'up',
+            button: event.button,
+            buttons: event.buttons
+          });
+        }, { passive: false });
+      }
+
+      gamepadTimer = setInterval(() => {
+        const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+        for (const pad of pads) {
+          const state = normalizeGamepad(pad);
+          const signature = stableGamepadSignature(state);
+          if (lastGamepadSignature.get(pad.index) !== signature) {
+            lastGamepadSignature.set(pad.index, signature);
+            sendControl(state);
+          }
+        }
+      }, 16);
+    }
+
+    async function connect() {
+      if (gamepadTimer) clearInterval(gamepadTimer);
+      if (latencyTimer) clearInterval(latencyTimer);
+      if (statsTimer) clearInterval(statsTimer);
+      pc?.close();
+      ws?.close();
+      controlChannel = null;
+      video.srcObject = null;
+      lastGamepadSignature.clear();
+
+      const room = roomInput.value.trim() || 'game';
+      const signalUrl = signalInput.value.trim();
+
+      pc = new RTCPeerConnection({ iceServers: [] });
+      pc.ontrack = event => {
+        const stream = event.streams[0] || new MediaStream([event.track]);
+        video.srcObject = stream;
+        video.play().catch(() => {});
+        setStatus('video track');
+      };
+      pc.ondatachannel = event => {
+        controlChannel = event.channel;
+        controlChannel.onopen = () => {
+          setStatus('control ready');
+          startLatencyProbe();
+        };
+        controlChannel.onmessage = message => {
+          try {
+            const payload = JSON.parse(message.data);
+            if (payload.type === 'latency-pong') {
+              applyLatencyPong(latencyState, payload, performance.now());
+              updateLatencyMetrics();
+            }
+          } catch {
+            console.log('control from sender', message.data);
+          }
+        };
+      };
+      pc.onicecandidate = event => {
+        if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate });
+      };
+      pc.onconnectionstatechange = () => setStatus(pc.connectionState);
+
+      ws = new WebSocket(signalUrl);
+      ws.onopen = () => {
+        setStatus('signaling');
+        sendSignal({ type: 'join', room, role: 'receiver' });
+      };
+      ws.onmessage = async event => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'offer') {
+          await pc.setRemoteDescription(message.description);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          sendSignal({ type: 'answer', description: pc.localDescription });
+        } else if (message.type === 'candidate' && message.candidate) {
+          await pc.addIceCandidate(message.candidate).catch(console.warn);
+        }
+      };
+      ws.onclose = () => setStatus('signal closed');
+
+      startInputCapture();
+      startStatsProbe();
+    }
+
+    panel.addEventListener('submit', event => {
+      event.preventDefault();
+      connect().catch(error => setStatus(error.message));
+    });
+
+    video.addEventListener('dblclick', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else video.requestFullscreen?.();
+    });
+
+    if (params.has('autoconnect')) connect().catch(console.error);
+  </script>
+</body>
+</html>
