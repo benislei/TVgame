@@ -8,6 +8,11 @@
     "signal": "node src/signaling-server.js",
     "sender": "node src/sender.js",
     "capture:preview": "node src/capture/preview-server.js",
+    "native:check": "node src/native-streamer/cli.js check",
+    "native:install": "node src/native-streamer/cli.js install",
+    "native:pipeline": "node src/native-streamer/cli.js pipeline",
+    "native:profiles": "node src/native-streamer/cli.js profiles",
+    "native:run": "node src/native-streamer/cli.js run",
     "test": "node --test"
   },
   "dependencies": {

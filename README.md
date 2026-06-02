@@ -105,7 +105,7 @@ http://<电脑局域网IP>:8080/sender-browser.html?room=game
 
 1. 电视或另一个浏览器标签打开 `receiver.html?room=game`，点击连接。
 2. 电脑浏览器打开 `sender-browser.html?room=game`。
-3. 点击 `Start real screen`，在浏览器弹窗里选择要共享的屏幕或窗口。
+3. 点击 `开始共享真实画面`，在浏览器弹窗里选择要共享的屏幕或窗口。
 
 这条路径已经是真实桌面画面，但捕获和编码由浏览器/libwebrtc 完成。后续 DXGI 原生模块完成后，可以把浏览器发送端替换回 Node 发送端。
 
@@ -130,6 +130,54 @@ buttons: a, b, x, y, lb, rb, lt, rt, back, start, ls, rs, dpadUp, dpadDown, dpad
 ```
 
 接收端会做摇杆死区处理，并且只在手柄状态变化时发送，避免每帧刷大量重复事件。
+
+## 阶段 1：原生低延迟发送端
+
+浏览器发送端已经可以跑通真实画面，但画质、帧率和控制延迟会受到浏览器捕获与 libwebrtc 默认编码策略限制。阶段 1 增加一条真正游戏串流方向的发送路径：
+
+```text
+D3D11 屏幕捕获 -> NVENC H.264 低延迟编码 -> RTP -> GStreamer webrtcbin -> 电视接收端
+```
+
+先检测环境：
+
+```bash
+npm run native:check
+```
+
+如果提示缺少依赖，运行自动安装：
+
+```bash
+npm run native:install
+```
+
+它会下载并安装官方 64 位 MSVC 版 GStreamer runtime/devel，并安装 Python `websockets` 信令依赖。安装完成后请重新打开终端或 QuickVerify，再次运行：
+
+```bash
+npm run native:check
+```
+
+查看 1080p60 管线：
+
+```bash
+npm run native:pipeline -- --profile 1080p60
+```
+
+启动原生发送端：
+
+```bash
+npm run native:run -- --profile 1080p60 --room game --signal ws://127.0.0.1:8080
+```
+
+QuickVerify.exe 也增加了：
+
+```text
+8. 检测原生串流环境（GStreamer / NVENC）
+9. 安装 GStreamer 原生串流依赖
+10. 启动原生 NVENC 发送端（1080p60）
+```
+
+当前这条原生路径是阶段 1 骨架，目标是验证依赖、管线和信令联通。实际机器上安装 GStreamer 后，可能还需要根据本机插件版本微调 `d3d11screencapturesrc` 或 `nvh264enc` 的属性名。
 
 ## DXGI 捕获模块
 
