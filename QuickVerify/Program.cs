@@ -128,11 +128,18 @@ static void OpenUrl(string url)
     Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
 }
 
-static string ReadAndroidTvIpOrDefault()
+static string? ReadValidatedAndroidTvIpOrDefault()
 {
     Console.Write("请输入 Android TV IP（默认 127.0.0.1）：");
     var tvIp = Console.ReadLine()?.Trim();
-    return string.IsNullOrWhiteSpace(tvIp) ? "127.0.0.1" : tvIp;
+    var candidate = string.IsNullOrWhiteSpace(tvIp) ? "127.0.0.1" : tvIp;
+    if (IPAddress.TryParse(candidate, out var address) && address.AddressFamily == AddressFamily.InterNetwork)
+    {
+        return candidate;
+    }
+
+    Console.WriteLine("Android TV IP 必须是合法的 IPv4 地址。");
+    return null;
 }
 
 static void PrintHeader(string root, string? lanIp)
@@ -278,7 +285,8 @@ while (true)
 
     if (choice == "12")
     {
-        var tvIp = ReadAndroidTvIpOrDefault();
+        var tvIp = ReadValidatedAndroidTvIpOrDefault();
+        if (tvIp == null) continue;
         StartCommandWindow(
             "阶段 2 RTP 发送端",
             $"{Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",
@@ -288,7 +296,8 @@ while (true)
 
     if (choice == "13")
     {
-        var tvIp = ReadAndroidTvIpOrDefault();
+        var tvIp = ReadValidatedAndroidTvIpOrDefault();
+        if (tvIp == null) continue;
         StartCommandWindow(
             "阶段 2 检测和 RTP 发送端",
             $"{Quote(NpmCmd())} run stage2:check && {Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",

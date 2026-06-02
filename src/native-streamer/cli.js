@@ -1,6 +1,7 @@
 'use strict';
 
 const childProcess = require('child_process');
+const net = require('net');
 const path = require('path');
 const {
   createEnvironmentReport,
@@ -100,38 +101,117 @@ function printRtpHelp() {
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 
-function runRtpSender(args) {
+function parseIntegerOption(value, label, min, max, errors) {
+  if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value)) {
+    errors.push(`${label}必须是整数。`);
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    errors.push(`${label}必须在 ${min}-${max} 之间。`);
+    return null;
+  }
+
+  return parsed;
+}
+
+function validateRtpArgs(args) {
+  const errors = [];
+  const host = args.host === undefined ? '127.0.0.1' : args.host;
+  if (typeof host !== 'string' || net.isIP(host) !== 4) {
+    errors.push('host 必须是合法的 IPv4 地址。');
+  }
+
+  const videoPort = parseIntegerOption(args['video-port'] || '5004', 'video-port ', 1, 65535, errors);
+  const audioPort = parseIntegerOption(args['audio-port'] || '5006', 'audio-port ', 1, 65535, errors);
+  const bitrateKbps = parseIntegerOption(args.bitrate || '25000', 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
+  const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    config: {
+      host: typeof host === 'string' ? host : '',
+      videoPort,
+      audioPort,
+      bitrateKbps,
+      displayIndex
+    }
+  };
+}
+
+function printRtpValidationErrors(errors) {
+  console.error('RTP 参数无效：');
+  for (const error of errors) {
+    console.error(`  - ${error}`);
+  }
+  console.error('');
+  printRtpHelp();
+}
+
+function stopRtpChildren(children, failedChild) {
+  for (const child of children) {
+    if (child === failedChild) continue;
+    if (!child || child.killed || typeof child.kill !== 'function') continue;
+    child.kill();
+  }
+}
+
+function runRtpSender(args, options = {}) {
   if (args.help) {
     printRtpHelp();
     return;
   }
 
-  const report = createStage2Report();
+  const validation = validateRtpArgs(args);
+  if (!validation.ok) {
+    printRtpValidationErrors(validation.errors);
+    process.exitCode = 1;
+    return;
+  }
+
+  const createReport = options.createReport || createStage2Report;
+  const spawn = options.spawn || childProcess.spawn;
+  const report = createReport();
   if (!report.ready) {
     printStage2Report(report);
     process.exitCode = 1;
     return;
   }
 
-  const config = buildRtpConfig({
-    host: args.host,
-    videoPort: args['video-port'],
-    audioPort: args['audio-port'],
-    bitrateKbps: args.bitrate,
-    displayIndex: args.display
-  });
+  const config = buildRtpConfig(validation.config);
   const commands = buildRtpLaunchCommands(config);
-  const children = commands.map(command => {
+  const gstLaunch = report.gstreamer.gstLaunch || 'gst-launch-1.0';
+  const children = [];
+  for (const command of commands) {
     console.log(`启动：${command.title}`);
-    return childProcess.spawn(command.executable, command.args, {
-      stdio: 'inherit',
-      windowsHide: false
-    });
-  });
+    let child;
+    try {
+      child = spawn(gstLaunch, command.args, {
+        stdio: 'inherit',
+        windowsHide: false
+      });
+    } catch (error) {
+      console.error(`启动失败：${command.title}：${error.message}`);
+      process.exitCode = 1;
+      stopRtpChildren(children, null);
+      return;
+    }
 
-  for (const child of children) {
+    children.push(child);
+    if (options.onChild) options.onChild(child, command);
+    child.on('error', error => {
+      console.error(`启动失败：${command.title}：${error.message}`);
+      process.exitCode = 1;
+      stopRtpChildren(children, child);
+    });
     child.on('exit', code => {
-      if (code && process.exitCode !== 1) process.exitCode = code;
+      if (code) {
+        console.error(`发送端退出异常：${command.title}，退出码 ${code}`);
+        if (process.exitCode !== 1) process.exitCode = code;
+        stopRtpChildren(children, child);
+      }
     });
   }
 }
@@ -270,4 +350,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, main, printReport, printStage2Report, printRtpHelp, runRtpSender };
+module.exports = { parseArgs, main, printReport, printStage2Report, printRtpHelp, validateRtpArgs, runRtpSender };

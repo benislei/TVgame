@@ -1,5 +1,7 @@
 'use strict';
 
+const EventEmitter = require('node:events');
+const childProcess = require('node:child_process');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -12,7 +14,34 @@ const {
   buildPipelineConfig,
   buildPipelineDescription
 } = require('../src/native-streamer/pipeline');
-const { parseArgs } = require('../src/native-streamer/cli');
+const { parseArgs, runRtpSender } = require('../src/native-streamer/cli');
+
+function withPatchedSpawn(spawn, fn) {
+  const originalSpawn = childProcess.spawn;
+  const originalExitCode = process.exitCode;
+  childProcess.spawn = spawn;
+  process.exitCode = undefined;
+  try {
+    return fn();
+  } finally {
+    childProcess.spawn = originalSpawn;
+    process.exitCode = originalExitCode;
+  }
+}
+
+function createReadyStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-launch-1.0.exe') {
+  return {
+    ready: true,
+    gstreamer: {
+      ready: true,
+      gstLaunch,
+      gstInspect: 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-inspect-1.0.exe'
+    },
+    dotnet: { ready: true, path: 'C:/Program Files/dotnet/dotnet.exe' },
+    plugins: {},
+    missing: { executables: [], plugins: [] }
+  };
+}
 
 test('GStreamer download URLs point at official 64-bit MSVC installers', () => {
   const urls = buildGStreamerDownloadUrls();
@@ -122,4 +151,61 @@ test('parseArgs accepts Android TV RTP target options', () => {
   assert.equal(args.host, '192.168.1.50');
   assert.equal(args['video-port'], '5004');
   assert.equal(args['audio-port'], '5006');
+});
+
+test('runRtpSender rejects invalid RTP options without spawning', () => {
+  let spawnCount = 0;
+
+  withPatchedSpawn(() => {
+    spawnCount += 1;
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50 & calc', '--video-port', '70000', '--bitrate', '0', '--display', '-1']),
+      { createReport: () => createReadyStage2Report() }
+    );
+
+    assert.equal(spawnCount, 0);
+    assert.equal(process.exitCode, 1);
+  });
+});
+
+test('runRtpSender uses the resolved gst-launch path from stage2 report', () => {
+  const executables = [];
+  const gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-launch-1.0.exe';
+
+  withPatchedSpawn((executable) => {
+    executables.push(executable);
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50']),
+      { createReport: () => createReadyStage2Report(gstLaunch) }
+    );
+  });
+
+  assert.deepEqual(executables, [gstLaunch, gstLaunch]);
+});
+
+test('runRtpSender stops sibling RTP process when spawn errors', () => {
+  const firstChild = new EventEmitter();
+  const secondChild = new EventEmitter();
+  firstChild.kill = () => { firstChild.killed = true; };
+  secondChild.kill = () => { secondChild.killed = true; };
+  const children = [firstChild, secondChild];
+
+  withPatchedSpawn(() => children.shift(), () => {
+    const spawned = [];
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50']),
+      {
+        createReport: () => createReadyStage2Report(),
+        onChild: child => spawned.push(child)
+      }
+    );
+
+    assert.doesNotThrow(() => spawned[0].emit('error', new Error('spawn failed')));
+    assert.equal(secondChild.killed, true);
+    assert.equal(process.exitCode, 1);
+  });
 });
