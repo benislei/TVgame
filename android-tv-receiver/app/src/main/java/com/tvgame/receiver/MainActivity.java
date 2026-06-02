@@ -1,0 +1,63 @@
+package com.tvgame.receiver;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.SurfaceView;
+import android.widget.FrameLayout;
+import android.widget.TextView;
+
+public final class MainActivity extends Activity {
+    private static final String TITLE = "电视游戏接收端";
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final StatsModel stats = new StatsModel();
+    private final Runnable updateOverlay = new Runnable() {
+        @Override
+        public void run() {
+            overlay.setText(TITLE + "\n" + stats.render());
+            handler.postDelayed(this, 500);
+        }
+    };
+
+    private SurfaceView surfaceView;
+    private TextView overlay;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        surfaceView = new SurfaceView(this);
+
+        overlay = new TextView(this);
+        overlay.setTextColor(0xFFFFFFFF);
+        overlay.setTextSize(16);
+        overlay.setBackgroundColor(0x99000000);
+        overlay.setPadding(16, 12, 16, 12);
+        overlay.setText(TITLE + "\n等待视频和音频");
+
+        FrameLayout root = new FrameLayout(this);
+        root.addView(surfaceView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+
+        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP | Gravity.START
+        );
+        root.addView(overlay, overlayParams);
+
+        setContentView(root);
+        handler.postDelayed(updateOverlay, 500);
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(updateOverlay);
+        super.onDestroy();
+    }
+}
