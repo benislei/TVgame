@@ -33,7 +33,9 @@ function defaultSearchDirs(env = process.env) {
     env.GSTREAMER_1_0_ROOT_MSVC_X86_64,
     env.GSTREAMER_1_0_ROOT_MINGW_X86_64,
     'C:/gstreamer/1.0/msvc_x86_64',
-    'C:/gstreamer/1.0/mingw_x86_64'
+    'C:/gstreamer/1.0/mingw_x86_64',
+    'D:/gstreamer/1.0/msvc_x86_64',
+    'D:/gstreamer/1.0/mingw_x86_64'
   ].filter(Boolean);
 
   for (const root of roots) {

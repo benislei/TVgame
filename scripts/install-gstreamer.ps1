@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$Version = "1.24.13",
   [switch]$InstallDevel
 )
@@ -7,6 +7,53 @@ $ErrorActionPreference = "Stop"
 
 function Test-Command($Name) {
   $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Install-Msi($Path, $Name) {
+  Write-Host "正在安装 $Name..."
+  $process = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$Path`" /passive /norestart" -Wait -PassThru
+  if ($process.ExitCode -ne 0) {
+    throw "$Name 安装失败，退出码：$($process.ExitCode)"
+  }
+}
+
+function Download-File($Url, $Path) {
+  if ((Test-Path $Path) -and ((Get-Item $Path).Length -gt 0)) {
+    Write-Host "检测到已有下载文件，尝试断点续传：$Path"
+  }
+
+  if (Test-Command "aria2c") {
+    Write-Host "使用 aria2c 下载/续传..."
+    & aria2c -c -x 16 -s 16 -k 1M --summary-interval=30 --connect-timeout=20 --timeout=60 --retry-wait=5 --max-tries=20 -d (Split-Path $Path) -o (Split-Path $Path -Leaf) $Url
+    if ($LASTEXITCODE -ne 0) { throw "aria2c 下载失败，退出码：$LASTEXITCODE" }
+    return
+  }
+
+  if (Test-Command "curl.exe") {
+    Write-Host "使用 curl 下载/续传..."
+    & curl.exe -L -C - --connect-timeout 20 --retry 5 --retry-delay 5 --output $Path $Url
+    if ($LASTEXITCODE -ne 0) { throw "curl 下载失败，退出码：$LASTEXITCODE" }
+    return
+  }
+
+  Write-Host "使用 Invoke-WebRequest 下载..."
+  Invoke-WebRequest -Uri $Url -OutFile $Path
+}
+
+function Find-GStreamerRoot {
+  $candidates = @(
+    $env:GSTREAMER_1_0_ROOT_MSVC_X86_64,
+    "C:\gstreamer\1.0\msvc_x86_64",
+    "D:\gstreamer\1.0\msvc_x86_64"
+  ) | Where-Object { $_ }
+
+  foreach ($root in $candidates) {
+    if (Test-Path (Join-Path $root "bin\gst-launch-1.0.exe")) {
+      return $root
+    }
+  }
+
+  return $null
 }
 
 $baseUrl = "https://gstreamer.freedesktop.org/pkg/windows/$Version/msvc"
@@ -26,18 +73,16 @@ if (Test-Command "gst-launch-1.0") {
   $runtimeMsi = Join-Path $downloadDir "gstreamer-runtime.msi"
   Write-Host "正在下载 GStreamer runtime..."
   Write-Host $runtimeUrl
-  Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeMsi
-  Write-Host "正在安装 GStreamer runtime..."
-  Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$runtimeMsi`" /passive /norestart" -Wait
+  Download-File -Url $runtimeUrl -Path $runtimeMsi
+  Install-Msi -Path $runtimeMsi -Name "GStreamer runtime"
 }
 
 if ($InstallDevel) {
   $develMsi = Join-Path $downloadDir "gstreamer-devel.msi"
   Write-Host "正在下载 GStreamer devel..."
   Write-Host $develUrl
-  Invoke-WebRequest -Uri $develUrl -OutFile $develMsi
-  Write-Host "正在安装 GStreamer devel..."
-  Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$develMsi`" /passive /norestart" -Wait
+  Download-File -Url $develUrl -Path $develMsi
+  Install-Msi -Path $develMsi -Name "GStreamer devel"
 }
 
 if (Test-Command "python") {
@@ -47,18 +92,22 @@ if (Test-Command "python") {
   Write-Host "正在安装/更新 Python websockets 依赖..."
   & py -3 -m pip install --user --upgrade websockets
 } else {
-  Write-Host "未检测到 python。原生发送端需要 Python 3，请先安装 Python 3 并重新运行本脚本。"
+  Write-Host "未检测到 Python 3。原生发送端需要 Python 3，请先安装 Python 3 并重新运行本脚本。"
 }
 
-$defaultBin = "C:\gstreamer\1.0\msvc_x86_64\bin"
-if (Test-Path $defaultBin) {
+$gstreamerRoot = Find-GStreamerRoot
+if ($gstreamerRoot) {
+  [Environment]::SetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", $gstreamerRoot, "User")
+  $defaultBin = Join-Path $gstreamerRoot "bin"
   $currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not ($currentPath -split ";" | Where-Object { $_ -eq $defaultBin })) {
     Write-Host "正在把 GStreamer 加入用户 PATH：$defaultBin"
     [Environment]::SetEnvironmentVariable("Path", "$currentPath;$defaultBin", "User")
   }
+} else {
+  Write-Host "未找到 GStreamer 安装目录，请重新打开终端后运行：npm.cmd run native:check"
 }
 
 Write-Host ""
 Write-Host "安装流程完成。请重新打开终端，或重启 QuickVerify。"
-Write-Host "然后运行：npm run native:check"
+Write-Host "然后运行：npm.cmd run native:check"

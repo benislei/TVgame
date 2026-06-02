@@ -72,6 +72,25 @@ test('environment report accepts the Windows py launcher as Python', () => {
   assert.equal(report.executables.python.path, 'C:/Windows/py.exe');
 });
 
+test('environment report searches the D drive GStreamer default install path', () => {
+  const seen = [];
+  const report = createEnvironmentReport({
+    findExecutable: name => {
+      seen.push(name);
+      if (name === 'python' || name === 'python3') return null;
+      if (name === 'py') return 'C:/Windows/py.exe';
+      return `D:/gstreamer/1.0/msvc_x86_64/bin/${name}.exe`;
+    },
+    inspectPlugin: () => true,
+    checkPythonModule: () => true,
+    env: {}
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.executables.gstLaunch.path, 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-launch-1.0.exe');
+  assert.ok(seen.includes('gst-launch-1.0'));
+});
+
 test('1080p60 profile builds low-latency NVENC pipeline settings', () => {
   const config = buildPipelineConfig(PROFILES['1080p60']);
 
