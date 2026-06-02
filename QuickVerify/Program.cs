@@ -128,6 +128,13 @@ static void OpenUrl(string url)
     Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
 }
 
+static string ReadAndroidTvIpOrDefault()
+{
+    Console.Write("请输入 Android TV IP（默认 127.0.0.1）：");
+    var tvIp = Console.ReadLine()?.Trim();
+    return string.IsNullOrWhiteSpace(tvIp) ? "127.0.0.1" : tvIp;
+}
+
 static void PrintHeader(string root, string? lanIp)
 {
     if (!Console.IsOutputRedirected) Console.Clear();
@@ -166,6 +173,7 @@ while (true)
     Console.WriteLine(" 10. 启动原生 NVENC 发送端（1080p60）");
     Console.WriteLine(" 11. 检测阶段 2 原生发送端环境");
     Console.WriteLine(" 12. 启动阶段 2 RTP 发送端（需要填写电视 IP）");
+    Console.WriteLine(" 13. 一键阶段 2：检测环境 + 启动 RTP 发送端");
     Console.WriteLine("  0. 退出");
     Console.WriteLine();
     Console.Write("> ");
@@ -270,23 +278,25 @@ while (true)
 
     if (choice == "12")
     {
-        Console.Write("请输入 Android TV IP：");
-        var tvIp = Console.ReadLine()?.Trim();
-        if (string.IsNullOrWhiteSpace(tvIp))
-        {
-            Console.WriteLine("电视 IP 不能为空。");
-        }
-        else
-        {
-            StartCommandWindow(
-                "阶段 2 RTP 发送端",
-                $"{Quote(NpmCmd())} run native:rtp -- --host {tvIp}",
-                root);
-            Console.WriteLine("已打开阶段 2 RTP 发送端窗口。");
-        }
+        var tvIp = ReadAndroidTvIpOrDefault();
+        StartCommandWindow(
+            "阶段 2 RTP 发送端",
+            $"{Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",
+            root);
+        Console.WriteLine($"已打开阶段 2 RTP 发送端窗口，目标 IP：{tvIp}");
     }
 
-    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10" or "11" or "12"))
+    if (choice == "13")
+    {
+        var tvIp = ReadAndroidTvIpOrDefault();
+        StartCommandWindow(
+            "阶段 2 检测和 RTP 发送端",
+            $"{Quote(NpmCmd())} run stage2:check && {Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",
+            root);
+        Console.WriteLine($"已打开阶段 2 检测和 RTP 发送端窗口，目标 IP：{tvIp}");
+    }
+
+    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10" or "11" or "12" or "13"))
     {
         Console.WriteLine("无效选择。");
     }
