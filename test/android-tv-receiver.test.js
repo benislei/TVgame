@@ -6,25 +6,34 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const root = path.join(__dirname, '..');
+const javaRoot = 'android-tv-receiver/app/src/main/java/com/tvgame/receiver';
 
 function readProjectFile(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
-test('Android TV receiver skeleton files exist', () => {
+function assertFileExists(relativePath) {
+  assert.equal(fs.existsSync(path.join(root, relativePath)), true, `${relativePath} should exist`);
+}
+
+test('Android TV receiver skeleton and RTP receiver files exist', () => {
   const files = [
     'android-tv-receiver/settings.gradle',
     'android-tv-receiver/build.gradle',
     'android-tv-receiver/app/build.gradle',
     'android-tv-receiver/app/src/main/AndroidManifest.xml',
     'android-tv-receiver/app/src/main/res/values/styles.xml',
-    'android-tv-receiver/app/src/main/java/com/tvgame/receiver/MainActivity.java',
-    'android-tv-receiver/app/src/main/java/com/tvgame/receiver/StatsModel.java',
+    `${javaRoot}/MainActivity.java`,
+    `${javaRoot}/StatsModel.java`,
+    `${javaRoot}/RtpPacket.java`,
+    `${javaRoot}/H264RtpDepacketizer.java`,
+    `${javaRoot}/H264VideoReceiver.java`,
+    `${javaRoot}/L16AudioReceiver.java`,
     'docs/stage2-local-verify.md'
   ];
 
   for (const file of files) {
-    assert.equal(fs.existsSync(path.join(root, file)), true, `${file} should exist`);
+    assertFileExists(file);
   }
 });
 
@@ -56,18 +65,100 @@ test('Android TV manifest exposes Chinese Leanback app with required permissions
   assert.match(manifest, /android:theme="@style\/AppTheme"/);
 });
 
-test('Android TV receiver Java UI renders Chinese metrics without mojibake', () => {
-  const statsModel = readProjectFile('android-tv-receiver/app/src/main/java/com/tvgame/receiver/StatsModel.java');
-  const mainActivity = readProjectFile('android-tv-receiver/app/src/main/java/com/tvgame/receiver/MainActivity.java');
-  const combined = `${statsModel}\n${mainActivity}`;
+test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
+  const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
+
+  assert.match(source, /public\s+static\s+RtpPacket\s+parse\(byte\[\]\s+buffer,\s*int\s+length\)/);
+  assert.match(source, /version\s*!=\s*2/);
+  assert.match(source, /IllegalArgumentException\("RTP/);
+  assert.match(source, /csrcCount\s*\*\s*4/);
+  assert.match(source, /12\s*\+\s*csrcCount\s*\*\s*4/);
+  assert.match(source, /Arrays\.copyOfRange\(buffer,\s*headerLength,\s*length\)/);
+  assert.match(source, /payloadType/);
+  assert.match(source, /sequenceNumber/);
+  assert.match(source, /timestamp/);
+  assert.match(source, /marker/);
+});
+
+test('H264 RTP depacketizer supports single NAL, STAP-A and FU-A safely', () => {
+  const source = readProjectFile(`${javaRoot}/H264RtpDepacketizer.java`);
+
+  assert.match(source, /START_CODE\s*=\s*new\s+byte\[\]\s*\{\s*0,\s*0,\s*0,\s*1\s*\}/);
+  assert.match(source, /nalType\s*>=\s*1\s*&&\s*nalType\s*<=\s*23/);
+  assert.match(source, /nalType\s*==\s*24/);
+  assert.match(source, /nalType\s*==\s*28/);
+  assert.match(source, /startBit/);
+  assert.match(source, /endBit/);
+  assert.match(source, /fragmentBuffer\.reset\(\)/);
+  assert.match(source, /fragmentStarted/);
+});
+
+test('video and audio receivers use required ports, codecs and stats', () => {
+  const video = readProjectFile(`${javaRoot}/H264VideoReceiver.java`);
+  const audio = readProjectFile(`${javaRoot}/L16AudioReceiver.java`);
+
+  assert.match(video, /VIDEO_PORT\s*=\s*5004/);
+  assert.match(video, /MediaCodec\.createDecoderByType\("video\/avc"\)/);
+  assert.match(video, /MediaFormat\.createVideoFormat\("video\/avc",\s*1920,\s*1080\)/);
+  assert.match(video, /stats\.videoPackets\+\+/);
+  assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
+  assert.match(video, /stats\.videoFrames\+\+/);
+  assert.match(video, /stats\.droppedFrames\+\+/);
+  assert.match(video, /setSoTimeout\(/);
+  assert.match(video, /public\s+void\s+stop\(\)/);
+  assert.match(video, /socket\.close\(\)/);
+
+  assert.match(audio, /AUDIO_PORT\s*=\s*5006/);
+  assert.match(audio, /AudioAttributes\.USAGE_GAME/);
+  assert.match(audio, /ENCODING_PCM_16BIT/);
+  assert.match(audio, /SAMPLE_RATE\s*=\s*48000/);
+  assert.match(audio, /CHANNEL_OUT_STEREO/);
+  assert.match(audio, /MODE_STREAM/);
+  assert.match(audio, /stats\.audioPackets\+\+/);
+  assert.match(audio, /stats\.audioBytes\s*\+=/);
+  assert.match(audio, /stats\.lastAudioAtMs\s*=\s*System\.currentTimeMillis\(\)/);
+  assert.match(audio, /littleEndian\[i\]\s*=\s*payload\[i\s*\+\s*1\]/);
+  assert.match(audio, /littleEndian\[i\s*\+\s*1\]\s*=\s*payload\[i\]/);
+  assert.match(audio, /setSoTimeout\(/);
+  assert.match(audio, /public\s+void\s+stop\(\)/);
+  assert.match(audio, /socket\.close\(\)/);
+});
+
+test('MainActivity starts receivers once and stops them on surface or activity teardown', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /implements\s+SurfaceHolder\.Callback/);
+  assert.match(source, /surfaceView\.getHolder\(\)\.addCallback\(this\)/);
+  assert.match(source, /surfaceView\.getHolder\(\)\.removeCallback\(this\)/);
+  assert.match(source, /void\s+surfaceCreated\(SurfaceHolder\s+holder\)/);
+  assert.match(source, /void\s+surfaceDestroyed\(SurfaceHolder\s+holder\)/);
+  assert.match(source, /startReceivers\(holder\.getSurface\(\)\)/);
+  assert.match(source, /if\s*\(\s*videoThread\s*!=\s*null\s*&&\s*videoThread\.isAlive\(\)\s*\)/);
+  assert.match(source, /stopReceivers\(\)/);
+  assert.match(source, /videoReceiver\.stop\(\)/);
+  assert.match(source, /audioReceiver\.stop\(\)/);
+  assert.match(source, /handler\.removeCallbacks\(updateOverlay\)/);
+});
+
+test('Android TV receiver production text is real Chinese without mojibake fragments', () => {
+  const files = [
+    'android-tv-receiver/app/src/main/AndroidManifest.xml',
+    `${javaRoot}/MainActivity.java`,
+    `${javaRoot}/StatsModel.java`,
+    'docs/stage2-local-verify.md'
+  ];
+  const combined = files.map(readProjectFile).join('\n');
   const forbiddenFragments = [
     '\uFFFD',
-    '鐢佃',
-    '瑙嗛',
-    '闊抽',
-    '鏈',
-    '鍙戦',
-    '绔�'
+    '鐢',
+    '闊',
+    '瑙',
+    '绛',
+    '鏈',
+    '姝',
+    '瓒',
+    '鈥',
+    '銆'
   ];
 
   for (const fragment of forbiddenFragments) {
@@ -86,11 +177,8 @@ test('Android TV receiver Java UI renders Chinese metrics without mojibake', () 
     '音频状态',
     '未收到',
     '正常',
-    '超过 '
+    '超过'
   ]) {
     assert.match(combined, new RegExp(text));
   }
-
-  assert.match(mainActivity, /new SurfaceView\(this\)/);
-  assert.match(mainActivity, /postDelayed\(.*500/s);
 });

@@ -5,11 +5,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.Surface;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -24,12 +26,17 @@ public final class MainActivity extends Activity {
 
     private SurfaceView surfaceView;
     private TextView overlay;
+    private H264VideoReceiver videoReceiver;
+    private L16AudioReceiver audioReceiver;
+    private Thread videoThread;
+    private Thread audioThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         surfaceView = new SurfaceView(this);
+        surfaceView.getHolder().addCallback(this);
 
         overlay = new TextView(this);
         overlay.setTextColor(0xFFFFFFFF);
@@ -56,8 +63,52 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        startReceivers(holder.getSurface());
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        stopReceivers();
+    }
+
+    @Override
     protected void onDestroy() {
         handler.removeCallbacks(updateOverlay);
+        if (surfaceView != null) {
+            surfaceView.getHolder().removeCallback(this);
+        }
+        stopReceivers();
         super.onDestroy();
+    }
+
+    private void startReceivers(Surface surface) {
+        if (videoThread != null && videoThread.isAlive()) {
+            return;
+        }
+
+        videoReceiver = new H264VideoReceiver(surface, stats);
+        audioReceiver = new L16AudioReceiver(stats);
+        videoThread = new Thread(videoReceiver, "RTP 视频接收");
+        audioThread = new Thread(audioReceiver, "RTP 音频接收");
+        videoThread.start();
+        audioThread.start();
+    }
+
+    private void stopReceivers() {
+        if (videoReceiver != null) {
+            videoReceiver.stop();
+            videoReceiver = null;
+        }
+        if (audioReceiver != null) {
+            audioReceiver.stop();
+            audioReceiver = null;
+        }
+        videoThread = null;
+        audioThread = null;
     }
 }
