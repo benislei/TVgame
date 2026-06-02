@@ -1,10 +1,13 @@
 package com.tvgame.receiver;
 
 import android.app.Activity;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -13,6 +16,9 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
+    private static final String INPUT_RELAY_HOST_METADATA = "com.tvgame.receiver.INPUT_RELAY_HOST";
+    private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.1.178";
+    private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
 
     private final Object lifecycleLock = new Object();
@@ -30,12 +36,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private TextView overlay;
     private H264VideoReceiver videoReceiver;
     private L16AudioReceiver audioReceiver;
+    private InputClient inputClient;
     private Thread videoThread;
     private Thread audioThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        inputClient = new InputClient(resolveInputRelayHost(), INPUT_RELAY_PORT);
 
         surfaceView = new SurfaceView(this);
         surfaceView.getHolder().addCallback(this);
@@ -84,8 +92,28 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (surfaceView != null) {
             surfaceView.getHolder().removeCallback(this);
         }
+        if (inputClient != null) {
+            inputClient.close();
+            inputClient = null;
+        }
         stopReceivers();
         super.onDestroy();
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (inputClient != null) {
+            inputClient.sendKey("down", keyCode);
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (inputClient != null) {
+            inputClient.sendKey("up", keyCode);
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     private void startReceivers(Surface surface) {
@@ -143,5 +171,23 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             Thread.currentThread().interrupt();
         }
         return !thread.isAlive();
+    }
+
+    private String resolveInputRelayHost() {
+        try {
+            ApplicationInfo info = getPackageManager().getApplicationInfo(
+                getPackageName(),
+                PackageManager.GET_META_DATA
+            );
+            if (info.metaData != null) {
+                String host = info.metaData.getString(INPUT_RELAY_HOST_METADATA);
+                if (host != null && host.trim().length() > 0) {
+                    return host.trim();
+                }
+            }
+        } catch (PackageManager.NameNotFoundException ex) {
+            // Fall back to the documented MVP address.
+        }
+        return DEFAULT_INPUT_RELAY_HOST;
     }
 }

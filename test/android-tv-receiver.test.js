@@ -29,6 +29,7 @@ test('Android TV receiver skeleton and RTP receiver files exist', () => {
     `${javaRoot}/H264RtpDepacketizer.java`,
     `${javaRoot}/H264VideoReceiver.java`,
     `${javaRoot}/L16AudioReceiver.java`,
+    `${javaRoot}/InputClient.java`,
     'docs/stage2-local-verify.md'
   ];
 
@@ -63,6 +64,26 @@ test('Android TV manifest exposes Chinese Leanback app with required permissions
   assert.match(manifest, /android:usesCleartextTraffic="true"/);
   assert.match(manifest, /android:label="电视游戏接收端"/);
   assert.match(manifest, /android:theme="@style\/AppTheme"/);
+});
+
+test('InputClient sends safe newline-delimited UTF-8 input JSON on a background thread', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /public\s+InputClient\(String\s+host,\s*int\s+port\)/);
+  assert.match(source, /public\s+void\s+sendKey\(String\s+action,\s*int\s+keyCode\)/);
+  assert.match(source, /public\s+void\s+(close|stop)\(\)/);
+  assert.match(source, /ExecutorService/);
+  assert.match(source, /tvgame-input/);
+  assert.match(source, /Socket/);
+  assert.match(source, /connect\(.*CONNECT_TIMEOUT_MS\)/s);
+  assert.match(source, /setSoTimeout\(SOCKET_TIMEOUT_MS\)/);
+  assert.match(source, /StandardCharsets\.UTF_8/);
+  assert.match(source, /\\"type\\":\\"input\\"/);
+  assert.match(source, /\\"kind\\":\\"keyboard\\"/);
+  assert.match(source, /\\n/);
+  assert.match(source, /"down"\.equals\(action\)\s*\|\|\s*"up"\.equals\(action\)/);
+  assert.match(source, /if\s*\(\s*closed/);
+  assert.match(source, /catch\s*\(\s*IOException\s+\w+\s*\)/);
 });
 
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
@@ -163,11 +184,52 @@ test('MainActivity starts receivers once and stops them on surface or activity t
   assert.match(source, /handler\.removeCallbacks\(updateOverlay\)/);
 });
 
+test('MainActivity wires key events to InputClient without disrupting receiver lifecycle', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /DEFAULT_INPUT_RELAY_HOST\s*=\s*"192\.168\.1\.178"/);
+  assert.match(source, /INPUT_RELAY_PORT\s*=\s*8789/);
+  assert.match(source, /INPUT_RELAY_HOST_METADATA\s*=\s*"com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
+  assert.match(source, /InputClient\s+inputClient/);
+  assert.match(source, /new\s+InputClient\(resolveInputRelayHost\(\),\s*INPUT_RELAY_PORT\)/);
+  assert.match(source, /return\s+DEFAULT_INPUT_RELAY_HOST/);
+  assert.match(source, /boolean\s+onKeyDown\(int\s+keyCode,\s*KeyEvent\s+event\)/);
+  assert.match(source, /inputClient\.sendKey\("down",\s*keyCode\)/);
+  assert.match(source, /return\s+super\.onKeyDown\(keyCode,\s*event\)/);
+  assert.match(source, /boolean\s+onKeyUp\(int\s+keyCode,\s*KeyEvent\s+event\)/);
+  assert.match(source, /inputClient\.sendKey\("up",\s*keyCode\)/);
+  assert.match(source, /return\s+super\.onKeyUp\(keyCode,\s*event\)/);
+  assert.match(source, /inputClient\.close\(\)/);
+  assert.match(source, /stopReceivers\(\)/);
+});
+
+test('stage 2 verification guide documents input return and acceptance checklist in Chinese', () => {
+  const doc = readProjectFile('docs/stage2-local-verify.md');
+
+  assert.match(doc, /## 输入回传/);
+  assert.match(doc, /Android TV 第一版会把遥控器和键盘按键事件发送到 PC 端 TCP 8789/);
+  assert.match(doc, /PC 端还需要 relay 接入 InputBridge\/SendInput/);
+  assert.match(doc, /relay 未实现不影响视频和声音验证/);
+  assert.match(doc, /## 验收记录/);
+  for (const item of [
+    'App 启动中文状态面板',
+    '`stage2:check` 通过',
+    '`native:rtp` 启动视频音频发送',
+    '电视视频包计数增长',
+    '音频包计数增长',
+    '播放 PC 系统声音',
+    '输入回传到达 PC relay'
+  ]) {
+    assert.match(doc, new RegExp(item));
+  }
+});
+
 test('Android TV receiver production text is real Chinese without mojibake fragments', () => {
   const files = [
     'android-tv-receiver/app/src/main/AndroidManifest.xml',
     `${javaRoot}/MainActivity.java`,
     `${javaRoot}/StatsModel.java`,
+    `${javaRoot}/InputClient.java`,
     'docs/stage2-local-verify.md'
   ];
   const combined = files.map(readProjectFile).join('\n');
@@ -177,11 +239,18 @@ test('Android TV receiver production text is real Chinese without mojibake fragm
     '闊',
     '瑙',
     '绛',
-    '鏈',
-    '姝',
-    '瓒',
+    '閻',
+    '闂',
+    '鐟',
+    '缁',
+    '閺',
+    '濮',
+    '鐡',
+    '閳',
+    '閵',
     '鈥',
-    '銆'
+    '楠',
+    '鍥炰紶'
   ];
 
   for (const fragment of forbiddenFragments) {
@@ -200,7 +269,8 @@ test('Android TV receiver production text is real Chinese without mojibake fragm
     '音频状态',
     '未收到',
     '正常',
-    '超过'
+    '超过',
+    '输入回传'
   ]) {
     assert.match(combined, new RegExp(text));
   }
