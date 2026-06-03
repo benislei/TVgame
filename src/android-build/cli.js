@@ -37,6 +37,7 @@ function printApk(report) {
   console.log('Android TV Debug APK');
   console.log('====================');
   console.log(`预期 APK 路径：${report.apk.path}`);
+  console.log(`是否存在：${report.apk.found ? '是' : '否'}`);
   console.log(`当前状态：${report.apk.found ? '已存在' : '尚未生成'}`);
 }
 
@@ -48,7 +49,7 @@ function printHelp() {
   console.log('命令：');
   console.log('  check    检查 Android APK 构建环境');
   console.log('  install  安装 Android APK 构建依赖');
-  console.log('  build    预留构建入口');
+  console.log('  build    构建 Android TV 接收端 Debug APK');
   console.log('  apk      显示 Debug APK 路径');
 }
 
@@ -74,16 +75,55 @@ function runInstall(spawnSync = childProcess.spawnSync) {
   process.exitCode = typeof result.status === 'number' ? result.status : 1;
 }
 
+function runBuild(report, spawnSync = childProcess.spawnSync) {
+  printCheckReport(report);
+
+  if (!report.ready) {
+    console.error('');
+    console.error('Android TV APK 构建环境缺少依赖，无法开始构建。');
+    console.error('缺失项：');
+    for (const item of report.missing) {
+      console.error(`  - ${item}`);
+    }
+    console.error('');
+    console.error('请先运行 npm.cmd run android:install，或按上面的缺失项手动安装后重试。');
+    process.exitCode = 1;
+    return;
+  }
+
+  const gradlew = path.join(report.paths.receiverRoot, 'gradlew.bat');
+  console.log('');
+  console.log('正在构建 Android TV 接收端 Debug APK...');
+  const result = spawnSync(gradlew, [':app:assembleDebug', '--no-daemon'], {
+    cwd: report.paths.receiverRoot,
+    stdio: 'inherit'
+  });
+
+  if (result.error) {
+    console.error(`Gradle Wrapper 启动失败：${result.error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const exitCode = typeof result.status === 'number' ? result.status : 1;
+  process.exitCode = exitCode;
+
+  if (exitCode === 0) {
+    console.log(`APK 输出：${report.apk.path}`);
+  }
+}
+
 function main(argv = process.argv.slice(2), options = {}) {
   const command = argv[0] || 'check';
+  const createReport = options.createReport || createAndroidBuildReport;
 
   if (command === 'check') {
-    printCheckReport(createAndroidBuildReport());
+    printCheckReport(createReport());
     return;
   }
 
   if (command === 'apk') {
-    printApk(createAndroidBuildReport());
+    printApk(createReport());
     return;
   }
 
@@ -93,8 +133,7 @@ function main(argv = process.argv.slice(2), options = {}) {
   }
 
   if (command === 'build') {
-    console.log('Android APK 构建命令将在后续步骤接入 Gradle Wrapper。');
-    console.log('当前可先运行：npm.cmd run android:check');
+    runBuild(createReport(), options.spawnSync);
     return;
   }
 
@@ -112,4 +151,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, printCheckReport, printApk, runInstall };
+module.exports = { main, printCheckReport, printApk, runInstall, runBuild };

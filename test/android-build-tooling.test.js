@@ -25,6 +25,37 @@ function createCliTestEnv() {
   };
 }
 
+function createCliReportOverride({ ready, missing = [], receiverRoot = path.join('C:', 'repo', 'android-tv-receiver'), apkFound = false }) {
+  const apkPath = path.join(receiverRoot, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  const found = Boolean(ready);
+  return {
+    ready,
+    missing,
+    paths: { receiverRoot },
+    jdk: {
+      java: { found, path: found ? path.join('C:', 'Java', 'bin', 'java.exe') : null },
+      javac: { found, path: found ? path.join('C:', 'Java', 'bin', 'javac.exe') : null }
+    },
+    sdk: {
+      root: path.join('C:', 'Android', 'Sdk'),
+      sdkmanager: { found, path: found ? path.join('C:', 'Android', 'Sdk', 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat') : null },
+      adb: { found, path: found ? path.join('C:', 'Android', 'Sdk', 'platform-tools', 'adb.exe') : null }
+    },
+    packages: {
+      android35: { found },
+      buildTools35: { found }
+    },
+    gradleWrapper: {
+      ready: found,
+      path: found ? path.join(receiverRoot, 'gradlew.bat') : null
+    },
+    apk: {
+      path: apkPath,
+      found: apkFound
+    }
+  };
+}
+
 test('android build report finds configured SDK packages and wrapper', () => {
   const root = path.join('C:', 'repo');
   const sdkRoot = path.join('D:', 'Android', 'Sdk');
@@ -173,6 +204,138 @@ test('android apk CLI prints the expected APK path in Chinese', () => {
   assert.match(result.stdout, /当前状态/);
 });
 
+test('android build CLI reports missing dependencies and does not spawn Gradle', () => {
+  const cli = require('../src/android-build/cli');
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalExitCode = process.exitCode;
+  const output = [];
+  const spawned = [];
+  let exitCode;
+
+  console.log = message => output.push(String(message));
+  console.error = message => output.push(String(message));
+  process.exitCode = undefined;
+
+  try {
+    cli.main(['build'], {
+      createReport() {
+        return createCliReportOverride({
+          ready: false,
+          missing: ['JDK javac.exe', 'Android SDK platform-tools adb.exe']
+        });
+      },
+      spawnSync(command, args, options) {
+        spawned.push({ command, args, options });
+        return { status: 0 };
+      }
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.exitCode = originalExitCode;
+  }
+
+  assert.equal(spawned.length, 0);
+  assert.equal(exitCode, 1);
+  assert.match(output.join('\n'), /Android TV APK 构建环境缺少依赖/);
+  assert.match(output.join('\n'), /JDK javac\.exe/);
+  assert.match(output.join('\n'), /Android SDK platform-tools adb\.exe/);
+});
+
+test('android build CLI runs gradlew.bat in receiver directory and prints APK output on success', () => {
+  const cli = require('../src/android-build/cli');
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalExitCode = process.exitCode;
+  const output = [];
+  const calls = [];
+  const receiverRoot = path.join('C:', 'repo', 'android-tv-receiver');
+  const apkPath = path.join(receiverRoot, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  let exitCode;
+
+  console.log = message => output.push(String(message));
+  console.error = message => output.push(String(message));
+  process.exitCode = undefined;
+
+  try {
+    cli.main(['build'], {
+      createReport() {
+        return createCliReportOverride({ ready: true, receiverRoot, apkFound: true });
+      },
+      spawnSync(command, args, options) {
+        calls.push({ command, args, options });
+        return { status: 0 };
+      }
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.exitCode = originalExitCode;
+  }
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, path.join(receiverRoot, 'gradlew.bat'));
+  assert.deepEqual(calls[0].args, [':app:assembleDebug', '--no-daemon']);
+  assert.equal(calls[0].options.cwd, receiverRoot);
+  assert.equal(calls[0].options.stdio, 'inherit');
+  assert.equal(exitCode, 0);
+  assert.match(output.join('\n'), new RegExp(`APK 输出：${apkPath.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}`));
+});
+
+test('android build CLI preserves Gradle exit code when Gradle fails', () => {
+  const cli = require('../src/android-build/cli');
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalExitCode = process.exitCode;
+
+  console.log = () => {};
+  console.error = () => {};
+  process.exitCode = undefined;
+
+  try {
+    cli.main(['build'], {
+      createReport() {
+        const receiverRoot = path.join('C:', 'repo', 'android-tv-receiver');
+        return createCliReportOverride({ ready: true, receiverRoot, apkFound: false });
+      },
+      spawnSync() {
+        return { status: 23 };
+      }
+    });
+    assert.equal(process.exitCode, 23);
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+    process.exitCode = originalExitCode;
+  }
+});
+
+test('android apk CLI reports whether the APK exists from injected report', () => {
+  const cli = require('../src/android-build/cli');
+  const originalLog = console.log;
+  const output = [];
+  const apkPath = path.join('C:', 'repo', 'android-tv-receiver', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+
+  console.log = message => output.push(String(message));
+
+  try {
+    cli.main(['apk'], {
+      createReport() {
+        return { apk: { path: apkPath, found: true } };
+      }
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert.match(output.join('\n'), /预期 APK 路径/);
+  assert.match(output.join('\n'), /是否存在：是/);
+  assert.match(output.join('\n'), new RegExp(apkPath.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')));
+});
+
 test('android build installer script documents JDK, SDK download and required packages', () => {
   const script = fs.readFileSync(
     path.join(__dirname, '..', 'scripts', 'install-android-build-tools.ps1'),
@@ -253,7 +416,9 @@ test('new android build production files do not contain replacement characters o
     path.join(__dirname, '..', 'src', 'android-build', 'cli.js'),
     path.join(__dirname, '..', 'scripts', 'install-android-build-tools.ps1'),
     path.join(__dirname, '..', 'android-tv-receiver', 'gradlew.bat'),
-    path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.properties')
+    path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.properties'),
+    path.join(__dirname, '..', 'docs', 'android-build-setup.md'),
+    path.join(__dirname, '..', 'docs', 'stage2-local-verify.md')
   ];
 
   for (const file of files) {
@@ -262,4 +427,19 @@ test('new android build production files do not contain replacement characters o
     assert.doesNotMatch(text, /[閿涚粙闁艾濮╅弸鍕紦閻滎垰顣╙]{4,}/);
     assert.doesNotMatch(text, /[ÂÃÄÅ]{2,}/);
   }
+});
+
+test('android build setup docs describe install, check, build, APK path and TV install in Chinese', () => {
+  const setup = fs.readFileSync(path.join(__dirname, '..', 'docs', 'android-build-setup.md'), 'utf8');
+  const stage2 = fs.readFileSync(path.join(__dirname, '..', 'docs', 'stage2-local-verify.md'), 'utf8');
+
+  assert.match(setup, /npm\.cmd run android:install/);
+  assert.match(setup, /npm\.cmd run android:check/);
+  assert.match(setup, /npm\.cmd run android:build/);
+  assert.match(setup, /android-tv-receiver\\app\\build\\outputs\\apk\\debug\\app-debug\.apk/);
+  assert.match(setup, /Android TV/);
+  assert.match(setup, /adb install/);
+  assert.match(stage2, /npm\.cmd run android:install/);
+  assert.match(stage2, /npm\.cmd run android:build/);
+  assert.doesNotMatch(stage2, /gradle` 不是可识别的/);
 });

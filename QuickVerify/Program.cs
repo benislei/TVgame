@@ -181,6 +181,9 @@ while (true)
     Console.WriteLine(" 11. 检测阶段 2 原生发送端环境");
     Console.WriteLine(" 12. 启动阶段 2 RTP 发送端（需要填写电视 IP）");
     Console.WriteLine(" 13. 一键阶段 2：检测环境 + 启动 RTP 发送端");
+    Console.WriteLine(" 14. 检查 Android TV APK 构建环境");
+    Console.WriteLine(" 15. 安装 Android TV APK 构建依赖");
+    Console.WriteLine(" 16. 构建 Android TV 接收端 APK");
     Console.WriteLine("  0. 退出");
     Console.WriteLine();
     Console.Write("> ");
@@ -305,7 +308,25 @@ while (true)
         Console.WriteLine($"已打开阶段 2 检测和 RTP 发送端窗口，目标 IP：{tvIp}");
     }
 
-    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10" or "11" or "12" or "13"))
+    if (choice == "14")
+    {
+        StartCommandWindow("Android TV APK 构建环境检查", $"{Quote(NpmCmd())} run android:check", root);
+        Console.WriteLine("已打开 Android TV APK 构建环境检查窗口。");
+    }
+
+    if (choice == "15")
+    {
+        StartCommandWindow("安装 Android TV APK 构建依赖", $"{Quote(NpmCmd())} run android:install", root);
+        Console.WriteLine("已打开 Android TV APK 构建依赖安装窗口。安装完成后请重新运行检查。");
+    }
+
+    if (choice == "16")
+    {
+        StartCommandWindow("构建 Android TV 接收端 APK", $"{Quote(NpmCmd())} run android:build", root);
+        Console.WriteLine("已打开 Android TV 接收端 APK 构建窗口。");
+    }
+
+    if (choice is not ("1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" or "10" or "11" or "12" or "13" or "14" or "15" or "16"))
     {
         Console.WriteLine("无效选择。");
     }

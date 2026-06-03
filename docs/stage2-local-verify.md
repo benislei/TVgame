@@ -42,13 +42,31 @@ PC 端还需要 relay 接入 InputBridge/SendInput，才能把这些 JSON 按键
 
 ## Android 构建工具记录
 
-本地已尝试在 `android-tv-receiver` 目录运行：
+Android TV 接收端 APK 构建现在通过项目脚本统一执行。首次准备环境时，在项目根目录运行：
 
 ```powershell
-gradle :app:assembleDebug
+npm.cmd run android:install
 ```
 
-当前环境失败原因：PowerShell 报告 `gradle` 不是可识别的 cmdlet、函数、脚本文件或可运行程序，说明本机 PATH 中没有可用的 Gradle 命令。项目目录中也没有 Gradle Wrapper，因此本轮无法继续验证 Android APK 构建。安装 Gradle 或补充 `gradlew` 后，应重新运行 `gradle :app:assembleDebug` 或等价 wrapper 命令。
+安装完成后检查 JDK、Android SDK、SDK 包和 Gradle Wrapper：
+
+```powershell
+npm.cmd run android:check
+```
+
+确认检查通过后构建 Debug APK：
+
+```powershell
+npm.cmd run android:build
+```
+
+构建成功后 APK 位于：
+
+```text
+android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
+```
+
+也可以运行 `npm.cmd run android:apk` 查看预期 APK 路径和文件是否存在。更完整的说明见 `docs/android-build-setup.md`。
 
 ## 验收记录
 

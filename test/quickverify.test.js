@@ -41,3 +41,14 @@ test('QuickVerify rejects dangerous Android TV IP input before building npm comm
 
   assert.match(source, /var tvIp = ReadValidatedAndroidTvIpOrDefault\(\);\s+if \(tvIp == null\) continue;\s+StartCommandWindow\([\s\S]+?--host \{Quote\(tvIp\)\}/);
 });
+
+test('QuickVerify offers Android APK build check, install and build menu entries', () => {
+  const source = readProgram();
+
+  assert.match(source, /14\. 检查 Android TV APK 构建环境/);
+  assert.match(source, /15\. 安装 Android TV APK 构建依赖/);
+  assert.match(source, /16\. 构建 Android TV 接收端 APK/);
+  assert.match(source, /if \(choice == "14"\)[\s\S]+?run android:check/);
+  assert.match(source, /if \(choice == "15"\)[\s\S]+?run android:install/);
+  assert.match(source, /if \(choice == "16"\)[\s\S]+?run android:build/);
+});
