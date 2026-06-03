@@ -11,6 +11,19 @@ const {
   findAndroidSdkRoot
 } = require('../src/android-build/tooling');
 
+function createCliTestEnv() {
+  return {
+    SystemRoot: process.env.SystemRoot || 'C:\\Windows',
+    ComSpec: process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe',
+    PATH: '',
+    JAVA_HOME: '',
+    ANDROID_HOME: '',
+    ANDROID_SDK_ROOT: path.join('Z:', 'MissingSdk'),
+    LOCALAPPDATA: path.join('Z:', 'MissingLocalAppData'),
+    USERPROFILE: path.join('Z:', 'MissingUser')
+  };
+}
+
 test('android build report finds configured SDK packages and wrapper', () => {
   const root = path.join('C:', 'repo');
   const sdkRoot = path.join('D:', 'Android', 'Sdk');
@@ -94,6 +107,34 @@ test('android build report falls back from invalid ANDROID_SDK_ROOT to valid AND
   assert.deepEqual(report.missing, []);
 });
 
+test('android build report normalizes relative SDK roots before reporting ready', () => {
+  const root = path.join('C:', 'repo');
+  const relativeSdkRoot = path.join('relative', 'Sdk');
+  const absoluteSdkRoot = path.resolve(relativeSdkRoot);
+  const existing = new Set([
+    path.join('C:', 'Java', 'bin', 'java.exe'),
+    path.join('C:', 'Java', 'bin', 'javac.exe'),
+    path.join(absoluteSdkRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat'),
+    path.join(absoluteSdkRoot, 'platform-tools', 'adb.exe'),
+    path.join(absoluteSdkRoot, 'platforms', 'android-35', 'android.jar'),
+    path.join(absoluteSdkRoot, 'build-tools', '35.0.0', 'aapt2.exe'),
+    path.join(root, 'android-tv-receiver', 'gradlew.bat')
+  ]);
+
+  const report = createAndroidBuildReport({
+    projectRoot: root,
+    env: {
+      JAVA_HOME: path.join('C:', 'Java'),
+      ANDROID_SDK_ROOT: `  ${relativeSdkRoot}  `
+    },
+    exists: file => existing.has(file)
+  });
+
+  assert.equal(path.isAbsolute(report.sdk.root), true);
+  assert.equal(report.sdk.root, absoluteSdkRoot);
+  assert.equal(report.ready, true);
+});
+
 test('android path helpers choose SDK roots from environment and default user profile', () => {
   const envRoot = path.join('E:', 'Sdk');
   const sdkmanager = path.join(envRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat');
@@ -110,13 +151,13 @@ test('android check CLI prints a Chinese environment report', () => {
   const cliPath = path.join(__dirname, '..', 'src', 'android-build', 'cli.js');
   const result = childProcess.spawnSync(process.execPath, [cliPath, 'check'], {
     encoding: 'utf8',
-    env: { ...process.env, ANDROID_SDK_ROOT: path.join('Z:', 'MissingSdk') }
+    env: createCliTestEnv()
   });
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Android 构建环境检查/);
   assert.match(result.stdout, /缺失项/);
-  assert.match(result.stdout, /npm\.cmd run android:install/);
+  assert.match(result.stdout, /安装命令将在下一步接入/);
 });
 
 test('android apk CLI prints the expected APK path in Chinese', () => {

@@ -27,7 +27,7 @@ function printCheckReport(report) {
       console.log(`  - ${item}`);
     }
     console.log('');
-    console.log('可运行：npm.cmd run android:install');
+    console.log('安装命令将在下一步接入；当前请先查看 docs/android-build-setup.md，或等待自动安装入口。');
   }
 }
 
@@ -64,13 +64,13 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'install') {
-    console.log('Android 构建依赖安装命令已预留，后续任务会接入安装脚本。');
-    console.log('当前可先运行：npm.cmd run android:check');
+    console.log('Android 构建依赖安装命令将在下一步接入。');
+    console.log('当前请先查看 docs/android-build-setup.md，或等待自动安装入口。');
     return;
   }
 
   if (command === 'build') {
-    console.log('Android APK 构建命令已预留，后续任务会接入 Gradle Wrapper。');
+    console.log('Android APK 构建命令将在后续步骤接入 Gradle Wrapper。');
     console.log('当前可先运行：npm.cmd run android:check');
     return;
   }

@@ -27,12 +27,18 @@ function findInPath(name, env, exists) {
   return null;
 }
 
+function normalizeEnvRoot(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  return path.resolve(trimmed);
+}
+
 function findAndroidSdkRoot(env = process.env, exists = fs.existsSync) {
-  const home = env.USERPROFILE || env.HOME || '';
+  const home = normalizeEnvRoot(env.USERPROFILE || env.HOME);
   const candidates = [
-    env.ANDROID_SDK_ROOT,
-    env.ANDROID_HOME,
-    env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Android', 'Sdk'),
+    normalizeEnvRoot(env.ANDROID_SDK_ROOT),
+    normalizeEnvRoot(env.ANDROID_HOME),
+    normalizeEnvRoot(env.LOCALAPPDATA) && path.join(normalizeEnvRoot(env.LOCALAPPDATA), 'Android', 'Sdk'),
     home && path.join(home, 'AppData', 'Local', 'Android', 'Sdk')
   ].filter(Boolean);
 
@@ -50,11 +56,12 @@ function findAndroidSdkRoot(env = process.env, exists = fs.existsSync) {
 }
 
 function createAndroidPaths(projectRoot = path.resolve(__dirname, '..', '..'), env = process.env, exists = fs.existsSync) {
-  const home = env.USERPROFILE || env.HOME || '';
+  const home = normalizeEnvRoot(env.USERPROFILE || env.HOME);
+  const localAppData = normalizeEnvRoot(env.LOCALAPPDATA);
   const sdkRoot = findAndroidSdkRoot(env, exists)
-    || env.ANDROID_SDK_ROOT
-    || env.ANDROID_HOME
-    || (env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Android', 'Sdk') : '')
+    || normalizeEnvRoot(env.ANDROID_SDK_ROOT)
+    || normalizeEnvRoot(env.ANDROID_HOME)
+    || (localAppData ? path.join(localAppData, 'Android', 'Sdk') : '')
     || (home ? path.join(home, 'AppData', 'Local', 'Android', 'Sdk') : '');
 
   return {
@@ -66,7 +73,7 @@ function createAndroidPaths(projectRoot = path.resolve(__dirname, '..', '..'), e
 }
 
 function findJavaTool(name, env, exists) {
-  const javaHome = env.JAVA_HOME || '';
+  const javaHome = normalizeEnvRoot(env.JAVA_HOME);
   if (javaHome) {
     const candidate = path.join(javaHome, 'bin', `${name}.exe`);
     if (exists(candidate)) return candidate;
