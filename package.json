@@ -15,6 +15,10 @@
     "native:run": "node src/native-streamer/cli.js run",
     "stage2:check": "node src/native-streamer/cli.js stage2-check",
     "native:rtp": "node src/native-streamer/cli.js rtp",
+    "android:check": "node src/android-build/cli.js check",
+    "android:install": "node src/android-build/cli.js install",
+    "android:build": "node src/android-build/cli.js build",
+    "android:apk": "node src/android-build/cli.js apk",
     "test": "node --test"
   },
   "dependencies": {
