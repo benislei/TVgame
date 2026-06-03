@@ -59,6 +59,9 @@ test('Android TV receiver Gradle files use the required app identity and SDKs', 
   assert.match(appBuild, /compileSdk\s+35/);
   assert.match(appBuild, /minSdk\s+23/);
   assert.match(appBuild, /targetSdk\s+35/);
+  assert.match(appBuild, /manifestPlaceholders/);
+  assert.match(appBuild, /inputRelayHost/);
+  assert.match(appBuild, /192\.168\.50\.148/);
   assert.match(appBuild, /versionName\s+"0\.1\.0"/);
 });
 
@@ -72,6 +75,8 @@ test('Android TV manifest exposes Chinese Leanback app with required permissions
   assert.match(manifest, /android:usesCleartextTraffic="true"/);
   assert.match(manifest, /android:label="电视游戏接收端"/);
   assert.match(manifest, /android:theme="@style\/AppTheme"/);
+  assert.match(manifest, /android:name="com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
+  assert.match(manifest, /android:value="\$\{inputRelayHost\}"/);
 });
 
 test('InputClient sends safe newline-delimited UTF-8 input JSON on a background thread', () => {
@@ -296,7 +301,7 @@ test('MainActivity starts receivers once and stops them on surface or activity t
 test('MainActivity wires key events to InputClient without disrupting receiver lifecycle', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
-  assert.match(source, /DEFAULT_INPUT_RELAY_HOST\s*=\s*"192\.168\.1\.178"/);
+  assert.match(source, /DEFAULT_INPUT_RELAY_HOST\s*=\s*"192\.168\.50\.148"/);
   assert.match(source, /INPUT_RELAY_PORT\s*=\s*8789/);
   assert.match(source, /INPUT_RELAY_HOST_METADATA\s*=\s*"com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
   assert.match(source, /InputClient\s+inputClient/);

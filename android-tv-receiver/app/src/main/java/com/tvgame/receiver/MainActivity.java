@@ -19,7 +19,7 @@ import android.widget.TextView;
 public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
     private static final String INPUT_RELAY_HOST_METADATA = "com.tvgame.receiver.INPUT_RELAY_HOST";
-    private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.1.178";
+    private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.50.148";
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;

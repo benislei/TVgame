@@ -9,7 +9,7 @@
         android:usesCleartextTraffic="true">
         <meta-data
             android:name="com.tvgame.receiver.INPUT_RELAY_HOST"
-            android:value="192.168.1.178" />
+            android:value="${inputRelayHost}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
