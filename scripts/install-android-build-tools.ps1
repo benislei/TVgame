@@ -25,6 +25,20 @@ function Write-Step {
   Write-Host "==> $Message"
 }
 
+function Exit-WithFailure {
+  param(
+    [string] $Message,
+    [int] $ExitCode = 1
+  )
+
+  if ($ExitCode -eq 0) {
+    $ExitCode = 1
+  }
+
+  Write-Host $Message
+  exit $ExitCode
+}
+
 function Resolve-CommandPath {
   param([string] $Name)
   $command = Get-Command $Name -ErrorAction SilentlyContinue
@@ -65,6 +79,51 @@ function Get-JavaMajorVersion {
   return $null
 }
 
+function Find-TemurinJdk17 {
+  $roots = @(
+    $(if (-not [string]::IsNullOrWhiteSpace($env:ProgramFiles)) { Join-Path $env:ProgramFiles 'Eclipse Adoptium' }),
+    $(if (-not [string]::IsNullOrWhiteSpace(${env:ProgramFiles(x86)})) { Join-Path ${env:ProgramFiles(x86)} 'Eclipse Adoptium' }),
+    'C:\Program Files\Eclipse Adoptium',
+    'C:\Program Files\Java'
+  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+
+  foreach ($root in $roots) {
+    if (-not (Test-Path $root)) {
+      continue
+    }
+
+    $candidates = Get-ChildItem -Path $root -Directory -Filter 'jdk-17*' -ErrorAction SilentlyContinue |
+      Sort-Object -Property Name -Descending
+
+    foreach ($candidate in $candidates) {
+      $javaPath = Join-Path $candidate.FullName 'bin\java.exe'
+      $javacPath = Join-Path $candidate.FullName 'bin\javac.exe'
+      if ((Test-Path $javaPath) -and (Test-Path $javacPath)) {
+        $javaMajor = Get-JavaMajorVersion -ToolPath $javaPath -ToolName 'java'
+        $javacMajor = Get-JavaMajorVersion -ToolPath $javacPath -ToolName 'javac'
+        if ($javaMajor -eq 17 -and $javacMajor -eq 17) {
+          return $candidate.FullName
+        }
+      }
+    }
+  }
+
+  return $null
+}
+
+function Update-Jdk17Environment {
+  $jdkRoot = Find-TemurinJdk17
+  if ([string]::IsNullOrWhiteSpace($jdkRoot)) {
+    return $false
+  }
+
+  $binPath = Join-Path $jdkRoot 'bin'
+  $env:JAVA_HOME = $jdkRoot
+  $env:Path = "$binPath;$env:Path"
+  Write-Host "已为当前 PowerShell 会话设置 JAVA_HOME：$env:JAVA_HOME"
+  return $true
+}
+
 function Test-Jdk17 {
   $javaPath = Resolve-JavaTool 'java'
   $javacPath = Resolve-JavaTool 'javac'
@@ -95,13 +154,13 @@ function Test-Jdk17 {
 function Install-Jdk17 {
   $wingetPath = Resolve-CommandPath 'winget.exe'
   if ([string]::IsNullOrWhiteSpace($wingetPath)) {
-    throw '未找到 winget。请手动安装 JDK 17，或安装 Windows 应用安装程序后重试。'
+    Exit-WithFailure -Message '未找到 winget。请手动安装 JDK 17，或安装 Windows 应用安装程序后重试。' -ExitCode 1
   }
 
   Write-Step '正在通过 winget 安装 Temurin JDK 17'
   winget install --id EclipseAdoptium.Temurin.17.JDK --silent --accept-package-agreements --accept-source-agreements
   if ($LASTEXITCODE -ne 0) {
-    throw "winget 安装 JDK 17 失败，退出码：$LASTEXITCODE"
+    Exit-WithFailure -Message "winget 安装 JDK 17 失败，退出码：$LASTEXITCODE" -ExitCode $LASTEXITCODE
   }
 }
 
@@ -178,7 +237,7 @@ function Invoke-SdkManager {
   )
   & $SdkManager @Arguments
   if ($LASTEXITCODE -ne 0) {
-    throw "sdkmanager.bat 执行失败，退出码：$LASTEXITCODE"
+    Exit-WithFailure -Message "sdkmanager.bat 执行失败，退出码：$LASTEXITCODE" -ExitCode $LASTEXITCODE
   }
 }
 
@@ -189,8 +248,10 @@ Write-Host "Android SDK 根目录：$SdkRoot"
 Write-Step '检查 JDK 17'
 if (-not (Test-Jdk17)) {
   Install-Jdk17
+  Update-Jdk17Environment | Out-Null
   if (-not (Test-Jdk17)) {
     Write-Host 'JDK 17 已安装或正在安装，但当前终端尚未刷新 PATH。请重新打开 PowerShell 后再次运行本命令。'
+    exit 1
   }
 }
 
@@ -200,15 +261,13 @@ $sdkManagerPath = Install-CommandLineTools -AndroidSdkRoot $SdkRoot
 Write-Step '接受 Android SDK 许可证'
 cmd.exe /d /c "(for /l %i in (1,1,100) do @echo y) | `"$sdkManagerPath`" --sdk_root=`"$SdkRoot`" --licenses"
 if ($LASTEXITCODE -ne 0) {
-  throw "接受 Android SDK 许可证失败，退出码：$LASTEXITCODE"
+  Exit-WithFailure -Message "接受 Android SDK 许可证失败，退出码：$LASTEXITCODE" -ExitCode $LASTEXITCODE
 }
 
 Write-Step '安装 Android SDK 构建包'
 Invoke-SdkManager -SdkManager $sdkManagerPath -Arguments @(
   "--sdk_root=$SdkRoot",
-  "platform-tools",
-  "platforms;android-35",
-  "build-tools;35.0.0"
+  $RequiredPackages
 )
 
 Write-Host ""

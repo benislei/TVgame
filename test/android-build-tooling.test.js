@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
@@ -190,6 +191,12 @@ test('android build installer script documents JDK, SDK download and required pa
   assert.match(script, /"platform-tools"/);
   assert.match(script, /"platforms;android-35"/);
   assert.match(script, /"build-tools;35\.0\.0"/);
+  assert.match(script, /function\s+Find-TemurinJdk17/);
+  assert.match(script, /function\s+Update-Jdk17Environment/);
+  assert.match(script, /\$env:JAVA_HOME/);
+  assert.match(script, /\$env:Path\s*=\s*"\$binPath;\$env:Path"/);
+  assert.match(script, /function\s+Exit-WithFailure/);
+  assert.match(script, /exit\s+\$ExitCode/);
 });
 
 test('android gradle wrapper files target Gradle 8.10.2 and include a non-empty jar', () => {
@@ -197,9 +204,13 @@ test('android gradle wrapper files target Gradle 8.10.2 and include a non-empty 
   const jarPath = path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.jar');
   const properties = fs.readFileSync(propertiesPath, 'utf8');
   const jar = fs.statSync(jarPath);
+  const jarBytes = fs.readFileSync(jarPath);
+  const sha256 = crypto.createHash('sha256').update(jarBytes).digest('hex');
 
   assert.match(properties, /distributionUrl=https\\:\/\/services\.gradle\.org\/distributions\/gradle-8\.10\.2-bin\.zip/);
-  assert.ok(jar.size > 0);
+  assert.equal(sha256, '2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046');
+  assert.equal(jar.size, 43583);
+  assert.equal(jarBytes.includes(Buffer.from('gradle-wrapper.jar', 'utf8')), false);
 });
 
 test('android install CLI spawns the PowerShell installer script', () => {
@@ -230,8 +241,9 @@ test('android install CLI spawns the PowerShell installer script', () => {
     '-ExecutionPolicy',
     'Bypass',
     '-File',
-    path.join('scripts', 'install-android-build-tools.ps1')
+    path.resolve(__dirname, '..', 'scripts', 'install-android-build-tools.ps1')
   ]);
+  assert.equal(path.isAbsolute(calls[0].args[4]), true);
   assert.equal(calls[0].options.stdio, 'inherit');
 });
 

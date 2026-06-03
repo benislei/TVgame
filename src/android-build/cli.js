@@ -53,7 +53,7 @@ function printHelp() {
 }
 
 function runInstall(spawnSync = childProcess.spawnSync) {
-  const scriptPath = path.join('scripts', 'install-android-build-tools.ps1');
+  const scriptPath = path.resolve(__dirname, '..', '..', 'scripts', 'install-android-build-tools.ps1');
   console.log('正在启动 Android 构建依赖安装脚本...');
   const result = spawnSync('powershell.exe', [
     '-NoProfile',
