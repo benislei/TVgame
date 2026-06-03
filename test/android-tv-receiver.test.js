@@ -228,6 +228,14 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /MediaFormat\.createVideoFormat\("video\/avc",\s*1920,\s*1080\)/);
   assert.match(video, /stats\.videoPackets\+\+/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
+  assert.match(video, /ByteArrayOutputStream\s+accessUnitBuffer/);
+  assert.match(video, /MAX_ACCESS_UNIT_SIZE/);
+  assert.match(video, /appendNalUnits\(packet\.timestamp,\s*nalUnits\)/);
+  assert.match(video, /if\s*\(\s*packet\.marker\s*\)/);
+  assert.match(video, /queueCurrentAccessUnit\(packet\.timestamp\)/);
+  assert.match(video, /queueEncodedFrame\(accessUnit,\s*timestamp\)/);
+  assert.match(video, /firstVideoTimestamp/);
+  assert.match(video, /\(rtpTimestamp\s*-\s*firstVideoTimestamp\)\s*&\s*0xFFFFFFFFL/);
   assert.match(video, /stats\.videoFrames\+\+/);
   assert.match(video, /stats\.droppedFrames\+\+/);
   assert.match(video, /setSoTimeout\(/);

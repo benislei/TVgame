@@ -4,6 +4,7 @@ import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.view.Surface;
 
+import java.io.ByteArrayOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -16,13 +17,17 @@ public final class H264VideoReceiver implements Runnable {
     private static final int VIDEO_PORT = 5004;
     private static final int SOCKET_TIMEOUT_MS = 250;
     private static final int MAX_RTP_PACKET_SIZE = 1500;
+    private static final int MAX_ACCESS_UNIT_SIZE = 4 * 1024 * 1024;
 
     private final Surface surface;
     private final StatsModel stats;
     private final H264RtpDepacketizer depacketizer = new H264RtpDepacketizer();
+    private final ByteArrayOutputStream accessUnitBuffer = new ByteArrayOutputStream(512 * 1024);
     private volatile boolean running = true;
     private DatagramSocket socket;
     private MediaCodec decoder;
+    private long accessUnitTimestamp = -1;
+    private long firstVideoTimestamp = -1;
 
     public H264VideoReceiver(Surface surface, StatsModel stats) {
         this.surface = surface;
@@ -52,10 +57,13 @@ public final class H264VideoReceiver implements Runnable {
                     stats.videoPackets++;
                     stats.lastVideoAtMs = System.currentTimeMillis();
                     List<byte[]> nalUnits = depacketizer.depacketize(packet);
-                    for (byte[] nalUnit : nalUnits) {
-                        queueNalUnit(nalUnit, packet.timestamp);
-                        drainOutput();
+                    if (!nalUnits.isEmpty()) {
+                        appendNalUnits(packet.timestamp, nalUnits);
                     }
+                    if (packet.marker) {
+                        queueCurrentAccessUnit(packet.timestamp);
+                    }
+                    drainOutput();
                 } catch (SocketTimeoutException ignored) {
                     drainOutput();
                 } catch (SocketException ex) {
@@ -81,8 +89,42 @@ public final class H264VideoReceiver implements Runnable {
         }
     }
 
-    private void queueNalUnit(byte[] nalUnit, long timestamp) {
-        if (decoder == null || nalUnit.length == 0) {
+    private void appendNalUnits(long timestamp, List<byte[]> nalUnits) {
+        if (accessUnitTimestamp >= 0 && accessUnitTimestamp != timestamp && accessUnitBuffer.size() > 0) {
+            queueCurrentAccessUnit(accessUnitTimestamp);
+        }
+        if (accessUnitTimestamp < 0) {
+            accessUnitTimestamp = timestamp;
+        }
+
+        for (byte[] nalUnit : nalUnits) {
+            if (nalUnit == null || nalUnit.length == 0) {
+                continue;
+            }
+            if (accessUnitBuffer.size() + nalUnit.length > MAX_ACCESS_UNIT_SIZE) {
+                accessUnitBuffer.reset();
+                accessUnitTimestamp = -1;
+                stats.droppedFrames++;
+                return;
+            }
+            accessUnitBuffer.write(nalUnit, 0, nalUnit.length);
+        }
+    }
+
+    private void queueCurrentAccessUnit(long timestamp) {
+        if (accessUnitBuffer.size() == 0) {
+            accessUnitTimestamp = -1;
+            return;
+        }
+
+        byte[] accessUnit = accessUnitBuffer.toByteArray();
+        accessUnitBuffer.reset();
+        accessUnitTimestamp = -1;
+        queueEncodedFrame(accessUnit, timestamp);
+    }
+
+    private void queueEncodedFrame(byte[] accessUnit, long timestamp) {
+        if (decoder == null || accessUnit.length == 0) {
             return;
         }
 
@@ -93,15 +135,15 @@ public final class H264VideoReceiver implements Runnable {
         }
 
         ByteBuffer inputBuffer = decoder.getInputBuffer(inputIndex);
-        if (inputBuffer == null || inputBuffer.capacity() < nalUnit.length) {
+        if (inputBuffer == null || inputBuffer.capacity() < accessUnit.length) {
             stats.droppedFrames++;
             decoder.queueInputBuffer(inputIndex, 0, 0, presentationTimeUs(timestamp), 0);
             return;
         }
 
         inputBuffer.clear();
-        inputBuffer.put(nalUnit);
-        decoder.queueInputBuffer(inputIndex, 0, nalUnit.length, presentationTimeUs(timestamp), 0);
+        inputBuffer.put(accessUnit);
+        decoder.queueInputBuffer(inputIndex, 0, accessUnit.length, presentationTimeUs(timestamp), 0);
     }
 
     private void drainOutput() {
@@ -124,8 +166,12 @@ public final class H264VideoReceiver implements Runnable {
         }
     }
 
-    private static long presentationTimeUs(long rtpTimestamp) {
-        return (rtpTimestamp * 1000000L) / 90000L;
+    private long presentationTimeUs(long rtpTimestamp) {
+        if (firstVideoTimestamp < 0) {
+            firstVideoTimestamp = rtpTimestamp;
+        }
+        long delta = (rtpTimestamp - firstVideoTimestamp) & 0xFFFFFFFFL;
+        return (delta * 1000000L) / 90000L;
     }
 
     private void releaseResources() {
