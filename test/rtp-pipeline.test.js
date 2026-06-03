@@ -15,6 +15,8 @@ test('builds 1080p60 H264 RTP video pipeline for Android TV', () => {
 
   assert.match(pipeline, /d3d11screencapturesrc show-cursor=true/);
   assert.match(pipeline, /video\/x-raw\(memory:D3D11Memory\),framerate=60\/1/);
+  assert.match(pipeline, /d3d11download/);
+  assert.match(pipeline, /video\/x-raw,format=NV12,width=1920,height=1080,framerate=60\/1/);
   assert.match(pipeline, /nvh264enc/);
   assert.match(pipeline, /bframes=0/);
   assert.match(pipeline, /bitrate=25000/);

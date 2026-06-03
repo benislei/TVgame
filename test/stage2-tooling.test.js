@@ -21,6 +21,7 @@ test('stage2 report is ready when GStreamer RTP video and audio plugins exist', 
   assert.equal(report.ready, true);
   assert.equal(report.gstreamer.ready, true);
   assert.equal(report.plugins.d3d11screencapturesrc, true);
+  assert.equal(report.plugins.d3d11download, true);
   assert.equal(report.plugins.nvh264enc, true);
   assert.equal(report.plugins.wasapi2src, true);
   assert.equal(report.plugins.rtpL16pay, true);
@@ -71,7 +72,7 @@ test('stage2 report default inspector uses the resolved gst-inspect path', () =>
     });
 
     assert.equal(report.ready, true);
-    assert.equal(seen.length, 9);
+    assert.equal(seen.length, 10);
     assert.deepEqual(seen[0], ['d3d11screencapturesrc', 'D:/gstreamer/bin/gst-inspect-1.0.exe']);
   } finally {
     environment.inspectPlugin = originalInspectPlugin;

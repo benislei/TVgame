@@ -4,6 +4,7 @@ const { findExecutable, inspectPlugin } = require('../native-streamer/environmen
 
 const REQUIRED_PLUGINS = [
   'd3d11screencapturesrc',
+  'd3d11download',
   'nvh264enc',
   'rtph264pay',
   'h264parse',
