@@ -1,5 +1,7 @@
 'use strict';
 
+const childProcess = require('node:child_process');
+const path = require('node:path');
 const { createAndroidBuildReport } = require('./tooling');
 
 function statusText(found) {
@@ -27,7 +29,7 @@ function printCheckReport(report) {
       console.log(`  - ${item}`);
     }
     console.log('');
-    console.log('安装命令将在下一步接入；当前请先查看 docs/android-build-setup.md，或等待自动安装入口。');
+    console.log('可运行 npm.cmd run android:install 安装 JDK 17、Android SDK 构建工具和 Gradle Wrapper 依赖。');
   }
 }
 
@@ -45,12 +47,34 @@ function printHelp() {
   console.log('');
   console.log('命令：');
   console.log('  check    检查 Android APK 构建环境');
-  console.log('  install  预留安装入口');
+  console.log('  install  安装 Android APK 构建依赖');
   console.log('  build    预留构建入口');
   console.log('  apk      显示 Debug APK 路径');
 }
 
-function main(argv = process.argv.slice(2)) {
+function runInstall(spawnSync = childProcess.spawnSync) {
+  const scriptPath = path.join('scripts', 'install-android-build-tools.ps1');
+  console.log('正在启动 Android 构建依赖安装脚本...');
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    scriptPath
+  ], {
+    stdio: 'inherit'
+  });
+
+  if (result.error) {
+    console.error(`安装脚本启动失败：${result.error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.exitCode = typeof result.status === 'number' ? result.status : 1;
+}
+
+function main(argv = process.argv.slice(2), options = {}) {
   const command = argv[0] || 'check';
 
   if (command === 'check') {
@@ -64,8 +88,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'install') {
-    console.log('Android 构建依赖安装命令将在下一步接入。');
-    console.log('当前请先查看 docs/android-build-setup.md，或等待自动安装入口。');
+    runInstall(options.spawnSync);
     return;
   }
 
@@ -89,4 +112,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, printCheckReport, printApk };
+module.exports = { main, printCheckReport, printApk, runInstall };

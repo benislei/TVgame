@@ -157,7 +157,7 @@ test('android check CLI prints a Chinese environment report', () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Android 构建环境检查/);
   assert.match(result.stdout, /缺失项/);
-  assert.match(result.stdout, /安装命令将在下一步接入/);
+  assert.match(result.stdout, /可运行 npm\.cmd run android:install/);
 });
 
 test('android apk CLI prints the expected APK path in Chinese', () => {
@@ -172,15 +172,82 @@ test('android apk CLI prints the expected APK path in Chinese', () => {
   assert.match(result.stdout, /当前状态/);
 });
 
+test('android build installer script documents JDK, SDK download and required packages', () => {
+  const script = fs.readFileSync(
+    path.join(__dirname, '..', 'scripts', 'install-android-build-tools.ps1'),
+    'utf8'
+  );
+
+  assert.match(script, /winget\s+install\s+--id\s+EclipseAdoptium\.Temurin\.17\.JDK/);
+  assert.match(script, /--silent/);
+  assert.match(script, /--accept-package-agreements/);
+  assert.match(script, /--accept-source-agreements/);
+  assert.match(script, /java\.exe/);
+  assert.match(script, /javac\.exe/);
+  assert.match(script, /commandlinetools-win-14742923_latest\.zip/);
+  assert.match(script, /16b3f45ddb3d85ea6bbe6a1c0b47146daf0db450/);
+  assert.match(script, /sdkmanager\.bat/);
+  assert.match(script, /"platform-tools"/);
+  assert.match(script, /"platforms;android-35"/);
+  assert.match(script, /"build-tools;35\.0\.0"/);
+});
+
+test('android gradle wrapper files target Gradle 8.10.2 and include a non-empty jar', () => {
+  const propertiesPath = path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.properties');
+  const jarPath = path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.jar');
+  const properties = fs.readFileSync(propertiesPath, 'utf8');
+  const jar = fs.statSync(jarPath);
+
+  assert.match(properties, /distributionUrl=https\\:\/\/services\.gradle\.org\/distributions\/gradle-8\.10\.2-bin\.zip/);
+  assert.ok(jar.size > 0);
+});
+
+test('android install CLI spawns the PowerShell installer script', () => {
+  const cli = require('../src/android-build/cli');
+  const originalLog = console.log;
+  const originalExitCode = process.exitCode;
+  const calls = [];
+
+  console.log = () => {};
+  process.exitCode = undefined;
+
+  try {
+    cli.main(['install'], {
+      spawnSync(command, args, options) {
+        calls.push({ command, args, options });
+        return { status: 0 };
+      }
+    });
+  } finally {
+    console.log = originalLog;
+    process.exitCode = originalExitCode;
+  }
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, 'powershell.exe');
+  assert.deepEqual(calls[0].args, [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    path.join('scripts', 'install-android-build-tools.ps1')
+  ]);
+  assert.equal(calls[0].options.stdio, 'inherit');
+});
+
 test('new android build production files do not contain replacement characters or obvious mojibake', () => {
   const files = [
     path.join(__dirname, '..', 'src', 'android-build', 'tooling.js'),
-    path.join(__dirname, '..', 'src', 'android-build', 'cli.js')
+    path.join(__dirname, '..', 'src', 'android-build', 'cli.js'),
+    path.join(__dirname, '..', 'scripts', 'install-android-build-tools.ps1'),
+    path.join(__dirname, '..', 'android-tv-receiver', 'gradlew.bat'),
+    path.join(__dirname, '..', 'android-tv-receiver', 'gradle', 'wrapper', 'gradle-wrapper.properties')
   ];
 
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     assert.doesNotMatch(text, /\uFFFD/);
-    assert.doesNotMatch(text, /[锛绋閫氬姩鏋勫缓鐜]{4,}/);
+    assert.doesNotMatch(text, /[閿涚粙闁艾濮╅弸鍕紦閻滎垰顣╙]{4,}/);
+    assert.doesNotMatch(text, /[ÂÃÄÅ]{2,}/);
   }
 });
