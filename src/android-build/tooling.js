@@ -33,6 +33,46 @@ function normalizeEnvRoot(value) {
   return path.resolve(trimmed);
 }
 
+function defaultJdkRoots(env) {
+  const roots = [];
+  const programFiles = normalizeEnvRoot(env.ProgramFiles || 'C:\\Program Files');
+  const programFilesX86 = normalizeEnvRoot(env['ProgramFiles(x86)']);
+  if (programFiles) {
+    roots.push(path.join(programFiles, 'Eclipse Adoptium'));
+    roots.push(path.join(programFiles, 'Java'));
+  }
+  if (programFilesX86) {
+    roots.push(path.join(programFilesX86, 'Eclipse Adoptium'));
+    roots.push(path.join(programFilesX86, 'Java'));
+  }
+  return [...new Set(roots)];
+}
+
+function findBundledJdkTool(name, env, exists, listDirs = fs.readdirSync) {
+  for (const root of defaultJdkRoots(env)) {
+    if (!exists(root)) continue;
+    let entries;
+    try {
+      entries = listDirs(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    const candidates = entries
+      .filter(entry => entry.isDirectory && entry.isDirectory())
+      .map(entry => entry.name)
+      .filter(name => /^jdk-17/i.test(name))
+      .sort()
+      .reverse();
+
+    for (const candidateName of candidates) {
+      const candidate = path.join(root, candidateName, 'bin', `${name}.exe`);
+      if (exists(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
 function findAndroidSdkRoot(env = process.env, exists = fs.existsSync) {
   const home = normalizeEnvRoot(env.USERPROFILE || env.HOME);
   const candidates = [
@@ -72,14 +112,14 @@ function createAndroidPaths(projectRoot = path.resolve(__dirname, '..', '..'), e
   };
 }
 
-function findJavaTool(name, env, exists) {
+function findJavaTool(name, env, exists, listDirs = fs.readdirSync) {
   const javaHome = normalizeEnvRoot(env.JAVA_HOME);
   if (javaHome) {
     const candidate = path.join(javaHome, 'bin', `${name}.exe`);
     if (exists(candidate)) return candidate;
   }
 
-  return findInPath(name, env, exists);
+  return findInPath(name, env, exists) || findBundledJdkTool(name, env, exists, listDirs);
 }
 
 function checkFile(label, file, exists, missing) {
@@ -91,12 +131,13 @@ function checkFile(label, file, exists, missing) {
 function createAndroidBuildReport(options = {}) {
   const env = options.env || process.env;
   const exists = options.exists || fs.existsSync;
+  const listDirs = options.listDirs || fs.readdirSync;
   const projectRoot = options.projectRoot || path.resolve(__dirname, '..', '..');
   const paths = createAndroidPaths(projectRoot, env, exists);
   const missing = [];
 
-  const javaPath = findJavaTool('java', env, exists);
-  const javacPath = findJavaTool('javac', env, exists);
+  const javaPath = findJavaTool('java', env, exists, listDirs);
+  const javacPath = findJavaTool('javac', env, exists, listDirs);
   const java = checkFile('JDK java.exe', javaPath, exists, missing);
   const javac = checkFile('JDK javac.exe', javacPath, exists, missing);
 
@@ -127,6 +168,9 @@ function createAndroidBuildReport(options = {}) {
   const gradlew = checkFile('Gradle Wrapper gradlew.bat', gradlewPath, exists, missing);
   const apkFound = Boolean(paths.apk && exists(paths.apk));
 
+  const jdkHome = javac.found
+    ? path.dirname(path.dirname(javac.path))
+    : (java.found ? path.dirname(path.dirname(java.path)) : null);
   const jdkReady = java.found && javac.found;
   const sdkReady = sdkmanager.found && adb.found;
   const packagesReady = android35.found && buildTools35.found;
@@ -137,6 +181,7 @@ function createAndroidBuildReport(options = {}) {
     paths,
     jdk: {
       ready: jdkReady,
+      home: jdkHome,
       java,
       javac
     },

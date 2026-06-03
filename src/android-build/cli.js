@@ -91,12 +91,19 @@ function runBuild(report, spawnSync = childProcess.spawnSync) {
     return;
   }
 
-  const gradlew = path.join(report.paths.receiverRoot, 'gradlew.bat');
+  const gradleWrapperJar = path.join(report.paths.receiverRoot, 'gradle', 'wrapper', 'gradle-wrapper.jar');
   console.log('');
   console.log('正在构建 Android TV 接收端 Debug APK...');
-  const result = spawnSync(gradlew, [':app:assembleDebug', '--no-daemon'], {
+  const result = spawnSync(report.jdk.java.path, [
+    '-classpath',
+    gradleWrapperJar,
+    'org.gradle.wrapper.GradleWrapperMain',
+    ':app:assembleDebug',
+    '--no-daemon'
+  ], {
     cwd: report.paths.receiverRoot,
-    stdio: 'inherit'
+    stdio: 'inherit',
+    env: buildGradleEnv(report)
   });
 
   if (result.error) {
@@ -111,6 +118,27 @@ function runBuild(report, spawnSync = childProcess.spawnSync) {
   if (exitCode === 0) {
     console.log(`APK 输出：${report.apk.path}`);
   }
+}
+
+function buildGradleEnv(report, baseEnv = process.env) {
+  if (!report.jdk || !report.jdk.home) {
+    return baseEnv;
+  }
+
+  const javaBin = path.join(report.jdk.home, 'bin');
+  const sdkRoot = report.sdk && report.sdk.root ? report.sdk.root : baseEnv.ANDROID_SDK_ROOT || baseEnv.ANDROID_HOME;
+  const env = {
+    ...baseEnv,
+    JAVA_HOME: report.jdk.home,
+    PATH: `${javaBin}${path.delimiter}${baseEnv.PATH || baseEnv.Path || ''}`
+  };
+
+  if (sdkRoot) {
+    env.ANDROID_HOME = sdkRoot;
+    env.ANDROID_SDK_ROOT = sdkRoot;
+  }
+
+  return env;
 }
 
 function main(argv = process.argv.slice(2), options = {}) {
@@ -151,4 +179,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, printCheckReport, printApk, runInstall, runBuild };
+module.exports = { main, printCheckReport, printApk, runInstall, runBuild, buildGradleEnv };

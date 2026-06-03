@@ -28,13 +28,15 @@ function createCliTestEnv() {
 function createCliReportOverride({ ready, missing = [], receiverRoot = path.join('C:', 'repo', 'android-tv-receiver'), apkFound = false }) {
   const apkPath = path.join(receiverRoot, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
   const found = Boolean(ready);
+  const jdkHome = path.join('C:', 'Java');
   return {
     ready,
     missing,
     paths: { receiverRoot },
     jdk: {
-      java: { found, path: found ? path.join('C:', 'Java', 'bin', 'java.exe') : null },
-      javac: { found, path: found ? path.join('C:', 'Java', 'bin', 'javac.exe') : null }
+      home: found ? jdkHome : null,
+      java: { found, path: found ? path.join(jdkHome, 'bin', 'java.exe') : null },
+      javac: { found, path: found ? path.join(jdkHome, 'bin', 'javac.exe') : null }
     },
     sdk: {
       root: path.join('C:', 'Android', 'Sdk'),
@@ -80,6 +82,45 @@ test('android build report finds configured SDK packages and wrapper', () => {
   assert.equal(report.sdk.ready, true);
   assert.equal(report.gradleWrapper.ready, true);
   assert.deepEqual(report.missing, []);
+});
+
+test('android build report finds Temurin JDK 17 from the default installation directory', () => {
+  const root = path.join('C:', 'repo');
+  const sdkRoot = path.join('D:', 'Android', 'Sdk');
+  const adoptiumRoot = path.join('C:', 'Program Files', 'Eclipse Adoptium');
+  const jdkRoot = path.join(adoptiumRoot, 'jdk-17.0.19.10-hotspot');
+  const existing = new Set([
+    adoptiumRoot,
+    path.join(jdkRoot, 'bin', 'java.exe'),
+    path.join(jdkRoot, 'bin', 'javac.exe'),
+    path.join(sdkRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat'),
+    path.join(sdkRoot, 'platform-tools', 'adb.exe'),
+    path.join(sdkRoot, 'platforms', 'android-35', 'android.jar'),
+    path.join(sdkRoot, 'build-tools', '35.0.0', 'aapt2.exe'),
+    path.join(root, 'android-tv-receiver', 'gradlew.bat')
+  ]);
+
+  const report = createAndroidBuildReport({
+    projectRoot: root,
+    env: {
+      ProgramFiles: path.join('C:', 'Program Files'),
+      ANDROID_SDK_ROOT: sdkRoot,
+      PATH: ''
+    },
+    exists: file => existing.has(file),
+    listDirs(directory, options) {
+      assert.equal(options.withFileTypes, true);
+      if (directory === adoptiumRoot) {
+        return [{ name: 'jdk-17.0.19.10-hotspot', isDirectory: () => true }];
+      }
+      return [];
+    }
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.jdk.home, jdkRoot);
+  assert.equal(report.jdk.java.path, path.join(jdkRoot, 'bin', 'java.exe'));
+  assert.equal(report.jdk.javac.path, path.join(jdkRoot, 'bin', 'javac.exe'));
 });
 
 test('android build report marks missing dependencies clearly', () => {
@@ -244,7 +285,7 @@ test('android build CLI reports missing dependencies and does not spawn Gradle',
   assert.match(output.join('\n'), /Android SDK platform-tools adb\.exe/);
 });
 
-test('android build CLI runs gradlew.bat in receiver directory and prints APK output on success', () => {
+test('android build CLI runs Gradle wrapper through java in receiver directory and prints APK output on success', () => {
   const cli = require('../src/android-build/cli');
   const originalLog = console.log;
   const originalError = console.error;
@@ -277,10 +318,20 @@ test('android build CLI runs gradlew.bat in receiver directory and prints APK ou
   }
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, path.join(receiverRoot, 'gradlew.bat'));
-  assert.deepEqual(calls[0].args, [':app:assembleDebug', '--no-daemon']);
+  assert.equal(calls[0].command, path.join('C:', 'Java', 'bin', 'java.exe'));
+  assert.deepEqual(calls[0].args, [
+    '-classpath',
+    path.join(receiverRoot, 'gradle', 'wrapper', 'gradle-wrapper.jar'),
+    'org.gradle.wrapper.GradleWrapperMain',
+    ':app:assembleDebug',
+    '--no-daemon'
+  ]);
   assert.equal(calls[0].options.cwd, receiverRoot);
   assert.equal(calls[0].options.stdio, 'inherit');
+  assert.equal(calls[0].options.env.JAVA_HOME, path.join('C:', 'Java'));
+  assert.equal(calls[0].options.env.ANDROID_HOME, path.join('C:', 'Android', 'Sdk'));
+  assert.equal(calls[0].options.env.ANDROID_SDK_ROOT, path.join('C:', 'Android', 'Sdk'));
+  assert.ok(calls[0].options.env.PATH.startsWith(path.join('C:', 'Java', 'bin')));
   assert.equal(exitCode, 0);
   assert.match(output.join('\n'), new RegExp(`APK 输出：${apkPath.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}`));
 });
@@ -348,6 +399,9 @@ test('android build installer script documents JDK, SDK download and required pa
   assert.match(script, /--accept-source-agreements/);
   assert.match(script, /java\.exe/);
   assert.match(script, /javac\.exe/);
+  assert.match(script, /System\.Diagnostics\.ProcessStartInfo/);
+  assert.match(script, /RedirectStandardError\s*=\s*\$true/);
+  assert.doesNotMatch(script, /-version\s+2>&1/);
   assert.match(script, /commandlinetools-win-14742923_latest\.zip/);
   assert.match(script, /16b3f45ddb3d85ea6bbe6a1c0b47146daf0db450/);
   assert.match(script, /sdkmanager\.bat/);
@@ -356,10 +410,15 @@ test('android build installer script documents JDK, SDK download and required pa
   assert.match(script, /"build-tools;35\.0\.0"/);
   assert.match(script, /function\s+Find-TemurinJdk17/);
   assert.match(script, /function\s+Update-Jdk17Environment/);
+  assert.match(script, /if\s*\(Update-Jdk17Environment\)\s*{[\s\S]*?}\s*else\s*{[\s\S]*?Install-Jdk17/);
   assert.match(script, /\$env:JAVA_HOME/);
   assert.match(script, /\$env:Path\s*=\s*"\$binPath;\$env:Path"/);
   assert.match(script, /function\s+Exit-WithFailure/);
   assert.match(script, /exit\s+\$ExitCode/);
+  assert.match(script, /function\s+Accept-AndroidLicenses/);
+  assert.match(script, /lan-game-streaming-android-licenses\.txt/);
+  assert.match(script, /type `"\$licenseInput`" \| `"\$SdkManager`"/);
+  assert.match(script, /Arguments\s+\(@\("--sdk_root=\$SdkRoot"\)\s*\+\s*\$RequiredPackages\)/);
 });
 
 test('android gradle wrapper files target Gradle 8.10.2 and include a non-empty jar', () => {

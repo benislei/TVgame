@@ -69,7 +69,17 @@ function Get-JavaMajorVersion {
     return $null
   }
 
-  $versionOutput = & $ToolPath -version 2>&1 | Out-String
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = $ToolPath
+  $startInfo.Arguments = '-version'
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $process = [System.Diagnostics.Process]::Start($startInfo)
+  $stdout = $process.StandardOutput.ReadToEnd()
+  $stderr = $process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+  $versionOutput = "$stdout`n$stderr"
   if ($versionOutput -match 'version\s+"(?<version>\d+)') {
     return [int] $Matches.version
   }
@@ -241,14 +251,38 @@ function Invoke-SdkManager {
   }
 }
 
+function Accept-AndroidLicenses {
+  param(
+    [string] $SdkManager,
+    [string] $AndroidSdkRoot
+  )
+
+  $licenseInput = Join-Path ([System.IO.Path]::GetTempPath()) 'lan-game-streaming-android-licenses.txt'
+  try {
+    (1..100 | ForEach-Object { 'y' }) | Set-Content -Path $licenseInput -Encoding ascii
+    cmd.exe /d /s /c "type `"$licenseInput`" | `"$SdkManager`" --sdk_root=`"$AndroidSdkRoot`" --licenses"
+    if ($LASTEXITCODE -ne 0) {
+      Exit-WithFailure -Message "接受 Android SDK 许可证失败，退出码：$LASTEXITCODE" -ExitCode $LASTEXITCODE
+    }
+  } finally {
+    if (Test-Path $licenseInput) {
+      Remove-Item -LiteralPath $licenseInput -Force
+    }
+  }
+}
+
 Write-Host 'Android 构建依赖安装器'
 Write-Host '======================'
 Write-Host "Android SDK 根目录：$SdkRoot"
 
 Write-Step '检查 JDK 17'
 if (-not (Test-Jdk17)) {
-  Install-Jdk17
-  Update-Jdk17Environment | Out-Null
+  if (Update-Jdk17Environment) {
+    Write-Host '已找到本机安装的 JDK 17，并已刷新当前安装脚本环境。'
+  } else {
+    Install-Jdk17
+    Update-Jdk17Environment | Out-Null
+  }
   if (-not (Test-Jdk17)) {
     Write-Host 'JDK 17 已安装或正在安装，但当前终端尚未刷新 PATH。请重新打开 PowerShell 后再次运行本命令。'
     exit 1
@@ -259,16 +293,10 @@ Write-Step '准备 Android SDK command-line tools'
 $sdkManagerPath = Install-CommandLineTools -AndroidSdkRoot $SdkRoot
 
 Write-Step '接受 Android SDK 许可证'
-cmd.exe /d /c "(for /l %i in (1,1,100) do @echo y) | `"$sdkManagerPath`" --sdk_root=`"$SdkRoot`" --licenses"
-if ($LASTEXITCODE -ne 0) {
-  Exit-WithFailure -Message "接受 Android SDK 许可证失败，退出码：$LASTEXITCODE" -ExitCode $LASTEXITCODE
-}
+Accept-AndroidLicenses -SdkManager $sdkManagerPath -AndroidSdkRoot $SdkRoot
 
 Write-Step '安装 Android SDK 构建包'
-Invoke-SdkManager -SdkManager $sdkManagerPath -Arguments @(
-  "--sdk_root=$SdkRoot",
-  $RequiredPackages
-)
+Invoke-SdkManager -SdkManager $sdkManagerPath -Arguments (@("--sdk_root=$SdkRoot") + $RequiredPackages)
 
 Write-Host ""
 Write-Host 'Android 构建依赖安装完成。'
