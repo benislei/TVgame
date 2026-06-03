@@ -64,9 +64,40 @@ test('android build report marks missing dependencies clearly', () => {
   assert.ok(report.missing.includes('Gradle Wrapper gradlew.bat'));
 });
 
+test('android build report falls back from invalid ANDROID_SDK_ROOT to valid ANDROID_HOME', () => {
+  const root = path.join('C:', 'repo');
+  const invalidSdkRoot = path.join('D:', 'MissingSdk');
+  const sdkRoot = path.join('E:', 'Android', 'Sdk');
+  const existing = new Set([
+    path.join('C:', 'Java', 'bin', 'java.exe'),
+    path.join('C:', 'Java', 'bin', 'javac.exe'),
+    path.join(sdkRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat'),
+    path.join(sdkRoot, 'platform-tools', 'adb.exe'),
+    path.join(sdkRoot, 'platforms', 'android-35', 'android.jar'),
+    path.join(sdkRoot, 'build-tools', '35.0.0', 'aapt2.exe'),
+    path.join(root, 'android-tv-receiver', 'gradlew.bat')
+  ]);
+
+  const report = createAndroidBuildReport({
+    projectRoot: root,
+    env: {
+      JAVA_HOME: path.join('C:', 'Java'),
+      ANDROID_SDK_ROOT: invalidSdkRoot,
+      ANDROID_HOME: sdkRoot
+    },
+    exists: file => existing.has(file)
+  });
+
+  assert.equal(report.paths.sdkRoot, sdkRoot);
+  assert.equal(report.sdk.root, sdkRoot);
+  assert.equal(report.ready, true);
+  assert.deepEqual(report.missing, []);
+});
+
 test('android path helpers choose SDK roots from environment and default user profile', () => {
   const envRoot = path.join('E:', 'Sdk');
-  assert.equal(findAndroidSdkRoot({ ANDROID_SDK_ROOT: envRoot }, file => file === envRoot), envRoot);
+  const sdkmanager = path.join(envRoot, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat');
+  assert.equal(findAndroidSdkRoot({ ANDROID_SDK_ROOT: envRoot }, file => file === sdkmanager), envRoot);
 
   const home = path.join('C:', 'Users', 'Dev');
   const paths = createAndroidPaths(path.join('C:', 'repo'), { USERPROFILE: home });

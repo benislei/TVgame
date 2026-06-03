@@ -32,21 +32,29 @@ function findAndroidSdkRoot(env = process.env, exists = fs.existsSync) {
   const candidates = [
     env.ANDROID_SDK_ROOT,
     env.ANDROID_HOME,
+    env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, 'Android', 'Sdk'),
     home && path.join(home, 'AppData', 'Local', 'Android', 'Sdk')
   ].filter(Boolean);
 
   for (const candidate of candidates) {
-    if (exists(candidate)) return candidate;
+    const markers = [
+      path.join(candidate, 'cmdline-tools', 'latest', 'bin', 'sdkmanager.bat'),
+      path.join(candidate, 'platform-tools', 'adb.exe'),
+      path.join(candidate, 'platforms', 'android-35', 'android.jar'),
+      path.join(candidate, 'build-tools', '35.0.0', 'aapt2.exe')
+    ];
+    if (markers.some(marker => exists(marker))) return candidate;
   }
 
   return null;
 }
 
-function createAndroidPaths(projectRoot = path.resolve(__dirname, '..', '..'), env = process.env) {
+function createAndroidPaths(projectRoot = path.resolve(__dirname, '..', '..'), env = process.env, exists = fs.existsSync) {
   const home = env.USERPROFILE || env.HOME || '';
-  const sdkRoot = findAndroidSdkRoot(env, () => false)
+  const sdkRoot = findAndroidSdkRoot(env, exists)
     || env.ANDROID_SDK_ROOT
     || env.ANDROID_HOME
+    || (env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Android', 'Sdk') : '')
     || (home ? path.join(home, 'AppData', 'Local', 'Android', 'Sdk') : '');
 
   return {
@@ -77,7 +85,7 @@ function createAndroidBuildReport(options = {}) {
   const env = options.env || process.env;
   const exists = options.exists || fs.existsSync;
   const projectRoot = options.projectRoot || path.resolve(__dirname, '..', '..');
-  const paths = createAndroidPaths(projectRoot, env);
+  const paths = createAndroidPaths(projectRoot, env, exists);
   const missing = [];
 
   const javaPath = findJavaTool('java', env, exists);
