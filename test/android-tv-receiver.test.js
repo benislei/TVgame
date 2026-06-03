@@ -57,7 +57,7 @@ test('Android TV receiver Gradle files use the required app identity and SDKs', 
   assert.match(appBuild, /namespace\s+"com\.tvgame\.receiver"/);
   assert.match(appBuild, /applicationId\s+"com\.tvgame\.receiver"/);
   assert.match(appBuild, /compileSdk\s+35/);
-  assert.match(appBuild, /minSdk\s+26/);
+  assert.match(appBuild, /minSdk\s+23/);
   assert.match(appBuild, /targetSdk\s+35/);
   assert.match(appBuild, /versionName\s+"0\.1\.0"/);
 });
