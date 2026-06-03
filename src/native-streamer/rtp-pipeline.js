@@ -9,7 +9,7 @@ function buildRtpConfig(overrides = {}) {
     height: Number(overrides.height || 1080),
     fps: Number(overrides.fps || 60),
     bitrateKbps: Number(overrides.bitrateKbps || 25000),
-    keyframeInterval: Number(overrides.keyframeInterval || 60),
+    keyframeInterval: Number(overrides.keyframeInterval || 30),
     displayIndex: Number(overrides.displayIndex || 0)
   };
 }
@@ -32,6 +32,8 @@ function buildVideoRtpPipeline(config) {
     'd3d11download',
     '!',
     `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
     '!',
     `nvh264enc preset=low-latency-hq rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
     '!',

@@ -126,6 +126,10 @@ function validateRtpArgs(args) {
   const videoPort = parseIntegerOption(args['video-port'] || '5004', 'video-port ', 1, 65535, errors);
   const audioPort = parseIntegerOption(args['audio-port'] || '5006', 'audio-port ', 1, 65535, errors);
   const bitrateKbps = parseIntegerOption(args.bitrate || '25000', 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
+  const width = parseIntegerOption(args.width || '1920', 'width ', 320, 7680, errors);
+  const height = parseIntegerOption(args.height || '1080', 'height ', 240, 4320, errors);
+  const fps = parseIntegerOption(args.fps || '60', 'fps ', 1, 240, errors);
+  const keyframeInterval = parseIntegerOption(args.gop || '30', 'gop ', 1, 600, errors);
   const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
 
   return {
@@ -136,6 +140,10 @@ function validateRtpArgs(args) {
       videoPort,
       audioPort,
       bitrateKbps,
+      width,
+      height,
+      fps,
+      keyframeInterval,
       displayIndex
     }
   };

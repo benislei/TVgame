@@ -113,6 +113,17 @@ test('InputClient validates key JSON before enqueue and keeps the UI path bounde
   assert.match(source, /new\s+ArrayBlockingQueue<\s*Runnable\s*>\(INPUT_QUEUE_CAPACITY\)/);
 });
 
+test('InputClient can send browser-style keyboard code JSON for mapped gamepad axes', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /public\s+void\s+sendCode\(String\s+action,\s*String\s+code\)/);
+  assert.match(source, /buildCodeJsonLine\(action,\s*code\)/);
+  assert.match(source, /MAX_CODE_LENGTH\s*=\s*32/);
+  assert.match(source, /code\.matches\("\[A-Za-z0-9_\\\\-\]\+"\)/);
+  assert.match(source, /\\",\\"code\\":\\"/);
+  assert.match(source, /\+\s*code\s*\+\s*"\\?"/);
+});
+
 test('InputClient.buildKeyJsonLine returns exact JSON lines and rejects invalid input', (t) => {
   if (!commandExists('javac') || !commandExists('java')) {
     t.skip('javac/java not available; keeping InputClient behavior covered by static checks in this environment');
@@ -134,6 +145,7 @@ public final class InputClientHarness {
     public static void main(String[] args) {
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"down\\",\\"keyCode\\":66}\\n", InputClient.buildKeyJsonLine("down", 66));
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"up\\",\\"keyCode\\":23}\\n", InputClient.buildKeyJsonLine("up", 23));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"down\\",\\"code\\":\\"KeyW\\"}\\n", InputClient.buildCodeJsonLine("down", "KeyW"));
         assertThrows(new Runnable() {
             @Override
             public void run() {
@@ -298,6 +310,22 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /return\s+super\.onKeyUp\(keyCode,\s*event\)/);
   assert.match(source, /inputClient\.close\(\)/);
   assert.match(source, /stopReceivers\(\)/);
+});
+
+test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /import\s+android\.view\.MotionEvent/);
+  assert.match(source, /boolean\s+onGenericMotionEvent\(MotionEvent\s+event\)/);
+  assert.match(source, /SOURCE_JOYSTICK/);
+  assert.match(source, /SOURCE_GAMEPAD/);
+  assert.match(source, /AXIS_X/);
+  assert.match(source, /AXIS_Y/);
+  assert.match(source, /GAMEPAD_AXIS_DEADZONE/);
+  assert.match(source, /updateMappedKey\("KeyA"/);
+  assert.match(source, /updateMappedKey\("KeyD"/);
+  assert.match(source, /updateMappedKey\("KeyW"/);
+  assert.match(source, /updateMappedKey\("KeyS"/);
 });
 
 test('stage 2 verification guide documents input return and acceptance checklist in Chinese', () => {

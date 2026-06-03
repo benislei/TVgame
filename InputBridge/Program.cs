@@ -1,14 +1,17 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
 const string Prefix = "http://127.0.0.1:8788/";
+const int AndroidTcpInputPort = 8789;
 
 var listener = new HttpListener();
 listener.Prefixes.Add(Prefix);
 listener.Start();
+_ = RunTcpInputServerAsync();
 
 Console.WriteLine("电视游戏输入桥已启动");
 Console.WriteLine($"监听地址：ws://127.0.0.1:8788/input");
@@ -31,6 +34,36 @@ while (true)
         await HandleClient(ws);
         Console.WriteLine("输入通道已断开");
     });
+}
+
+async Task RunTcpInputServerAsync()
+{
+    var tcpListener = new TcpListener(IPAddress.Any, AndroidTcpInputPort);
+    tcpListener.Start();
+    while (true)
+    {
+        var client = await tcpListener.AcceptTcpClientAsync();
+        _ = Task.Run(() => HandleTcpClient(client));
+    }
+}
+
+static async Task HandleTcpClient(TcpClient client)
+{
+    using var currentClient = client;
+    using var reader = new StreamReader(currentClient.GetStream(), Encoding.UTF8);
+    while (await reader.ReadLineAsync() is { } line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+        try
+        {
+            using var doc = JsonDocument.Parse(line);
+            InputInjector.Dispatch(doc.RootElement);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"电视输入事件处理失败：{ex.Message}");
+        }
+    }
 }
 
 static async Task HandleClient(WebSocket ws)
@@ -92,8 +125,19 @@ static class InputInjector
     private static void HandleKeyboard(JsonElement input)
     {
         if (!TryGetString(input, "action", out var action)) return;
-        if (!TryGetString(input, "code", out var code)) return;
-        if (!KeyMap.TryGetValue(code, out var vk)) return;
+        ushort vk;
+        if (TryGetString(input, "code", out var code))
+        {
+            if (!KeyMap.TryGetValue(code, out vk)) return;
+        }
+        else if (TryGetInt(input, "keyCode", out var keyCode))
+        {
+            if (!AndroidKeyCodeMap.TryGetValue(keyCode, out vk)) return;
+        }
+        else
+        {
+            return;
+        }
 
         var flags = action == "up" ? KEYEVENTF_KEYUP : 0;
         SendKeyboard(vk, flags);
@@ -183,16 +227,22 @@ static class InputInjector
 
     private static int GetInt(JsonElement element, string name)
     {
-        if (!element.TryGetProperty(name, out var property)) return 0;
-        return property.ValueKind switch
-        {
-            JsonValueKind.Number when property.TryGetInt32(out var value) => value,
-            JsonValueKind.Number => (int)Math.Round(property.GetDouble()),
-            _ => 0
-        };
+        return TryGetInt(element, name, out var value) ? value : 0;
+    }
+
+    private static bool TryGetInt(JsonElement element, string name, out int value)
+    {
+        value = 0;
+        if (!element.TryGetProperty(name, out var property)) return false;
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out value)) return true;
+        if (property.ValueKind != JsonValueKind.Number) return false;
+
+        value = (int)Math.Round(property.GetDouble());
+        return true;
     }
 
     private static readonly Dictionary<string, ushort> KeyMap = BuildKeyMap();
+    private static readonly Dictionary<int, ushort> AndroidKeyCodeMap = BuildAndroidKeyCodeMap();
 
     private static Dictionary<string, ushort> BuildKeyMap()
     {
@@ -253,6 +303,26 @@ static class InputInjector
         for (var i = 1; i <= 24; i++) map[$"F{i}"] = (ushort)(0x70 + i - 1);
 
         return map;
+    }
+
+    private static Dictionary<int, ushort> BuildAndroidKeyCodeMap()
+    {
+        return new Dictionary<int, ushort>
+        {
+            [19] = 0x26,
+            [20] = 0x28,
+            [21] = 0x25,
+            [22] = 0x27,
+            [23] = 0x0D,
+            [96] = 0x20,
+            [97] = 0x1B,
+            [99] = 0x45,
+            [100] = 0x51,
+            [102] = 0x10,
+            [103] = 0x11,
+            [108] = 0x0D,
+            [109] = 0x09
+        };
     }
 
     [DllImport("user32.dll", SetLastError = true)]

@@ -145,12 +145,32 @@ test('pipeline description includes D3D11 capture, NVENC, RTP, and webrtcbin', (
 });
 
 test('parseArgs accepts Android TV RTP target options', () => {
-  const args = parseArgs(['rtp', '--host', '192.168.1.50', '--video-port', '5004', '--audio-port', '5006']);
+  const args = parseArgs([
+    'rtp',
+    '--host',
+    '192.168.1.50',
+    '--video-port',
+    '5004',
+    '--audio-port',
+    '5006',
+    '--width',
+    '1280',
+    '--height',
+    '720',
+    '--fps',
+    '60',
+    '--gop',
+    '30'
+  ]);
 
   assert.deepEqual(args._, ['rtp']);
   assert.equal(args.host, '192.168.1.50');
   assert.equal(args['video-port'], '5004');
   assert.equal(args['audio-port'], '5006');
+  assert.equal(args.width, '1280');
+  assert.equal(args.height, '720');
+  assert.equal(args.fps, '60');
+  assert.equal(args.gop, '30');
 });
 
 test('runRtpSender rejects invalid RTP options without spawning', () => {

@@ -17,6 +17,7 @@ public final class InputClient {
     private static final int SOCKET_TIMEOUT_MS = 250;
     private static final int INPUT_QUEUE_CAPACITY = 16;
     private static final int MAX_KEY_CODE = 10000;
+    private static final int MAX_CODE_LENGTH = 32;
 
     private final String host;
     private final int port;
@@ -55,6 +56,24 @@ public final class InputClient {
             return;
         }
 
+        enqueueLine(line);
+    }
+
+    public void sendCode(String action, String code) {
+        if (closed) {
+            return;
+        }
+        final String line;
+        try {
+            line = buildCodeJsonLine(action, code);
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+
+        enqueueLine(line);
+    }
+
+    private void enqueueLine(final String line) {
         try {
             executor.execute(new Runnable() {
                 @Override
@@ -85,6 +104,22 @@ public final class InputClient {
             + "\",\"keyCode\":"
             + keyCode
             + "}\n";
+    }
+
+    static String buildCodeJsonLine(String action, String code) {
+        if (!("down".equals(action) || "up".equals(action))) {
+            throw new IllegalArgumentException("action must be down or up");
+        }
+        if (code == null || code.length() == 0 || code.length() > MAX_CODE_LENGTH
+            || !code.matches("[A-Za-z0-9_\\-]+")) {
+            throw new IllegalArgumentException("code out of range");
+        }
+
+        return "{\"type\":\"input\",\"kind\":\"keyboard\",\"action\":\""
+            + action
+            + "\",\"code\":\""
+            + code
+            + "\"}\n";
     }
 
     private void sendLine(String line) {

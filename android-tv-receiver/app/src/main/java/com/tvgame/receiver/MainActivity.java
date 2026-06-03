@@ -7,7 +7,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -20,6 +22,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.1.178";
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
+    private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
 
     private final Object lifecycleLock = new Object();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -39,6 +42,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private InputClient inputClient;
     private Thread videoThread;
     private Thread audioThread;
+    private boolean keyAActive;
+    private boolean keyDActive;
+    private boolean keyWActive;
+    private boolean keySActive;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,6 +100,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             surfaceView.getHolder().removeCallback(this);
         }
         if (inputClient != null) {
+            releaseMappedKeys();
             inputClient.close();
             inputClient = null;
         }
@@ -102,7 +110,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (inputClient != null) {
+        if (inputClient != null && event.getRepeatCount() == 0) {
             inputClient.sendKey("down", keyCode);
         }
         return super.onKeyDown(keyCode, event);
@@ -114,6 +122,46 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             inputClient.sendKey("up", keyCode);
         }
         return super.onKeyUp(keyCode, event);
+    }
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        int source = event.getSource();
+        boolean isGamepad = (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+            || (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
+        if (!isGamepad || event.getAction() != MotionEvent.ACTION_MOVE || inputClient == null) {
+            return super.onGenericMotionEvent(event);
+        }
+
+        float axisX = event.getAxisValue(MotionEvent.AXIS_X);
+        float axisY = event.getAxisValue(MotionEvent.AXIS_Y);
+        if (Math.abs(axisX) < GAMEPAD_AXIS_DEADZONE) {
+            axisX = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+        }
+        if (Math.abs(axisY) < GAMEPAD_AXIS_DEADZONE) {
+            axisY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+        }
+
+        keyAActive = updateMappedKey("KeyA", keyAActive, axisX <= -GAMEPAD_AXIS_DEADZONE);
+        keyDActive = updateMappedKey("KeyD", keyDActive, axisX >= GAMEPAD_AXIS_DEADZONE);
+        keyWActive = updateMappedKey("KeyW", keyWActive, axisY <= -GAMEPAD_AXIS_DEADZONE);
+        keySActive = updateMappedKey("KeyS", keySActive, axisY >= GAMEPAD_AXIS_DEADZONE);
+        return true;
+    }
+
+    private boolean updateMappedKey(String code, boolean wasActive, boolean shouldBeActive) {
+        if (inputClient == null || wasActive == shouldBeActive) {
+            return wasActive;
+        }
+        inputClient.sendCode(shouldBeActive ? "down" : "up", code);
+        return shouldBeActive;
+    }
+
+    private void releaseMappedKeys() {
+        keyAActive = updateMappedKey("KeyA", keyAActive, false);
+        keyDActive = updateMappedKey("KeyD", keyDActive, false);
+        keyWActive = updateMappedKey("KeyW", keyWActive, false);
+        keySActive = updateMappedKey("KeyS", keySActive, false);
     }
 
     private void startReceivers(Surface surface) {
