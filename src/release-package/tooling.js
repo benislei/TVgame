@@ -74,17 +74,32 @@ function copyItemIfExists(projectRoot, packageDir, relativePath) {
   return target;
 }
 
+function toWindowsNewlines(text) {
+  return String(text)
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .join('\r\n');
+}
+
 function createBatchScript(body) {
-  return [
+  const text = [
     '@echo off',
     'chcp 65001 >nul',
     'setlocal',
+    'if not exist "%~dp0app\\package.json" (',
+    '  echo 未找到 app\\package.json。',
+    '  echo 请从完整的 TVGame-Friend-Preview 文件夹中运行本脚本，不要只复制单个 .bat 文件。',
+    '  exit /b 1',
+    ')',
     'cd /d "%~dp0app"',
     body.trim(),
     'echo.',
     'pause',
     ''
-  ].join('\r\n');
+  ].join('\n');
+
+  return toWindowsNewlines(text);
 }
 
 function createSenderBatch(profileArgs) {
@@ -197,21 +212,40 @@ function createZipArchive(packageDir, zipPath, spawnSync = childProcess.spawnSyn
   return zipPath;
 }
 
+function isBusyRemovalError(error) {
+  return error && ['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(error.code);
+}
+
+function preparePackageDirectory(outputRoot, basePackageName, rmSync = fs.rmSync) {
+  for (let index = 0; index < 100; index++) {
+    const packageName = index === 0 ? basePackageName : `${basePackageName}-${index + 1}`;
+    const packageDir = path.join(outputRoot, packageName);
+    try {
+      rmSync(packageDir, { recursive: true, force: true });
+      return { packageName, packageDir };
+    } catch (error) {
+      if (!isBusyRemovalError(error)) throw error;
+    }
+  }
+
+  throw new Error(`无法准备试用包目录：${path.join(outputRoot, basePackageName)}`);
+}
+
 function createFriendPreviewPackage(options = {}) {
   const projectRoot = path.resolve(options.projectRoot || path.join(__dirname, '..', '..'));
   const outputRoot = path.resolve(options.outputRoot || path.join(projectRoot, 'dist'));
-  const packageName = options.packageName || PACKAGE_NAME;
-  const packageDir = path.join(outputRoot, packageName);
-  const zipPath = path.join(outputRoot, `${packageName}.zip`);
+  const basePackageName = options.packageName || PACKAGE_NAME;
   const apkSource = options.apkSource || path.join(projectRoot, APK_SOURCE_RELATIVE);
-  const apkTarget = path.join(packageDir, 'TVGameReceiver.apk');
   const createZip = options.createZip !== false;
 
   if (!fs.existsSync(apkSource)) {
     throw new Error(`缺少 Android TV APK，请先运行 npm.cmd run android:build。缺失文件：${apkSource}`);
   }
 
-  fs.rmSync(packageDir, { recursive: true, force: true });
+  const prepared = preparePackageDirectory(outputRoot, basePackageName, options.rmSync);
+  const { packageName, packageDir } = prepared;
+  const zipPath = path.join(outputRoot, `${packageName}.zip`);
+  const apkTarget = path.join(packageDir, 'TVGameReceiver.apk');
   ensureDirectory(packageDir);
   ensureDirectory(path.join(packageDir, 'app'));
   copyFile(apkSource, apkTarget);
@@ -249,5 +283,6 @@ function createFriendPreviewPackage(options = {}) {
 module.exports = {
   createFriendPreviewPackage,
   createReadme,
-  createZipArchive
+  createZipArchive,
+  preparePackageDirectory
 };

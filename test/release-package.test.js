@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -98,6 +99,9 @@ test('friend preview launchers run the expected low-latency commands', () => {
 
   for (const text of [installNpm, installGstreamer, check, bridge, defaultSender, qualitySender, fallbackSender]) {
     assert.match(text, /chcp 65001 >nul/);
+    assert.doesNotMatch(text, /(?<!\r)\n/);
+    assert.match(text, /if not exist "%~dp0app\\package\.json"/);
+    assert.match(text, /请从完整的 TVGame-Friend-Preview 文件夹中运行本脚本/);
     assert.match(text, /cd \/d "%~dp0app"/);
   }
 
@@ -131,6 +135,31 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /TCP 8789/);
 });
 
+test('friend preview sender launcher waits for TV IP input and forwards it to native:rtp', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+  writeFile(path.join(report.packageDir, 'app', 'npm.cmd'), '@echo off\r\necho npm:%*\r\nexit /b 0\r\n');
+
+  const script = path.join(report.packageDir, '启动默认发送.bat');
+  const result = childProcess.spawnSync('cmd.exe', [
+    '/d',
+    '/c',
+    script
+  ], {
+    encoding: 'utf8',
+    input: '192.168.50.140\r\n\r\n',
+    timeout: 10000
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140"/);
+});
+
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();
@@ -152,6 +181,32 @@ test('friend preview package can request a zip archive through PowerShell Compre
   assert.deepEqual(calls[0].args.slice(0, 3), ['-NoProfile', '-ExecutionPolicy', 'Bypass']);
   assert.match(calls[0].args.join(' '), /Compress-Archive/);
   assert.match(calls[0].args.join(' '), /TVGame-Friend-Preview\.zip/);
+});
+
+test('friend preview package falls back to a numbered folder when the old package is locked', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const outputRoot = path.join(projectRoot, 'dist-test');
+  const lockedDir = path.join(outputRoot, 'TVGame-Friend-Preview');
+  fs.mkdirSync(lockedDir, { recursive: true });
+
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot,
+    createZip: false,
+    rmSync(target, options) {
+      if (target === lockedDir) {
+        const error = new Error('locked');
+        error.code = 'EBUSY';
+        throw error;
+      }
+      fs.rmSync(target, options);
+    }
+  });
+
+  assert.equal(report.packageName, 'TVGame-Friend-Preview-2');
+  assert.equal(report.packageDir, path.join(outputRoot, 'TVGame-Friend-Preview-2'));
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'TVGameReceiver.apk')), true);
 });
 
 test('package.json exposes package:friend script', () => {
