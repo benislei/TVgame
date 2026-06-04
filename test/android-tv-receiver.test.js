@@ -251,6 +251,9 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /recordVideoSequence\(packet\.sequenceNumber\)/);
   assert.match(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets/);
   assert.match(video, /accessUnitDamaged\s*=\s*true/);
+  assert.match(video, /waitingForKeyframe\s*=\s*true/);
+  assert.match(video, /accessUnitContainsIdr\(accessUnit\)/);
+  assert.match(video, /stats\.videoRecoveryWaits\+\+/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
   assert.match(video, /ByteArrayOutputStream\s+accessUnitBuffer/);
   assert.match(video, /MAX_ACCESS_UNIT_SIZE/);
@@ -412,6 +415,7 @@ test('Android TV receiver production text is real Chinese without mojibake fragm
     '视频包',
     '视频帧',
     '视频丢包',
+    '等待关键帧',
     '音频包',
     '音频字节',
     '丢帧',

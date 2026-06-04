@@ -1,15 +1,54 @@
 'use strict';
 
+const RTP_PROFILES = {
+  game720: {
+    codec: 'h264',
+    width: 1280,
+    height: 720,
+    fps: 60,
+    bitrateKbps: 18000,
+    keyframeInterval: 15
+  },
+  game1080: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    bitrateKbps: 28000,
+    keyframeInterval: 15
+  },
+  quality1080: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    bitrateKbps: 36000,
+    keyframeInterval: 30
+  },
+  game4k: {
+    codec: 'h265',
+    width: 3840,
+    height: 2160,
+    fps: 60,
+    bitrateKbps: 65000,
+    keyframeInterval: 30
+  }
+};
+
 function buildRtpConfig(overrides = {}) {
+  const profileName = overrides.profile || 'game1080';
+  const profile = RTP_PROFILES[profileName] || RTP_PROFILES.game1080;
   return {
+    profile: profileName,
     host: overrides.host || '127.0.0.1',
     videoPort: Number(overrides.videoPort || 5004),
     audioPort: Number(overrides.audioPort || 5006),
-    width: Number(overrides.width || 1280),
-    height: Number(overrides.height || 720),
-    fps: Number(overrides.fps || 60),
-    bitrateKbps: Number(overrides.bitrateKbps || 18000),
-    keyframeInterval: Number(overrides.keyframeInterval || 15),
+    codec: overrides.codec || profile.codec,
+    width: Number(overrides.width || profile.width),
+    height: Number(overrides.height || profile.height),
+    fps: Number(overrides.fps || profile.fps),
+    bitrateKbps: Number(overrides.bitrateKbps || profile.bitrateKbps),
+    keyframeInterval: Number(overrides.keyframeInterval || profile.keyframeInterval),
     displayIndex: Number(overrides.displayIndex || 0)
   };
 }
@@ -77,6 +116,7 @@ function buildRtpLaunchCommands(config) {
 }
 
 module.exports = {
+  RTP_PROFILES,
   buildRtpConfig,
   buildVideoRtpPipeline,
   buildAudioRtpPipeline,

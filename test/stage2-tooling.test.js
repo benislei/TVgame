@@ -23,8 +23,29 @@ test('stage2 report is ready when GStreamer RTP video and audio plugins exist', 
   assert.equal(report.plugins.d3d11screencapturesrc, true);
   assert.equal(report.plugins.d3d11download, true);
   assert.equal(report.plugins.nvh264enc, true);
+  assert.equal(report.optionalPlugins.nvh265enc, true);
+  assert.equal(report.codecs.hevc.ready, true);
   assert.equal(report.plugins.wasapi2src, true);
   assert.equal(report.plugins.rtpL16pay, true);
+});
+
+test('stage2 report keeps H264 ready when optional HEVC plugins are missing', () => {
+  const report = createStage2Report({
+    findExecutable: name => {
+      if (name === 'gst-launch-1.0' || name === 'gst-inspect-1.0') {
+        return `D:/gstreamer/1.0/msvc_x86_64/bin/${name}.exe`;
+      }
+      if (name === 'dotnet') return 'C:/Program Files/dotnet/dotnet.exe';
+      return null;
+    },
+    inspectPlugin: plugin => !['nvh265enc', 'h265parse', 'rtph265pay'].includes(plugin)
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.codecs.h264.ready, true);
+  assert.equal(report.codecs.hevc.ready, false);
+  assert.deepEqual(report.codecs.hevc.missing, ['nvh265enc', 'h265parse', 'rtph265pay']);
+  assert.doesNotMatch(report.missing.plugins.join(','), /nvh265enc/);
 });
 
 test('stage2 report does not require Python GStreamer bindings', () => {
@@ -72,7 +93,7 @@ test('stage2 report default inspector uses the resolved gst-inspect path', () =>
     });
 
     assert.equal(report.ready, true);
-    assert.equal(seen.length, 10);
+    assert.equal(seen.length, 13);
     assert.deepEqual(seen[0], ['d3d11screencapturesrc', 'D:/gstreamer/bin/gst-inspect-1.0.exe']);
   } finally {
     environment.inspectPlugin = originalInspectPlugin;
@@ -89,5 +110,8 @@ test('stage2-check CLI command prints the stage 2 report', () => {
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /阶段 2 发送端环境检测/);
+  assert.match(result.stdout, /编码能力/);
+  assert.match(result.stdout, /H\.264/);
+  assert.match(result.stdout, /HEVC/);
   assert.doesNotMatch(result.stderr, /未知命令/);
 });

@@ -31,6 +31,7 @@ public final class H264VideoReceiver implements Runnable {
     private long firstVideoTimestamp = -1;
     private int expectedVideoSequenceNumber = -1;
     private boolean accessUnitDamaged;
+    private boolean waitingForKeyframe;
 
     public H264VideoReceiver(Surface surface, StatsModel stats) {
         this.surface = surface;
@@ -137,6 +138,14 @@ public final class H264VideoReceiver implements Runnable {
         byte[] accessUnit = accessUnitBuffer.toByteArray();
         accessUnitBuffer.reset();
         accessUnitTimestamp = -1;
+        if (waitingForKeyframe) {
+            if (!accessUnitContainsIdr(accessUnit)) {
+                stats.videoRecoveryWaits++;
+                stats.droppedFrames++;
+                return;
+            }
+            waitingForKeyframe = false;
+        }
         queueEncodedFrame(accessUnit, timestamp);
     }
 
@@ -151,6 +160,7 @@ public final class H264VideoReceiver implements Runnable {
             if (lostPackets > 0 && lostPackets < 32768) {
                 stats.videoRtpLossPackets += lostPackets;
                 accessUnitDamaged = true;
+                waitingForKeyframe = true;
             }
         }
         expectedVideoSequenceNumber = nextSequenceNumber(sequenceNumber);
@@ -158,6 +168,33 @@ public final class H264VideoReceiver implements Runnable {
 
     private static int nextSequenceNumber(int sequenceNumber) {
         return (sequenceNumber + 1) & 0xFFFF;
+    }
+
+    private static boolean accessUnitContainsIdr(byte[] accessUnit) {
+        if (accessUnit == null || accessUnit.length < 5) {
+            return false;
+        }
+
+        for (int i = 0; i < accessUnit.length - 4; i++) {
+            int nalOffset = -1;
+            if (accessUnit[i] == 0 && accessUnit[i + 1] == 0 && accessUnit[i + 2] == 1) {
+                nalOffset = i + 3;
+            } else if (i < accessUnit.length - 5
+                && accessUnit[i] == 0
+                && accessUnit[i + 1] == 0
+                && accessUnit[i + 2] == 0
+                && accessUnit[i + 3] == 1) {
+                nalOffset = i + 4;
+            }
+
+            if (nalOffset >= 0 && nalOffset < accessUnit.length) {
+                int nalType = accessUnit[nalOffset] & 0x1F;
+                if (nalType == 5) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void queueEncodedFrame(byte[] accessUnit, long timestamp) {

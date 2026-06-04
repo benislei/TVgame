@@ -157,6 +157,8 @@ test('parseArgs accepts Android TV RTP target options', () => {
     '1280',
     '--height',
     '720',
+    '--profile',
+    'game720',
     '--fps',
     '60',
     '--gop',
@@ -169,11 +171,12 @@ test('parseArgs accepts Android TV RTP target options', () => {
   assert.equal(args['audio-port'], '5006');
   assert.equal(args.width, '1280');
   assert.equal(args.height, '720');
+  assert.equal(args.profile, 'game720');
   assert.equal(args.fps, '60');
   assert.equal(args.gop, '30');
 });
 
-test('runRtpSender default RTP options use validated game profile', () => {
+test('runRtpSender default RTP options use 1080p game profile', () => {
   const spawnedCommands = [];
 
   withPatchedSpawn((executable, args) => {
@@ -187,9 +190,62 @@ test('runRtpSender default RTP options use validated game profile', () => {
   });
 
   const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
+  assert.match(videoArgs, /bitrate=28000/);
+  assert.match(videoArgs, /gop-size=15/);
+});
+
+test('runRtpSender can select 720p fallback profile explicitly', () => {
+  const spawnedCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'game720']),
+      { createReport: () => createReadyStage2Report() }
+    );
+  });
+
+  const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /width=1280,height=720,framerate=60\/1/);
   assert.match(videoArgs, /bitrate=18000/);
   assert.match(videoArgs, /gop-size=15/);
+});
+
+test('runRtpSender rejects unknown RTP profiles before spawning', () => {
+  let spawnCount = 0;
+
+  withPatchedSpawn(() => {
+    spawnCount += 1;
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'fastish']),
+      { createReport: () => createReadyStage2Report() }
+    );
+
+    assert.equal(spawnCount, 0);
+    assert.equal(process.exitCode, 1);
+  });
+});
+
+test('runRtpSender rejects HEVC roadmap profile until receiver support exists', () => {
+  let spawnCount = 0;
+
+  withPatchedSpawn(() => {
+    spawnCount += 1;
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'game4k']),
+      { createReport: () => createReadyStage2Report() }
+    );
+
+    assert.equal(spawnCount, 0);
+    assert.equal(process.exitCode, 1);
+  });
 });
 
 test('runRtpSender rejects invalid RTP options without spawning', () => {

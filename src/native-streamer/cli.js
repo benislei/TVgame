@@ -14,7 +14,7 @@ const {
   listProfiles
 } = require('./pipeline');
 const { createStage2Report } = require('../stage2/tooling');
-const { buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
+const { RTP_PROFILES, buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -79,6 +79,10 @@ function printStage2Report(report) {
     console.log(`  ${found ? '通过' : '缺失'} ${name}`);
   }
   console.log('');
+  console.log('编码能力：');
+  console.log(`  H.264：${report.codecs.h264.ready ? '通过' : `缺失 ${report.codecs.h264.missing.join(', ')}`}`);
+  console.log(`  HEVC/4K60 预备：${report.codecs.hevc.ready ? '通过' : `缺失 ${report.codecs.hevc.missing.join(', ')}`}`);
+  console.log('');
   console.log(report.ready ? '结果：阶段 2 RTP 发送端环境已就绪。' : '结果：阶段 2 RTP 发送端环境未就绪。');
   if (!report.ready) {
     console.log('');
@@ -97,10 +101,11 @@ function printRtpHelp() {
   console.log('  --host <IP>           Android TV IP，默认 127.0.0.1');
   console.log('  --video-port <端口>   视频 RTP UDP 端口，默认 5004');
   console.log('  --audio-port <端口>   音频 RTP UDP 端口，默认 5006');
-  console.log('  --width <宽度>        视频宽度，默认 1280');
-  console.log('  --height <高度>       视频高度，默认 720');
+  console.log('  --profile <档位>      默认 game1080，可选 game720, quality1080, game4k');
+  console.log('  --width <宽度>        视频宽度，默认 1920');
+  console.log('  --height <高度>       视频高度，默认 1080');
   console.log('  --fps <帧率>          视频帧率，默认 60');
-  console.log('  --bitrate <kbps>      H.264 码率，默认 18000');
+  console.log('  --bitrate <kbps>      H.264 码率，默认 28000');
   console.log('  --gop <帧数>          关键帧间隔，默认 15');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
@@ -127,22 +132,34 @@ function validateRtpArgs(args) {
     errors.push('host 必须是合法的 IPv4 地址。');
   }
 
+  const profile = args.profile === undefined ? 'game1080' : args.profile;
+  const profileConfig = RTP_PROFILES[profile];
+  if (typeof profile !== 'string' || !profileConfig) {
+    errors.push(`profile 必须是以下之一：${Object.keys(RTP_PROFILES).join(', ')}`);
+  }
+  const fallbackProfile = profileConfig || RTP_PROFILES.game1080;
+  if (fallbackProfile.codec !== 'h264') {
+    errors.push(`${profile} 需要 HEVC 接收端支持，当前先用于 4K60 路线能力检测。`);
+  }
+
   const videoPort = parseIntegerOption(args['video-port'] || '5004', 'video-port ', 1, 65535, errors);
   const audioPort = parseIntegerOption(args['audio-port'] || '5006', 'audio-port ', 1, 65535, errors);
-  const bitrateKbps = parseIntegerOption(args.bitrate || '18000', 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
-  const width = parseIntegerOption(args.width || '1280', 'width ', 320, 7680, errors);
-  const height = parseIntegerOption(args.height || '720', 'height ', 240, 4320, errors);
-  const fps = parseIntegerOption(args.fps || '60', 'fps ', 1, 240, errors);
-  const keyframeInterval = parseIntegerOption(args.gop || '15', 'gop ', 1, 600, errors);
+  const bitrateKbps = parseIntegerOption(args.bitrate || String(fallbackProfile.bitrateKbps), 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
+  const width = parseIntegerOption(args.width || String(fallbackProfile.width), 'width ', 320, 7680, errors);
+  const height = parseIntegerOption(args.height || String(fallbackProfile.height), 'height ', 240, 4320, errors);
+  const fps = parseIntegerOption(args.fps || String(fallbackProfile.fps), 'fps ', 1, 240, errors);
+  const keyframeInterval = parseIntegerOption(args.gop || String(fallbackProfile.keyframeInterval), 'gop ', 1, 600, errors);
   const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
 
   return {
     ok: errors.length === 0,
     errors,
     config: {
+      profile,
       host: typeof host === 'string' ? host : '',
       videoPort,
       audioPort,
+      codec: fallbackProfile.codec,
       bitrateKbps,
       width,
       height,
