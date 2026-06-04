@@ -184,6 +184,7 @@ public final class H264VideoReceiver implements Runnable {
         if (waitingForKeyframe) {
             if (!accessUnitContainsIdr(accessUnit)) {
                 stats.videoRecoveryWaits++;
+                stats.videoRecoveryDrops++;
                 stats.droppedFrames++;
                 return;
             }

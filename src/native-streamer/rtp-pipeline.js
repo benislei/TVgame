@@ -22,8 +22,8 @@ const RTP_PROFILES = {
     width: 1920,
     height: 1080,
     fps: 60,
-    bitrateKbps: 36000,
-    keyframeInterval: 30
+    bitrateKbps: 30000,
+    keyframeInterval: 10
   },
   game4k: {
     codec: 'h265',

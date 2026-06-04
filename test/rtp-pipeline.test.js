@@ -18,6 +18,8 @@ test('RTP profiles include 720p fallback, 1080p game baseline, quality 1080p and
   assert.equal(RTP_PROFILES.game1080.height, 1080);
   assert.equal(RTP_PROFILES.game1080.bitrateKbps, 24000);
   assert.equal(RTP_PROFILES.game1080.keyframeInterval, 10);
+  assert.equal(RTP_PROFILES.quality1080.bitrateKbps, 30000);
+  assert.equal(RTP_PROFILES.quality1080.keyframeInterval, 10);
   assert.equal(RTP_PROFILES.game4k.width, 3840);
   assert.equal(RTP_PROFILES.game4k.height, 2160);
   assert.equal(RTP_PROFILES.game4k.codec, 'h265');
@@ -81,6 +83,21 @@ test('builds explicit 720p fallback profile when selected', () => {
   assert.equal(config.bitrateKbps, 18000);
   assert.match(pipeline, /width=1280,height=720,framerate=60\/1/);
   assert.match(pipeline, /bitrate=18000/);
+});
+
+test('builds quality 1080p profile with short recovery GOP for game streaming', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    profile: 'quality1080'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.width, 1920);
+  assert.equal(config.height, 1080);
+  assert.equal(config.bitrateKbps, 30000);
+  assert.equal(config.keyframeInterval, 10);
+  assert.match(pipeline, /bitrate=30000/);
+  assert.match(pipeline, /gop-size=10/);
 });
 
 test('builds low latency system audio RTP L16 pipeline', () => {

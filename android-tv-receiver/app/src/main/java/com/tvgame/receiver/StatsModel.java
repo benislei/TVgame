@@ -5,6 +5,7 @@ public final class StatsModel {
     public volatile long videoFrames;
     public volatile long videoRtpLossPackets;
     public volatile long videoRecoveryWaits;
+    public volatile long videoRecoveryDrops;
     public volatile long videoReceiveBufferBytes;
     public volatile long videoQueueDrops;
     public volatile long videoDecoderDrops;
@@ -19,6 +20,7 @@ public final class StatsModel {
             + "\n视频帧: " + videoFrames
             + "\n视频丢包: " + videoRtpLossPackets
             + "\n等待关键帧: " + videoRecoveryWaits
+            + "\n恢复丢帧: " + videoRecoveryDrops
             + "\n接收缓冲: " + videoReceiveBufferBytes
             + "\n队列丢帧: " + videoQueueDrops
             + "\n解码丢帧: " + videoDecoderDrops
