@@ -2,6 +2,7 @@ package com.tvgame.receiver;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.os.Bundle;
 import android.view.Surface;
 
 import java.io.ByteArrayOutputStream;
@@ -39,8 +40,14 @@ public final class H264VideoReceiver implements Runnable {
         try {
             decoder = MediaCodec.createDecoderByType("video/avc");
             MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
+            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+            format.setInteger(MediaFormat.KEY_PRIORITY, 0);
+            format.setInteger(MediaFormat.KEY_OPERATING_RATE, 60);
             decoder.configure(format, surface, null, 0);
             decoder.start();
+            Bundle decoderParameters = new Bundle();
+            decoderParameters.putInt(MediaCodec.PARAMETER_KEY_LOW_LATENCY, 1);
+            decoder.setParameters(decoderParameters);
 
             socket = new DatagramSocket(null);
             socket.setReuseAddress(true);

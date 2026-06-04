@@ -2,7 +2,13 @@
 
 ## 目标
 
-验证 PC 端原生 GStreamer RTP 发送链路与 Android TV 原生接收端可以配合使用。Task 5 后，Android TV 接收端会监听视频 UDP 5004 和音频 UDP 5006：视频 H.264 RTP 会送入 MediaCodec，音频 L16 PCM RTP 会转换为 Android 需要的小端 PCM 并交给 AudioTrack 播放。
+验证 PC 端原生 GStreamer RTP 发送链路与 Android TV 原生接收端可以配合使用。当前链路监听视频 UDP 5004 和音频 UDP 5006：视频 H.264 RTP 送入 MediaCodec，音频 L16 PCM RTP 转换为 Android 需要的小端 PCM 并交给 AudioTrack 播放。
+
+## Android 版本基线
+
+当前接收端以 Android 11+（API 30+）作为最低运行版本，目标是优先把画质、帧率、声音和输入延迟做到适合游戏。Android 9/10 暂不作为当前优化目标，Android 6/7/8 不再作为阶段 2 的兼容目标。
+
+低版本电视后续可以通过独立电视盒子或硬件接收端路线解决，不拖慢当前 Android 11+ 极致体验路线。
 
 ## PC 端准备
 
@@ -12,15 +18,17 @@
 npm.cmd run stage2:check
 ```
 
-确认 GStreamer、RTP 视频插件、RTP 音频插件和 dotnet 状态通过后，启动 RTP 发送端：
+确认 GStreamer、RTP 视频插件、RTP 音频插件和 dotnet 状态通过后，启动 InputBridge：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP>
+dotnet run --project InputBridge\InputBridge.csproj
 ```
+
+保持这个窗口打开。若游戏以管理员权限运行，InputBridge 也建议用管理员 PowerShell 启动。
 
 ## Android TV 端准备
 
-构建并安装 `android-tv-receiver` 生成的 APK，启动应用“电视游戏接收端”。首屏应显示全屏画面层和左上角半透明中文状态面板。
+构建并安装 `android-tv-receiver` 生成的 APK，启动应用“电视游戏接收端”。首屏应显示全屏画面层和左上角半透明中文状态面板，并包含“接收端档位：Android 11+ 极致模式”。
 
 默认端口规划：
 
@@ -28,21 +36,33 @@ npm.cmd run native:rtp -- --host <Android TV IP>
 - 音频 RTP：UDP 5006
 - 输入回传：TCP 8789
 
-Task 5 后，启动 PC 端 RTP 发送时，左上角指标中的视频包、音频包、音频字节和最近接收状态预计会增长或变为正常。若 Android TV 设备、编码参数和网络环境匹配，有机会显示视频画面并播放声音；这一点仍需要在真实 Android TV 或等效设备上验证。
+## 启动发送端
+
+先用 720p 快速验证手感：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --width 1280 --height 720 --bitrate 12000 --gop 30
+```
+
+如果 720p 的操作延迟和帧率可接受，再切到 1080p：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --width 1920 --height 1080 --bitrate 16000 --gop 30
+```
+
+启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。
 
 ## 输入回传
 
-Android TV 第一版会把遥控器和键盘按键事件发送到 PC 端 TCP 8789。发送内容是一行 UTF-8 JSON，字段包含 `type=input`、`kind=keyboard`、`action=down/up` 和 Android `keyCode`。
+Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789。发送内容是一行 UTF-8 JSON，字段包含 `type=input`、`kind=keyboard`、`action=down/up`，以及 Android `keyCode` 或浏览器风格 `code`。
 
-当前 Android TV App 的 PC 输入 relay 默认地址是 `192.168.1.178:8789`。如需调整 PC IP，可以修改 `AndroidManifest.xml` 中的 `com.tvgame.receiver.INPUT_RELAY_HOST` metadata；端口当前固定为 TCP 8789。
-
-PC 端还需要 relay 接入 InputBridge/SendInput，才能把这些 JSON 按键事件转换为 Windows 输入。relay 未实现不影响视频和声音验证；它只影响“输入回传到达 PC relay”这一项验收。
+PC 端需要启动 InputBridge/SendInput，才能把这些 JSON 输入事件转换为 Windows 输入。当前 APK 的 PC 输入 relay 地址来自构建时的 `inputRelayHost` 配置；回家测试前请确认它等于 PC 当前局域网 IP。
 
 当前 App 的 `onKeyDown`/`onKeyUp` 会继续返回 Android 系统默认处理结果，因此不会吞掉系统 BACK/HOME 行为。BACK 也可能被发给 PC relay，后续 relay 可以按需要过滤。
 
 ## Android 构建工具记录
 
-Android TV 接收端 APK 构建现在通过项目脚本统一执行。首次准备环境时，在项目根目录运行：
+Android TV 接收端 APK 构建通过项目脚本统一执行。首次准备环境时，在项目根目录运行：
 
 ```powershell
 npm.cmd run android:install
@@ -71,12 +91,14 @@ android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
 ## 验收记录
 
 - [ ] App 启动中文状态面板。
+- [ ] 状态面板显示 Android 11+ 极致模式。
 - [ ] `stage2:check` 通过。
+- [ ] InputBridge 启动并监听 TCP 8789。
 - [ ] `native:rtp` 启动视频音频发送。
 - [ ] 电视视频包计数增长。
 - [ ] 音频包计数增长。
 - [ ] 播放 PC 系统声音。
-- [ ] 输入回传到达 PC relay。
+- [ ] USB 手柄输入回传到达 PC relay。
 
 ## 验收清单
 
@@ -88,5 +110,5 @@ android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
 - [ ] 运行 `npm.cmd run stage2:check` 可以看到 PC 端阶段 2 依赖检查结果。
 - [ ] 运行 `npm.cmd run native:rtp -- --host <Android TV IP>` 后，PC 端启动视频和音频 RTP 发送进程。
 - [ ] Android TV 接收端视频 UDP 5004 和音频 UDP 5006 指标会随数据包增长。
-- [ ] 在真实 Android TV 上确认 MediaCodec 有机会显示 H.264 画面，AudioTrack 有机会播放 L16 音频。
-- [ ] Android TV 按键事件通过 TCP 8789 回传到 PC 端 relay。
+- [ ] 在真实 Android 11+ TV 上确认 MediaCodec 显示 H.264 画面，AudioTrack 播放 L16 音频。
+- [ ] Android TV 按键和 USB 手柄事件通过 TCP 8789 回传到 PC 端 relay。

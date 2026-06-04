@@ -3,6 +3,7 @@ package com.tvgame.receiver;
 import android.app.Activity;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,6 +19,7 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
+    private static final String RECEIVER_MODE = "接收端档位：Android 11+ 极致模式";
     private static final String INPUT_RELAY_HOST_METADATA = "com.tvgame.receiver.INPUT_RELAY_HOST";
     private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.50.148";
     private static final int INPUT_RELAY_PORT = 8789;
@@ -30,7 +32,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private final Runnable updateOverlay = new Runnable() {
         @Override
         public void run() {
-            overlay.setText(TITLE + "\n" + stats.render());
+            overlay.setText(TITLE + "\n" + RECEIVER_MODE + "（API " + Build.VERSION.SDK_INT + "）\n" + stats.render());
             handler.postDelayed(this, 500);
         }
     };
@@ -60,7 +62,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         overlay.setTextSize(16);
         overlay.setBackgroundColor(0x99000000);
         overlay.setPadding(16, 12, 16, 12);
-        overlay.setText(TITLE + "\n等待视频和音频");
+        overlay.setText(TITLE + "\n" + RECEIVER_MODE + "（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
 
         FrameLayout root = new FrameLayout(this);
         root.addView(surfaceView, new FrameLayout.LayoutParams(

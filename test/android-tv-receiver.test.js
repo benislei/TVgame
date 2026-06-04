@@ -57,7 +57,7 @@ test('Android TV receiver Gradle files use the required app identity and SDKs', 
   assert.match(appBuild, /namespace\s+"com\.tvgame\.receiver"/);
   assert.match(appBuild, /applicationId\s+"com\.tvgame\.receiver"/);
   assert.match(appBuild, /compileSdk\s+35/);
-  assert.match(appBuild, /minSdk\s+23/);
+  assert.match(appBuild, /minSdk\s+30/);
   assert.match(appBuild, /targetSdk\s+35/);
   assert.match(appBuild, /manifestPlaceholders/);
   assert.match(appBuild, /inputRelayHost/);
@@ -243,6 +243,10 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /VIDEO_PORT\s*=\s*5004/);
   assert.match(video, /MediaCodec\.createDecoderByType\("video\/avc"\)/);
   assert.match(video, /MediaFormat\.createVideoFormat\("video\/avc",\s*1920,\s*1080\)/);
+  assert.match(video, /MediaFormat\.KEY_LOW_LATENCY/);
+  assert.match(video, /MediaCodec\.PARAMETER_KEY_LOW_LATENCY/);
+  assert.match(video, /setInteger\(MediaFormat\.KEY_PRIORITY,\s*0\)/);
+  assert.match(video, /setInteger\(MediaFormat\.KEY_OPERATING_RATE,\s*60\)/);
   assert.match(video, /stats\.videoPackets\+\+/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
   assert.match(video, /ByteArrayOutputStream\s+accessUnitBuffer/);
@@ -317,6 +321,15 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /stopReceivers\(\)/);
 });
 
+test('MainActivity shows Android 11 plus extreme receiver mode in Chinese', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /TITLE\s*=\s*"电视游戏接收端"/);
+  assert.match(source, /RECEIVER_MODE\s*=\s*"接收端档位：Android 11\+ 极致模式"/);
+  assert.match(source, /Build\.VERSION\.SDK_INT/);
+  assert.match(source, /TITLE\s*\+\s*"\\n"\s*\+\s*RECEIVER_MODE/);
+});
+
 test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
@@ -336,10 +349,12 @@ test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
 test('stage 2 verification guide documents input return and acceptance checklist in Chinese', () => {
   const doc = readProjectFile('docs/stage2-local-verify.md');
 
+  assert.match(doc, /## Android 版本基线/);
+  assert.match(doc, /当前接收端以 Android 11\+（API 30\+）作为最低运行版本/);
+  assert.match(doc, /Android 9\/10 暂不作为当前优化目标/);
   assert.match(doc, /## 输入回传/);
-  assert.match(doc, /Android TV 第一版会把遥控器和键盘按键事件发送到 PC 端 TCP 8789/);
-  assert.match(doc, /PC 端还需要 relay 接入 InputBridge\/SendInput/);
-  assert.match(doc, /relay 未实现不影响视频和声音验证/);
+  assert.match(doc, /Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789/);
+  assert.match(doc, /PC 端需要启动 InputBridge\/SendInput/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /## 验收记录/);
   for (const item of [
