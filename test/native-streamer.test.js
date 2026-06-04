@@ -191,8 +191,26 @@ test('runRtpSender default RTP options use 1080p game profile', () => {
 
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
+  assert.match(videoArgs, /preset=default/);
   assert.match(videoArgs, /bitrate=24000/);
   assert.match(videoArgs, /gop-size=10/);
+});
+
+test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', () => {
+  const spawnedCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--encoder-preset', 'low-latency-hq']),
+      { createReport: () => createReadyStage2Report() }
+    );
+  });
+
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /preset=low-latency-hq/);
 });
 
 test('runRtpSender can select 720p fallback profile explicitly', () => {
@@ -257,6 +275,23 @@ test('runRtpSender rejects invalid RTP options without spawning', () => {
   }, () => {
     runRtpSender(
       parseArgs(['rtp', '--host', '192.168.1.50 & calc', '--video-port', '70000', '--bitrate', '0', '--display', '-1']),
+      { createReport: () => createReadyStage2Report() }
+    );
+
+    assert.equal(spawnCount, 0);
+    assert.equal(process.exitCode, 1);
+  });
+});
+
+test('runRtpSender rejects unsupported NVENC encoder preset before spawning', () => {
+  let spawnCount = 0;
+
+  withPatchedSpawn(() => {
+    spawnCount += 1;
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--encoder-preset', 'magic-fast']),
       { createReport: () => createReadyStage2Report() }
     );
 

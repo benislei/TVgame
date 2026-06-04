@@ -152,6 +152,10 @@ function createReadme() {
     '',
     '接收端左上角会显示实时FPS、实时丢帧、实时丢帧率、实时队列丢帧、实时解码丢帧、视频丢包、等待关键帧、恢复丢帧等指标。菜单键或 F1 可以隐藏或显示状态面板。',
     '',
+    '## NVENC 兼容性',
+    '',
+    '朋友试用包里的发送脚本默认使用兼容 NVENC preset：`--encoder-preset default`。如果确认显卡和驱动支持更激进的低延迟 preset，可以在项目目录手动运行 `npm.cmd run native:rtp -- --host <电视IP> --encoder-preset low-latency-hq` 继续调试。',
+    '',
     '## 端口',
     '',
     '- 视频：UDP 5004',
@@ -169,9 +173,9 @@ function writeLaunchers(packageDir) {
     '安装GStreamer依赖.bat': createBatchScript('echo 正在安装 GStreamer 依赖...\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-gstreamer.ps1" -InstallDevel'),
     '检查环境.bat': createBatchScript('echo 正在检查发送端环境...\r\ncall npm.cmd run stage2:check'),
     '启动输入桥.bat': createBatchScript('echo 正在启动输入桥，请保持此窗口打开。\r\ndotnet run --project InputBridge\\InputBridge.csproj'),
-    '启动默认发送.bat': createSenderBatch(''),
-    '启动高画质发送.bat': createSenderBatch('--profile quality1080'),
-    '启动720回退发送.bat': createSenderBatch('--profile game720')
+    '启动默认发送.bat': createSenderBatch('--encoder-preset default'),
+    '启动高画质发送.bat': createSenderBatch('--encoder-preset default --profile quality1080'),
+    '启动720回退发送.bat': createSenderBatch('--encoder-preset default --profile game720')
   };
 
   for (const [name, text] of Object.entries(launchers)) {

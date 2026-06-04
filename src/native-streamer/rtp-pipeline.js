@@ -35,6 +35,17 @@ const RTP_PROFILES = {
   }
 };
 
+const NVENC_ENCODER_PRESETS = [
+  'default',
+  'hp',
+  'hq',
+  'low-latency',
+  'low-latency-hq',
+  'low-latency-hp',
+  'lossless',
+  'lossless-hp'
+];
+
 function buildRtpConfig(overrides = {}) {
   const profileName = overrides.profile || 'game1080';
   const profile = RTP_PROFILES[profileName] || RTP_PROFILES.game1080;
@@ -49,6 +60,7 @@ function buildRtpConfig(overrides = {}) {
     fps: Number(overrides.fps || profile.fps),
     bitrateKbps: Number(overrides.bitrateKbps || profile.bitrateKbps),
     keyframeInterval: Number(overrides.keyframeInterval || profile.keyframeInterval),
+    encoderPreset: overrides.encoderPreset || 'default',
     displayIndex: Number(overrides.displayIndex || 0)
   };
 }
@@ -74,7 +86,7 @@ function buildVideoRtpPipeline(config) {
     '!',
     'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
     '!',
-    `nvh264enc preset=low-latency-hq rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
+    `nvh264enc preset=${config.encoderPreset} rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
     '!',
     'h264parse config-interval=1',
     '!',
@@ -117,6 +129,7 @@ function buildRtpLaunchCommands(config) {
 
 module.exports = {
   RTP_PROFILES,
+  NVENC_ENCODER_PRESETS,
   buildRtpConfig,
   buildVideoRtpPipeline,
   buildAudioRtpPipeline,

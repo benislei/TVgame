@@ -14,7 +14,7 @@ const {
   listProfiles
 } = require('./pipeline');
 const { createStage2Report } = require('../stage2/tooling');
-const { RTP_PROFILES, buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
+const { RTP_PROFILES, NVENC_ENCODER_PRESETS, buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -107,6 +107,7 @@ function printRtpHelp() {
   console.log('  --fps <帧率>          视频帧率，默认 60');
   console.log('  --bitrate <kbps>      H.264 码率，默认 24000');
   console.log('  --gop <帧数>          关键帧间隔，默认 10');
+  console.log('  --encoder-preset <值> NVENC preset，默认 default；可手动尝试 low-latency-hq');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 
@@ -150,6 +151,10 @@ function validateRtpArgs(args) {
   const fps = parseIntegerOption(args.fps || String(fallbackProfile.fps), 'fps ', 1, 240, errors);
   const keyframeInterval = parseIntegerOption(args.gop || String(fallbackProfile.keyframeInterval), 'gop ', 1, 600, errors);
   const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
+  const encoderPreset = args['encoder-preset'] === undefined ? 'default' : args['encoder-preset'];
+  if (typeof encoderPreset !== 'string' || !NVENC_ENCODER_PRESETS.includes(encoderPreset)) {
+    errors.push(`encoder-preset 必须是以下之一：${NVENC_ENCODER_PRESETS.join(', ')}`);
+  }
 
   return {
     ok: errors.length === 0,
@@ -165,6 +170,7 @@ function validateRtpArgs(args) {
       height,
       fps,
       keyframeInterval,
+      encoderPreset,
       displayIndex
     }
   };

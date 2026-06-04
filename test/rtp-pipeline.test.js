@@ -35,6 +35,7 @@ test('default RTP game profile uses 1080p60 baseline settings', () => {
   assert.equal(config.bitrateKbps, 24000);
   assert.equal(config.keyframeInterval, 10);
   assert.equal(config.codec, 'h264');
+  assert.equal(config.encoderPreset, 'default');
 });
 
 test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
@@ -46,6 +47,7 @@ test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
   assert.match(pipeline, /d3d11download/);
   assert.match(pipeline, /video\/x-raw,format=NV12,width=1920,height=1080,framerate=60\/1/);
   assert.match(pipeline, /nvh264enc/);
+  assert.match(pipeline, /preset=default/);
   assert.match(pipeline, /bframes=0/);
   assert.match(pipeline, /bitrate=24000/);
   assert.match(pipeline, /gop-size=10/);
@@ -54,6 +56,17 @@ test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
   assert.doesNotMatch(pipeline, /zero-reorder-delay/);
   assert.match(pipeline, /rtph264pay pt=96 config-interval=1/);
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false/);
+});
+
+test('builds explicit NVENC encoder preset when configured', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    encoderPreset: 'low-latency-hq'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.encoderPreset, 'low-latency-hq');
+  assert.match(pipeline, /nvh264enc preset=low-latency-hq/);
 });
 
 test('builds explicit 1080p60 RTP video pipeline when configured', () => {

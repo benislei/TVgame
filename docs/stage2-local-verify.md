@@ -58,6 +58,14 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
 
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
 
+如果发送端提示 `Selected preset not supported` 或 `Could not configure supporting library`，通常是当前显卡/驱动不支持 `low-latency-hq` 这类 NVENC preset。优先使用兼容 preset 启动：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --encoder-preset default
+```
+
+朋友试用包里的 `.bat` 已默认使用 `--encoder-preset default`，稳定后再手动尝试 `--encoder-preset low-latency-hq`。
+
 启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“实时FPS”“实时丢帧”“实时丢帧率”“实时队列丢帧”“实时解码丢帧”“视频丢包”“等待关键帧”“恢复丢帧”“队列丢帧”和“解码丢帧”：如果卡顿时恢复丢帧和等待关键帧同步增长，说明短暂丢包后的关键帧恢复仍在影响体感；如果主要是实时队列丢帧或实时解码丢帧增长，说明瓶颈更偏接收端解码或渲染。当前低延迟版本只保留最新 1 帧待解码画面，优先压低操作到画面变化的体感延迟。菜单键或 F1 可以隐藏或显示状态面板。
 
 ## 输入回传
