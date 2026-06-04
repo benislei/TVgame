@@ -58,13 +58,15 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
 
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
 
-启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“视频丢包”“等待关键帧”“恢复丢帧”“队列丢帧”和“解码丢帧”：如果卡顿时恢复丢帧和等待关键帧同步增长，说明短暂丢包后的关键帧恢复仍在影响体感；如果主要是队列丢帧或解码丢帧增长，说明瓶颈更偏接收端解码或渲染。
+启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“视频丢包”“等待关键帧”“恢复丢帧”“队列丢帧”和“解码丢帧”：如果卡顿时恢复丢帧和等待关键帧同步增长，说明短暂丢包后的关键帧恢复仍在影响体感；如果主要是队列丢帧或解码丢帧增长，说明瓶颈更偏接收端解码或渲染。当前低延迟版本只保留最新 1 帧待解码画面，优先压低操作到画面变化的体感延迟。
 
 ## 输入回传
 
 Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789。发送内容是一行 UTF-8 JSON，字段包含 `type=input`、`kind=keyboard`、`action=down/up`，以及 Android `keyCode` 或浏览器风格 `code`。
 
 PC 端需要启动 InputBridge/SendInput，才能把这些 JSON 输入事件转换为 Windows 输入。当前 APK 的 PC 输入 relay 地址来自构建时的 `inputRelayHost` 配置；回家测试前请确认它等于 PC 当前局域网 IP。
+
+Android TV 输入客户端会复用一个持久 TCP 连接，并开启 `TCP_NODELAY`，避免每次按键都重新建连或被 Nagle 算法合并等待。若 InputBridge 重启，下一次输入事件会自动重连。
 
 当前 App 的 `onKeyDown`/`onKeyUp` 会继续返回 Android 系统默认处理结果，因此不会吞掉系统 BACK/HOME 行为。BACK 也可能被发给 PC relay，后续 relay 可以按需要过滤。
 

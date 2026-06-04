@@ -23,6 +23,8 @@ public final class InputClient {
     private final int port;
     private final ExecutorService executor;
     private volatile boolean closed;
+    private Socket socket;
+    private OutputStream output;
 
     public InputClient(String host, int port) {
         this.host = host;
@@ -89,6 +91,7 @@ public final class InputClient {
     public void close() {
         closed = true;
         executor.shutdownNow();
+        closeSocket();
     }
 
     static String buildKeyJsonLine(String action, int keyCode) {
@@ -127,18 +130,47 @@ public final class InputClient {
             return;
         }
 
-        Socket socket = new Socket();
         try {
-            socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
-            socket.setSoTimeout(SOCKET_TIMEOUT_MS);
-            OutputStream output = socket.getOutputStream();
-            output.write(line.getBytes(StandardCharsets.UTF_8));
-            output.flush();
+            OutputStream currentOutput = getOrCreateSocket();
+            currentOutput.write(line.getBytes(StandardCharsets.UTF_8));
+            currentOutput.flush();
         } catch (IOException ex) {
+            closeSocket();
             // The PC relay is optional in this stage; input failures must not crash playback.
-        } finally {
+        }
+    }
+
+    private synchronized OutputStream getOrCreateSocket() throws IOException {
+        if (socket != null && socket.isConnected() && !socket.isClosed() && output != null) {
+            return output;
+        }
+
+        closeSocket();
+        Socket nextSocket = new Socket();
+        nextSocket.setTcpNoDelay(true);
+        nextSocket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
+        nextSocket.setSoTimeout(SOCKET_TIMEOUT_MS);
+        socket = nextSocket;
+        output = nextSocket.getOutputStream();
+        return output;
+    }
+
+    private synchronized void closeSocket() {
+        OutputStream currentOutput = output;
+        Socket currentSocket = socket;
+        output = null;
+        socket = null;
+
+        if (currentOutput != null) {
             try {
-                socket.close();
+                currentOutput.close();
+            } catch (IOException ex) {
+                // Nothing useful to do during cleanup.
+            }
+        }
+        if (currentSocket != null) {
+            try {
+                currentSocket.close();
             } catch (IOException ex) {
                 // Nothing useful to do during cleanup.
             }

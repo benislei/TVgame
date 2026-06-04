@@ -22,7 +22,7 @@ public final class H264VideoReceiver implements Runnable {
     private static final int VIDEO_RECEIVE_BUFFER_BYTES = 4 * 1024 * 1024;
     private static final int MAX_RTP_PACKET_SIZE = 1500;
     private static final int MAX_ACCESS_UNIT_SIZE = 4 * 1024 * 1024;
-    private static final int MAX_PENDING_ACCESS_UNITS = 3;
+    private static final int MAX_PENDING_ACCESS_UNITS = 1;
     private static final long DECODER_POLL_TIMEOUT_MS = 2;
     private static final long DECODER_INPUT_TIMEOUT_US = 2000;
     private static final long DECODER_JOIN_MS = 400;

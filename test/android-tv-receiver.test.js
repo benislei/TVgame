@@ -118,6 +118,18 @@ test('InputClient validates key JSON before enqueue and keeps the UI path bounde
   assert.match(source, /new\s+ArrayBlockingQueue<\s*Runnable\s*>\(INPUT_QUEUE_CAPACITY\)/);
 });
 
+test('InputClient keeps one TCP connection open with Nagle disabled for low latency input', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /private\s+Socket\s+socket/);
+  assert.match(source, /private\s+OutputStream\s+output/);
+  assert.match(source, /getOrCreateSocket\(\)/);
+  assert.match(source, /setTcpNoDelay\(true\)/);
+  assert.match(source, /socket\.isConnected\(\)/);
+  assert.match(source, /!socket\.isClosed\(\)/);
+  assert.match(source, /closeSocket\(\)/);
+});
+
 test('InputClient can send browser-style keyboard code JSON for mapped gamepad axes', () => {
   const source = readProjectFile(`${javaRoot}/InputClient.java`);
 
@@ -259,7 +271,7 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /socket\.setReceiveBufferSize\(VIDEO_RECEIVE_BUFFER_BYTES\)/);
   assert.match(video, /stats\.videoReceiveBufferBytes\s*=\s*socket\.getReceiveBufferSize\(\)/);
   assert.match(video, /ArrayBlockingQueue<\s*EncodedFrame\s*>/);
-  assert.match(video, /MAX_PENDING_ACCESS_UNITS\s*=\s*3/);
+  assert.match(video, /MAX_PENDING_ACCESS_UNITS\s*=\s*1/);
   assert.match(video, /pendingAccessUnits\.offer/);
   assert.match(video, /stats\.videoQueueDrops\+\+/);
   assert.match(video, /stats\.videoDecoderDrops\+\+/);
