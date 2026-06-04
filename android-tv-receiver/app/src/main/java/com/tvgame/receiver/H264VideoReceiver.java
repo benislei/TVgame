@@ -29,6 +29,8 @@ public final class H264VideoReceiver implements Runnable {
     private MediaCodec decoder;
     private long accessUnitTimestamp = -1;
     private long firstVideoTimestamp = -1;
+    private int expectedVideoSequenceNumber = -1;
+    private boolean accessUnitDamaged;
 
     public H264VideoReceiver(Surface surface, StatsModel stats) {
         this.surface = surface;
@@ -62,6 +64,7 @@ public final class H264VideoReceiver implements Runnable {
                     socket.receive(datagram);
                     RtpPacket packet = RtpPacket.parse(datagram.getData(), datagram.getLength());
                     stats.videoPackets++;
+                    recordVideoSequence(packet.sequenceNumber);
                     stats.lastVideoAtMs = System.currentTimeMillis();
                     List<byte[]> nalUnits = depacketizer.depacketize(packet);
                     if (!nalUnits.isEmpty()) {
@@ -119,6 +122,13 @@ public final class H264VideoReceiver implements Runnable {
     }
 
     private void queueCurrentAccessUnit(long timestamp) {
+        if (accessUnitDamaged) {
+            accessUnitBuffer.reset();
+            accessUnitTimestamp = -1;
+            accessUnitDamaged = false;
+            stats.droppedFrames++;
+            return;
+        }
         if (accessUnitBuffer.size() == 0) {
             accessUnitTimestamp = -1;
             return;
@@ -128,6 +138,26 @@ public final class H264VideoReceiver implements Runnable {
         accessUnitBuffer.reset();
         accessUnitTimestamp = -1;
         queueEncodedFrame(accessUnit, timestamp);
+    }
+
+    private void recordVideoSequence(int sequenceNumber) {
+        if (expectedVideoSequenceNumber < 0) {
+            expectedVideoSequenceNumber = nextSequenceNumber(sequenceNumber);
+            return;
+        }
+
+        if (sequenceNumber != expectedVideoSequenceNumber) {
+            int lostPackets = (sequenceNumber - expectedVideoSequenceNumber) & 0xFFFF;
+            if (lostPackets > 0 && lostPackets < 32768) {
+                stats.videoRtpLossPackets += lostPackets;
+                accessUnitDamaged = true;
+            }
+        }
+        expectedVideoSequenceNumber = nextSequenceNumber(sequenceNumber);
+    }
+
+    private static int nextSequenceNumber(int sequenceNumber) {
+        return (sequenceNumber + 1) & 0xFFFF;
     }
 
     private void queueEncodedFrame(byte[] accessUnit, long timestamp) {

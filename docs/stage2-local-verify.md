@@ -38,16 +38,22 @@ dotnet run --project InputBridge\InputBridge.csproj
 
 ## 启动发送端
 
-先用 720p 快速验证手感：
+默认发送档位已经按实测结果调整为 720p、18Mbps、GOP15。优先用默认游戏档验证手感：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP> --width 1280 --height 720 --bitrate 12000 --gop 30
+npm.cmd run native:rtp -- --host <Android TV IP>
 ```
 
-如果 720p 的操作延迟和帧率可接受，再切到 1080p：
+如果要显式指定同一档位：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP> --width 1920 --height 1080 --bitrate 16000 --gop 30
+npm.cmd run native:rtp -- --host <Android TV IP> --width 1280 --height 720 --bitrate 18000 --gop 15
+```
+
+如果 720p 的操作延迟和帧率可接受，再单独测试 1080p。当前 1080p 在快速运动时更容易花屏，建议只作为画质对比项：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --width 1920 --height 1080 --bitrate 25000 --gop 15
 ```
 
 启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。
@@ -96,6 +102,7 @@ android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
 - [ ] InputBridge 启动并监听 TCP 8789。
 - [ ] `native:rtp` 启动视频音频发送。
 - [ ] 电视视频包计数增长。
+- [ ] 视频丢包计数保持较低。
 - [ ] 音频包计数增长。
 - [ ] 播放 PC 系统声音。
 - [ ] USB 手柄输入回传到达 PC relay。

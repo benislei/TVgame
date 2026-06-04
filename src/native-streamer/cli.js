@@ -97,7 +97,11 @@ function printRtpHelp() {
   console.log('  --host <IP>           Android TV IP，默认 127.0.0.1');
   console.log('  --video-port <端口>   视频 RTP UDP 端口，默认 5004');
   console.log('  --audio-port <端口>   音频 RTP UDP 端口，默认 5006');
-  console.log('  --bitrate <kbps>      H.264 码率，默认 25000');
+  console.log('  --width <宽度>        视频宽度，默认 1280');
+  console.log('  --height <高度>       视频高度，默认 720');
+  console.log('  --fps <帧率>          视频帧率，默认 60');
+  console.log('  --bitrate <kbps>      H.264 码率，默认 18000');
+  console.log('  --gop <帧数>          关键帧间隔，默认 15');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 
@@ -125,11 +129,11 @@ function validateRtpArgs(args) {
 
   const videoPort = parseIntegerOption(args['video-port'] || '5004', 'video-port ', 1, 65535, errors);
   const audioPort = parseIntegerOption(args['audio-port'] || '5006', 'audio-port ', 1, 65535, errors);
-  const bitrateKbps = parseIntegerOption(args.bitrate || '25000', 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
-  const width = parseIntegerOption(args.width || '1920', 'width ', 320, 7680, errors);
-  const height = parseIntegerOption(args.height || '1080', 'height ', 240, 4320, errors);
+  const bitrateKbps = parseIntegerOption(args.bitrate || '18000', 'bitrate ', 1, Number.MAX_SAFE_INTEGER, errors);
+  const width = parseIntegerOption(args.width || '1280', 'width ', 320, 7680, errors);
+  const height = parseIntegerOption(args.height || '720', 'height ', 240, 4320, errors);
   const fps = parseIntegerOption(args.fps || '60', 'fps ', 1, 240, errors);
-  const keyframeInterval = parseIntegerOption(args.gop || '30', 'gop ', 1, 600, errors);
+  const keyframeInterval = parseIntegerOption(args.gop || '15', 'gop ', 1, 600, errors);
   const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
 
   return {

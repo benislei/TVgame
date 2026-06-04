@@ -3,6 +3,7 @@ package com.tvgame.receiver;
 public final class StatsModel {
     public volatile long videoPackets;
     public volatile long videoFrames;
+    public volatile long videoRtpLossPackets;
     public volatile long audioPackets;
     public volatile long audioBytes;
     public volatile long droppedFrames;
@@ -12,6 +13,7 @@ public final class StatsModel {
     public String render() {
         return "视频包: " + videoPackets
             + "\n视频帧: " + videoFrames
+            + "\n视频丢包: " + videoRtpLossPackets
             + "\n音频包: " + audioPackets
             + "\n音频字节: " + audioBytes
             + "\n丢帧: " + droppedFrames

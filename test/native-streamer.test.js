@@ -173,6 +173,25 @@ test('parseArgs accepts Android TV RTP target options', () => {
   assert.equal(args.gop, '30');
 });
 
+test('runRtpSender default RTP options use validated game profile', () => {
+  const spawnedCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50']),
+      { createReport: () => createReadyStage2Report() }
+    );
+  });
+
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /width=1280,height=720,framerate=60\/1/);
+  assert.match(videoArgs, /bitrate=18000/);
+  assert.match(videoArgs, /gop-size=15/);
+});
+
 test('runRtpSender rejects invalid RTP options without spawning', () => {
   let spawnCount = 0;
 

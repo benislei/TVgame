@@ -5,11 +5,11 @@ function buildRtpConfig(overrides = {}) {
     host: overrides.host || '127.0.0.1',
     videoPort: Number(overrides.videoPort || 5004),
     audioPort: Number(overrides.audioPort || 5006),
-    width: Number(overrides.width || 1920),
-    height: Number(overrides.height || 1080),
+    width: Number(overrides.width || 1280),
+    height: Number(overrides.height || 720),
     fps: Number(overrides.fps || 60),
-    bitrateKbps: Number(overrides.bitrateKbps || 25000),
-    keyframeInterval: Number(overrides.keyframeInterval || 30),
+    bitrateKbps: Number(overrides.bitrateKbps || 18000),
+    keyframeInterval: Number(overrides.keyframeInterval || 15),
     displayIndex: Number(overrides.displayIndex || 0)
   };
 }
