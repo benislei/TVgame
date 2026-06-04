@@ -13,20 +13,30 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public final class H264VideoReceiver implements Runnable {
     private static final int VIDEO_PORT = 5004;
     private static final int SOCKET_TIMEOUT_MS = 250;
+    private static final int VIDEO_RECEIVE_BUFFER_BYTES = 4 * 1024 * 1024;
     private static final int MAX_RTP_PACKET_SIZE = 1500;
     private static final int MAX_ACCESS_UNIT_SIZE = 4 * 1024 * 1024;
+    private static final int MAX_PENDING_ACCESS_UNITS = 3;
+    private static final long DECODER_POLL_TIMEOUT_MS = 2;
+    private static final long DECODER_INPUT_TIMEOUT_US = 2000;
+    private static final long DECODER_JOIN_MS = 400;
 
     private final Surface surface;
     private final StatsModel stats;
     private final H264RtpDepacketizer depacketizer = new H264RtpDepacketizer();
     private final ByteArrayOutputStream accessUnitBuffer = new ByteArrayOutputStream(512 * 1024);
+    private final ArrayBlockingQueue<EncodedFrame> pendingAccessUnits =
+        new ArrayBlockingQueue<>(MAX_PENDING_ACCESS_UNITS);
     private volatile boolean running = true;
     private DatagramSocket socket;
     private MediaCodec decoder;
+    private Thread decoderThread;
     private long accessUnitTimestamp = -1;
     private long firstVideoTimestamp = -1;
     private int expectedVideoSequenceNumber = -1;
@@ -40,21 +50,13 @@ public final class H264VideoReceiver implements Runnable {
 
     @Override
     public void run() {
+        startDecoderThread();
         try {
-            decoder = MediaCodec.createDecoderByType("video/avc");
-            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
-            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
-            format.setInteger(MediaFormat.KEY_PRIORITY, 0);
-            format.setInteger(MediaFormat.KEY_OPERATING_RATE, 60);
-            decoder.configure(format, surface, null, 0);
-            decoder.start();
-            Bundle decoderParameters = new Bundle();
-            decoderParameters.putInt(MediaCodec.PARAMETER_KEY_LOW_LATENCY, 1);
-            decoder.setParameters(decoderParameters);
-
             socket = new DatagramSocket(null);
             socket.setReuseAddress(true);
+            socket.setReceiveBufferSize(VIDEO_RECEIVE_BUFFER_BYTES);
             socket.bind(new InetSocketAddress(VIDEO_PORT));
+            stats.videoReceiveBufferBytes = socket.getReceiveBufferSize();
             socket.setSoTimeout(SOCKET_TIMEOUT_MS);
 
             byte[] buffer = new byte[MAX_RTP_PACKET_SIZE];
@@ -74,9 +76,7 @@ public final class H264VideoReceiver implements Runnable {
                     if (packet.marker) {
                         queueCurrentAccessUnit(packet.timestamp);
                     }
-                    drainOutput();
                 } catch (SocketTimeoutException ignored) {
-                    drainOutput();
                 } catch (SocketException ex) {
                     if (running) {
                         stats.droppedFrames++;
@@ -89,14 +89,57 @@ public final class H264VideoReceiver implements Runnable {
         } catch (Exception ex) {
             stats.droppedFrames++;
         } finally {
+            running = false;
             releaseResources();
         }
     }
 
     public void stop() {
         running = false;
-        if (socket != null) {
-            socket.close();
+        closeSocket();
+        Thread currentDecoderThread = decoderThread;
+        if (currentDecoderThread != null) {
+            currentDecoderThread.interrupt();
+        }
+    }
+
+    private void startDecoderThread() {
+        decoderThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runDecoderLoop();
+            }
+        }, "H264 解码");
+        decoderThread.start();
+    }
+
+    private void runDecoderLoop() {
+        try {
+            decoder = MediaCodec.createDecoderByType("video/avc");
+            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
+            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+            format.setInteger(MediaFormat.KEY_PRIORITY, 0);
+            format.setInteger(MediaFormat.KEY_OPERATING_RATE, 60);
+            decoder.configure(format, surface, null, 0);
+            decoder.start();
+            Bundle decoderParameters = new Bundle();
+            decoderParameters.putInt(MediaCodec.PARAMETER_KEY_LOW_LATENCY, 1);
+            decoder.setParameters(decoderParameters);
+
+            while (running || !pendingAccessUnits.isEmpty()) {
+                EncodedFrame frame = pendingAccessUnits.poll(DECODER_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                if (frame != null) {
+                    queueEncodedFrame(frame);
+                }
+                drainOutput();
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ex) {
+            stats.videoDecoderDrops++;
+            stats.droppedFrames++;
+        } finally {
+            releaseDecoder();
         }
     }
 
@@ -146,7 +189,19 @@ public final class H264VideoReceiver implements Runnable {
             }
             waitingForKeyframe = false;
         }
-        queueEncodedFrame(accessUnit, timestamp);
+        enqueueEncodedFrame(accessUnit, timestamp);
+    }
+
+    private void enqueueEncodedFrame(byte[] accessUnit, long timestamp) {
+        EncodedFrame frame = new EncodedFrame(accessUnit, timestamp);
+        while (!pendingAccessUnits.offer(frame)) {
+            EncodedFrame dropped = pendingAccessUnits.poll();
+            if (dropped == null) {
+                break;
+            }
+            stats.videoQueueDrops++;
+            stats.droppedFrames++;
+        }
     }
 
     private void recordVideoSequence(int sequenceNumber) {
@@ -197,19 +252,23 @@ public final class H264VideoReceiver implements Runnable {
         return false;
     }
 
-    private void queueEncodedFrame(byte[] accessUnit, long timestamp) {
+    private void queueEncodedFrame(EncodedFrame frame) {
+        byte[] accessUnit = frame.accessUnit;
+        long timestamp = frame.timestamp;
         if (decoder == null || accessUnit.length == 0) {
             return;
         }
 
-        int inputIndex = decoder.dequeueInputBuffer(0);
+        int inputIndex = decoder.dequeueInputBuffer(DECODER_INPUT_TIMEOUT_US);
         if (inputIndex < 0) {
+            stats.videoDecoderDrops++;
             stats.droppedFrames++;
             return;
         }
 
         ByteBuffer inputBuffer = decoder.getInputBuffer(inputIndex);
         if (inputBuffer == null || inputBuffer.capacity() < accessUnit.length) {
+            stats.videoDecoderDrops++;
             stats.droppedFrames++;
             decoder.queueInputBuffer(inputIndex, 0, 0, presentationTimeUs(timestamp), 0);
             return;
@@ -249,12 +308,34 @@ public final class H264VideoReceiver implements Runnable {
     }
 
     private void releaseResources() {
+        closeSocket();
+        stopDecoderThread();
+        pendingAccessUnits.clear();
+    }
+
+    private void closeSocket() {
         DatagramSocket currentSocket = socket;
         socket = null;
         if (currentSocket != null) {
             currentSocket.close();
         }
+    }
 
+    private void stopDecoderThread() {
+        Thread currentDecoderThread = decoderThread;
+        decoderThread = null;
+        if (currentDecoderThread == null || currentDecoderThread == Thread.currentThread()) {
+            return;
+        }
+        currentDecoderThread.interrupt();
+        try {
+            currentDecoderThread.join(DECODER_JOIN_MS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void releaseDecoder() {
         MediaCodec currentDecoder = decoder;
         decoder = null;
         if (currentDecoder != null) {
@@ -263,6 +344,16 @@ public final class H264VideoReceiver implements Runnable {
             } catch (IllegalStateException ignored) {
             }
             currentDecoder.release();
+        }
+    }
+
+    private static final class EncodedFrame {
+        private final byte[] accessUnit;
+        private final long timestamp;
+
+        private EncodedFrame(byte[] accessUnit, long timestamp) {
+            this.accessUnit = accessUnit;
+            this.timestamp = timestamp;
         }
     }
 }

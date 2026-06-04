@@ -16,8 +16,8 @@ test('RTP profiles include 720p fallback, 1080p game baseline, quality 1080p and
   assert.equal(RTP_PROFILES.game720.height, 720);
   assert.equal(RTP_PROFILES.game1080.width, 1920);
   assert.equal(RTP_PROFILES.game1080.height, 1080);
-  assert.equal(RTP_PROFILES.game1080.bitrateKbps, 28000);
-  assert.equal(RTP_PROFILES.game1080.keyframeInterval, 15);
+  assert.equal(RTP_PROFILES.game1080.bitrateKbps, 24000);
+  assert.equal(RTP_PROFILES.game1080.keyframeInterval, 10);
   assert.equal(RTP_PROFILES.game4k.width, 3840);
   assert.equal(RTP_PROFILES.game4k.height, 2160);
   assert.equal(RTP_PROFILES.game4k.codec, 'h265');
@@ -30,8 +30,8 @@ test('default RTP game profile uses 1080p60 baseline settings', () => {
   assert.equal(config.width, 1920);
   assert.equal(config.height, 1080);
   assert.equal(config.fps, 60);
-  assert.equal(config.bitrateKbps, 28000);
-  assert.equal(config.keyframeInterval, 15);
+  assert.equal(config.bitrateKbps, 24000);
+  assert.equal(config.keyframeInterval, 10);
   assert.equal(config.codec, 'h264');
 });
 
@@ -45,8 +45,8 @@ test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
   assert.match(pipeline, /video\/x-raw,format=NV12,width=1920,height=1080,framerate=60\/1/);
   assert.match(pipeline, /nvh264enc/);
   assert.match(pipeline, /bframes=0/);
-  assert.match(pipeline, /bitrate=28000/);
-  assert.match(pipeline, /gop-size=15/);
+  assert.match(pipeline, /bitrate=24000/);
+  assert.match(pipeline, /gop-size=10/);
   assert.match(pipeline, /zerolatency=true/);
   assert.match(pipeline, /queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream/);
   assert.doesNotMatch(pipeline, /zero-reorder-delay/);

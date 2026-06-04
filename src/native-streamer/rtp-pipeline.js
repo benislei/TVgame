@@ -14,8 +14,8 @@ const RTP_PROFILES = {
     width: 1920,
     height: 1080,
     fps: 60,
-    bitrateKbps: 28000,
-    keyframeInterval: 15
+    bitrateKbps: 24000,
+    keyframeInterval: 10
   },
   quality1080: {
     codec: 'h264',

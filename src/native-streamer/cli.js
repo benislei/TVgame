@@ -105,8 +105,8 @@ function printRtpHelp() {
   console.log('  --width <宽度>        视频宽度，默认 1920');
   console.log('  --height <高度>       视频高度，默认 1080');
   console.log('  --fps <帧率>          视频帧率，默认 60');
-  console.log('  --bitrate <kbps>      H.264 码率，默认 28000');
-  console.log('  --gop <帧数>          关键帧间隔，默认 15');
+  console.log('  --bitrate <kbps>      H.264 码率，默认 24000');
+  console.log('  --gop <帧数>          关键帧间隔，默认 10');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 

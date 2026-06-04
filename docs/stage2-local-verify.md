@@ -38,7 +38,7 @@ dotnet run --project InputBridge\InputBridge.csproj
 
 ## 启动发送端
 
-默认发送档位已经按阶段 2 目标调整为 `game1080`：1080p、28Mbps、60fps、GOP15。优先用默认游戏档验证 1080p 底线画质和手感：
+默认发送档位已经按阶段 2 目标调整为 `game1080`：1080p、24Mbps、60fps、GOP10。优先用默认游戏档验证 1080p 底线画质和手感：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP>
@@ -50,7 +50,7 @@ npm.cmd run native:rtp -- --host <Android TV IP>
 npm.cmd run native:rtp -- --host <Android TV IP> --profile game720
 ```
 
-如果默认档稳定，可以再测 1080p 画质档，观察清晰度提升是否值得 GOP30 带来的恢复等待：
+如果默认档稳定，可以再测 1080p 画质档，观察清晰度提升是否值得更高码率带来的压力：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
@@ -58,7 +58,7 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
 
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
 
-启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“视频丢包”和“等待关键帧”：如果花屏时视频丢包同步增长，接收端会丢弃后续依赖帧并等待下一帧 IDR，避免破损画面长时间扩散。
+启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“视频丢包”“等待关键帧”“队列丢帧”和“解码丢帧”：如果卡顿时视频丢包同步增长，说明收包链路仍有空档；如果主要是队列丢帧或解码丢帧增长，说明瓶颈更偏接收端解码或渲染。
 
 ## 输入回传
 
@@ -106,6 +106,7 @@ android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
 - [ ] 电视视频包计数增长。
 - [ ] 视频丢包计数保持较低。
 - [ ] 花屏后“等待关键帧”短暂增长，随后画面恢复。
+- [ ] 卡顿时记录“视频丢包 / 队列丢帧 / 解码丢帧”哪一个增长最明显。
 - [ ] 音频包计数增长。
 - [ ] 播放 PC 系统声音。
 - [ ] USB 手柄输入回传到达 PC relay。
@@ -115,7 +116,7 @@ android-tv-receiver\app\build\outputs\apk\debug\app-debug.apk
 - [ ] Android TV 应用可以从 Leanback 启动器打开。
 - [ ] 应用 label 显示为“电视游戏接收端”。
 - [ ] 首屏显示“等待视频和音频”。
-- [ ] 状态面板包含视频包、视频帧、视频丢包、等待关键帧、音频包、音频字节、丢帧、视频状态、音频状态。
+- [ ] 状态面板包含视频包、视频帧、视频丢包、等待关键帧、接收缓冲、队列丢帧、解码丢帧、音频包、音频字节、丢帧、视频状态、音频状态。
 - [ ] 未收到数据时，视频状态和音频状态显示“未收到”。
 - [ ] 运行 `npm.cmd run stage2:check` 可以看到 PC 端阶段 2 依赖检查结果。
 - [ ] 运行 `npm.cmd run native:rtp -- --host <Android TV IP>` 后，PC 端启动视频和音频 RTP 发送进程。

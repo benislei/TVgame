@@ -191,8 +191,8 @@ test('runRtpSender default RTP options use 1080p game profile', () => {
 
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
-  assert.match(videoArgs, /bitrate=28000/);
-  assert.match(videoArgs, /gop-size=15/);
+  assert.match(videoArgs, /bitrate=24000/);
+  assert.match(videoArgs, /gop-size=10/);
 });
 
 test('runRtpSender can select 720p fallback profile explicitly', () => {

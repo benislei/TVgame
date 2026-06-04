@@ -254,6 +254,17 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /waitingForKeyframe\s*=\s*true/);
   assert.match(video, /accessUnitContainsIdr\(accessUnit\)/);
   assert.match(video, /stats\.videoRecoveryWaits\+\+/);
+  assert.match(video, /VIDEO_RECEIVE_BUFFER_BYTES\s*=\s*4\s*\*\s*1024\s*\*\s*1024/);
+  assert.match(video, /socket\.setReceiveBufferSize\(VIDEO_RECEIVE_BUFFER_BYTES\)/);
+  assert.match(video, /stats\.videoReceiveBufferBytes\s*=\s*socket\.getReceiveBufferSize\(\)/);
+  assert.match(video, /ArrayBlockingQueue<\s*EncodedFrame\s*>/);
+  assert.match(video, /MAX_PENDING_ACCESS_UNITS\s*=\s*3/);
+  assert.match(video, /pendingAccessUnits\.offer/);
+  assert.match(video, /stats\.videoQueueDrops\+\+/);
+  assert.match(video, /stats\.videoDecoderDrops\+\+/);
+  assert.match(video, /DECODER_INPUT_TIMEOUT_US\s*=\s*2000/);
+  assert.match(video, /dequeueInputBuffer\(DECODER_INPUT_TIMEOUT_US\)/);
+  assert.match(video, /new\s+Thread\([\s\S]*,\s*"H264 解码"\)/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
   assert.match(video, /ByteArrayOutputStream\s+accessUnitBuffer/);
   assert.match(video, /MAX_ACCESS_UNIT_SIZE/);
@@ -267,7 +278,8 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /stats\.droppedFrames\+\+/);
   assert.match(video, /setSoTimeout\(/);
   assert.match(video, /public\s+void\s+stop\(\)/);
-  assert.match(video, /socket\.close\(\)/);
+  assert.match(video, /closeSocket\(\)/);
+  assert.match(video, /currentSocket\.close\(\)/);
 
   assert.match(audio, /AUDIO_PORT\s*=\s*5006/);
   assert.match(audio, /AudioAttributes\.USAGE_GAME/);
@@ -416,6 +428,9 @@ test('Android TV receiver production text is real Chinese without mojibake fragm
     '视频帧',
     '视频丢包',
     '等待关键帧',
+    '接收缓冲',
+    '队列丢帧',
+    '解码丢帧',
     '音频包',
     '音频字节',
     '丢帧',
