@@ -19,6 +19,7 @@
     "android:install": "node src/android-build/cli.js install",
     "android:build": "node src/android-build/cli.js build",
     "android:apk": "node src/android-build/cli.js apk",
+    "package:friend": "node src/release-package/cli.js friend",
     "test": "node --test"
   },
   "dependencies": {

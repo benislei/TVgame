@@ -204,6 +204,59 @@ public final class InputClientHarness {
   execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.InputClientHarness'], { stdio: 'pipe' });
 });
 
+test('StatsModel renders realtime one-second frame and drop metrics', (t) => {
+  if (!commandExists('javac') || !commandExists('java')) {
+    t.skip('javac/java not available; keeping StatsModel behavior covered by static checks in this environment');
+    return;
+  }
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tvgame-stats-model-'));
+  const packageDir = path.join(tempRoot, 'com', 'tvgame', 'receiver');
+  const classDir = path.join(tempRoot, 'classes');
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.mkdirSync(classDir, { recursive: true });
+
+  const statsSource = path.join(root, `${javaRoot}/StatsModel.java`);
+  const harnessSource = path.join(packageDir, 'StatsModelHarness.java');
+  fs.writeFileSync(harnessSource, `
+package com.tvgame.receiver;
+
+public final class StatsModelHarness {
+    public static void main(String[] args) {
+        StatsModel stats = new StatsModel();
+        stats.lastVideoAtMs = 1000;
+        stats.lastAudioAtMs = 1000;
+        stats.videoFrames = 60;
+        stats.droppedFrames = 6;
+        stats.videoQueueDrops = 4;
+        stats.videoDecoderDrops = 2;
+        stats.render(1000);
+
+        stats.videoFrames = 120;
+        stats.droppedFrames = 9;
+        stats.videoQueueDrops = 6;
+        stats.videoDecoderDrops = 3;
+        String text = stats.render(2000);
+
+        assertContains(text, "实时FPS: 60");
+        assertContains(text, "实时丢帧: 3");
+        assertContains(text, "实时丢帧率: 4.8%");
+        assertContains(text, "实时队列丢帧: 2");
+        assertContains(text, "实时解码丢帧: 1");
+    }
+
+    private static void assertContains(String text, String expected) {
+        if (!text.contains(expected)) {
+            throw new AssertionError("Expected text to contain [" + expected + "] but got [" + text + "]");
+        }
+    }
+}
+`, 'utf8');
+
+  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, statsSource, harnessSource], { stdio: 'pipe' });
+  execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.StatsModelHarness'], { stdio: 'pipe' });
+});
+
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
   const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
 
@@ -352,6 +405,19 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /stopReceivers\(\)/);
 });
 
+test('MainActivity toggles overlay with MENU or F1 without forwarding those keys', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /import\s+android\.view\.View/);
+  assert.match(source, /boolean\s+overlayVisible\s*=\s*true/);
+  assert.match(source, /isOverlayToggleKey\(keyCode\)/);
+  assert.match(source, /KeyEvent\.KEYCODE_MENU/);
+  assert.match(source, /KeyEvent\.KEYCODE_F1/);
+  assert.match(source, /toggleOverlay\(\)/);
+  assert.match(source, /overlay\.setVisibility\(overlayVisible\s*\?\s*View\.VISIBLE\s*:\s*View\.GONE\)/);
+  assert.match(source, /if\s*\(\s*event\.getRepeatCount\(\)\s*==\s*0\s*&&\s*isOverlayToggleKey\(keyCode\)\s*\)[\s\S]*?return\s+true/);
+});
+
 test('MainActivity shows Android 11 plus extreme receiver mode in Chinese', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
@@ -387,6 +453,7 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789/);
   assert.match(doc, /PC 端需要启动 InputBridge\/SendInput/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
+  assert.match(doc, /菜单键或 F1 可以隐藏或显示状态面板/);
   assert.match(doc, /## 验收记录/);
   for (const item of [
     'App 启动中文状态面板',

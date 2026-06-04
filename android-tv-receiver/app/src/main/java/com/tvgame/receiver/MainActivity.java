@@ -14,6 +14,7 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -48,6 +49,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private boolean keyDActive;
     private boolean keyWActive;
     private boolean keySActive;
+    private boolean overlayVisible = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,6 +114,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (event.getRepeatCount() == 0 && isOverlayToggleKey(keyCode)) {
+            toggleOverlay();
+            return true;
+        }
         if (inputClient != null && event.getRepeatCount() == 0) {
             inputClient.sendKey("down", keyCode);
         }
@@ -120,10 +126,24 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (isOverlayToggleKey(keyCode)) {
+            return true;
+        }
         if (inputClient != null) {
             inputClient.sendKey("up", keyCode);
         }
         return super.onKeyUp(keyCode, event);
+    }
+
+    private static boolean isOverlayToggleKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_F1;
+    }
+
+    private void toggleOverlay() {
+        overlayVisible = !overlayVisible;
+        if (overlay != null) {
+            overlay.setVisibility(overlayVisible ? View.VISIBLE : View.GONE);
+        }
     }
 
     @Override
