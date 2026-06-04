@@ -14,7 +14,14 @@ const {
   listProfiles
 } = require('./pipeline');
 const { createStage2Report } = require('../stage2/tooling');
-const { RTP_PROFILES, NVENC_ENCODER_PRESETS, buildRtpConfig, buildRtpLaunchCommands } = require('./rtp-pipeline');
+const {
+  RTP_PROFILES,
+  NVENC_ENCODER_PRESETS,
+  NVENC_AUTO_PRESET_ORDER,
+  buildRtpConfig,
+  buildNvencPresetProbeArgs,
+  buildRtpLaunchCommands
+} = require('./rtp-pipeline');
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -107,7 +114,7 @@ function printRtpHelp() {
   console.log('  --fps <帧率>          视频帧率，默认 60');
   console.log('  --bitrate <kbps>      H.264 码率，默认 24000');
   console.log('  --gop <帧数>          关键帧间隔，默认 10');
-  console.log('  --encoder-preset <值> NVENC preset，默认 default；可手动尝试 low-latency-hq');
+  console.log('  --encoder-preset <值> NVENC preset，默认 auto；按体验优先自动探测，可手动指定 low-latency-hq 或 default');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 
@@ -151,9 +158,10 @@ function validateRtpArgs(args) {
   const fps = parseIntegerOption(args.fps || String(fallbackProfile.fps), 'fps ', 1, 240, errors);
   const keyframeInterval = parseIntegerOption(args.gop || String(fallbackProfile.keyframeInterval), 'gop ', 1, 600, errors);
   const displayIndex = parseIntegerOption(args.display || '0', 'display ', 0, Number.MAX_SAFE_INTEGER, errors);
-  const encoderPreset = args['encoder-preset'] === undefined ? 'default' : args['encoder-preset'];
-  if (typeof encoderPreset !== 'string' || !NVENC_ENCODER_PRESETS.includes(encoderPreset)) {
-    errors.push(`encoder-preset 必须是以下之一：${NVENC_ENCODER_PRESETS.join(', ')}`);
+  const encoderPreset = args['encoder-preset'] === undefined ? 'auto' : args['encoder-preset'];
+  const validEncoderPresets = ['auto'].concat(NVENC_ENCODER_PRESETS);
+  if (typeof encoderPreset !== 'string' || !validEncoderPresets.includes(encoderPreset)) {
+    errors.push(`encoder-preset 必须是以下之一：${validEncoderPresets.join(', ')}`);
   }
 
   return {
@@ -193,6 +201,30 @@ function stopRtpChildren(children, failedChild) {
   }
 }
 
+function selectAutoEncoderPreset(config, gstLaunch, spawnSync) {
+  console.log(`自动探测 NVENC preset，体验优先顺序：${NVENC_AUTO_PRESET_ORDER.join(' -> ')}`);
+
+  for (const preset of NVENC_AUTO_PRESET_ORDER) {
+    const args = buildNvencPresetProbeArgs(config, preset);
+    const result = spawnSync(gstLaunch, args, {
+      encoding: 'utf8',
+      stdio: 'pipe',
+      windowsHide: true
+    });
+
+    if (result && result.status === 0) {
+      console.log(`NVENC preset 自动选择：${preset}`);
+      return preset;
+    }
+
+    console.log(`NVENC preset 不可用，继续回退：${preset}`);
+  }
+
+  console.error('自动探测 NVENC preset 失败：当前显卡、驱动或 GStreamer 无法启动 H.264 NVENC 编码。');
+  console.error('可先更新 NVIDIA 驱动，或运行“检查环境.bat”确认 GStreamer nvcodec 插件状态。');
+  return null;
+}
+
 function runRtpSender(args, options = {}) {
   if (args.help) {
     printRtpHelp();
@@ -208,6 +240,7 @@ function runRtpSender(args, options = {}) {
 
   const createReport = options.createReport || createStage2Report;
   const spawn = options.spawn || childProcess.spawn;
+  const spawnSync = options.spawnSync || childProcess.spawnSync;
   const report = createReport();
   if (!report.ready) {
     printStage2Report(report);
@@ -216,8 +249,17 @@ function runRtpSender(args, options = {}) {
   }
 
   const config = buildRtpConfig(validation.config);
-  const commands = buildRtpLaunchCommands(config);
   const gstLaunch = report.gstreamer.gstLaunch || 'gst-launch-1.0';
+  if (config.encoderPreset === 'auto') {
+    const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
+    if (!selectedPreset) {
+      process.exitCode = 1;
+      return;
+    }
+    config.encoderPreset = selectedPreset;
+  }
+
+  const commands = buildRtpLaunchCommands(config);
   const children = [];
   for (const command of commands) {
     console.log(`启动：${command.title}`);

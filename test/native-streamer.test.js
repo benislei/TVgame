@@ -43,6 +43,10 @@ function createReadyStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/g
   };
 }
 
+function createSuccessfulPresetProbe() {
+  return () => ({ status: 0, stdout: '', stderr: '' });
+}
+
 test('GStreamer download URLs point at official 64-bit MSVC installers', () => {
   const urls = buildGStreamerDownloadUrls();
 
@@ -185,19 +189,50 @@ test('runRtpSender default RTP options use 1080p game profile', () => {
   }, () => {
     runRtpSender(
       parseArgs(['rtp', '--host', '192.168.1.50']),
-      { createReport: () => createReadyStage2Report() }
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync: createSuccessfulPresetProbe()
+      }
     );
   });
 
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
-  assert.match(videoArgs, /preset=default/);
+  assert.match(videoArgs, /preset=low-latency-hq/);
   assert.match(videoArgs, /bitrate=24000/);
   assert.match(videoArgs, /gop-size=10/);
 });
 
+test('runRtpSender auto probes NVENC presets in game-feel order and launches first supported', () => {
+  const spawnedCommands = [];
+  const probedPresets = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--encoder-preset', 'auto']),
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync(executable, args) {
+          const joined = args.join(' ');
+          const match = joined.match(/preset=([\w-]+)/);
+          probedPresets.push(match && match[1]);
+          return { status: probedPresets.length === 1 ? 1 : 0, stdout: '', stderr: 'Selected preset not supported' };
+        }
+      }
+    );
+  });
+
+  assert.deepEqual(probedPresets.slice(0, 2), ['low-latency-hq', 'low-latency-hp']);
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /preset=low-latency-hp/);
+});
+
 test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', () => {
   const spawnedCommands = [];
+  let probeCount = 0;
 
   withPatchedSpawn((executable, args) => {
     spawnedCommands.push({ executable, args });
@@ -205,10 +240,17 @@ test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', (
   }, () => {
     runRtpSender(
       parseArgs(['rtp', '--host', '192.168.1.50', '--encoder-preset', 'low-latency-hq']),
-      { createReport: () => createReadyStage2Report() }
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync() {
+          probeCount += 1;
+          return { status: 0, stdout: '', stderr: '' };
+        }
+      }
     );
   });
 
+  assert.equal(probeCount, 0);
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /preset=low-latency-hq/);
 });
@@ -222,7 +264,10 @@ test('runRtpSender can select 720p fallback profile explicitly', () => {
   }, () => {
     runRtpSender(
       parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'game720']),
-      { createReport: () => createReadyStage2Report() }
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync: createSuccessfulPresetProbe()
+      }
     );
   });
 
@@ -310,7 +355,10 @@ test('runRtpSender uses the resolved gst-launch path from stage2 report', () => 
   }, () => {
     runRtpSender(
       parseArgs(['rtp', '--host', '192.168.1.50']),
-      { createReport: () => createReadyStage2Report(gstLaunch) }
+      {
+        createReport: () => createReadyStage2Report(gstLaunch),
+        spawnSync: createSuccessfulPresetProbe()
+      }
     );
   });
 
@@ -330,6 +378,7 @@ test('runRtpSender stops sibling RTP process when spawn errors', () => {
       parseArgs(['rtp', '--host', '192.168.1.50']),
       {
         createReport: () => createReadyStage2Report(),
+        spawnSync: createSuccessfulPresetProbe(),
         onChild: child => spawned.push(child)
       }
     );

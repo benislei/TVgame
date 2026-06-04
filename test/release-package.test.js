@@ -109,9 +109,9 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(installGstreamer, /powershell\.exe[\s\S]+scripts\\install-gstreamer\.ps1[\s\S]+-InstallDevel/);
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
-  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset default/);
-  assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset default --profile quality1080/);
-  assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset default --profile game720/);
+  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto/);
+  assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile quality1080/);
+  assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game720/);
 });
 
 test('friend preview README explains Chinese validation steps and overlay hiding', () => {
@@ -130,7 +130,7 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /启动默认发送\.bat/);
   assert.match(readme, /启动高画质发送\.bat/);
   assert.match(readme, /菜单键或 F1/);
-  assert.match(readme, /兼容 NVENC preset/);
+  assert.match(readme, /自动探测 NVENC preset/);
   assert.match(readme, /--encoder-preset low-latency-hq/);
   assert.match(readme, /UDP 5004/);
   assert.match(readme, /UDP 5006/);
@@ -159,7 +159,7 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder-preset default/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder-preset auto/);
 });
 
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {

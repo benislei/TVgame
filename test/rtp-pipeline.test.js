@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   RTP_PROFILES,
+  NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
   buildVideoRtpPipeline,
   buildAudioRtpPipeline,
@@ -36,6 +37,17 @@ test('default RTP game profile uses 1080p60 baseline settings', () => {
   assert.equal(config.keyframeInterval, 10);
   assert.equal(config.codec, 'h264');
   assert.equal(config.encoderPreset, 'default');
+});
+
+test('NVENC auto preset order prioritizes game feel before compatibility fallback', () => {
+  assert.deepEqual(NVENC_AUTO_PRESET_ORDER, [
+    'low-latency-hq',
+    'low-latency-hp',
+    'low-latency',
+    'hp',
+    'default',
+    'hq'
+  ]);
 });
 
 test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {

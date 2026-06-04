@@ -46,6 +46,15 @@ const NVENC_ENCODER_PRESETS = [
   'lossless-hp'
 ];
 
+const NVENC_AUTO_PRESET_ORDER = [
+  'low-latency-hq',
+  'low-latency-hp',
+  'low-latency',
+  'hp',
+  'default',
+  'hq'
+];
+
 function buildRtpConfig(overrides = {}) {
   const profileName = overrides.profile || 'game1080';
   const profile = RTP_PROFILES[profileName] || RTP_PROFILES.game1080;
@@ -112,6 +121,23 @@ function buildAudioRtpPipeline(config) {
   ].join(' ');
 }
 
+function buildNvencPresetProbePipeline(config, preset) {
+  const fps = `${config.fps}/1`;
+  return [
+    'videotestsrc num-buffers=1',
+    '!',
+    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    `nvh264enc preset=${preset} rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
+    '!',
+    'fakesink sync=false'
+  ].join(' ');
+}
+
+function buildNvencPresetProbeArgs(config, preset) {
+  return ['-q'].concat(splitPipeline(buildNvencPresetProbePipeline(config, preset)));
+}
+
 function buildRtpLaunchCommands(config) {
   return [
     {
@@ -130,8 +156,11 @@ function buildRtpLaunchCommands(config) {
 module.exports = {
   RTP_PROFILES,
   NVENC_ENCODER_PRESETS,
+  NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
   buildVideoRtpPipeline,
   buildAudioRtpPipeline,
+  buildNvencPresetProbePipeline,
+  buildNvencPresetProbeArgs,
   buildRtpLaunchCommands
 };
