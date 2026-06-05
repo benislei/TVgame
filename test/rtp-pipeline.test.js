@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   RTP_PROFILES,
+  H264_ENCODER_AUTO_ORDER,
   NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
   buildVideoRtpPipeline,
@@ -59,6 +60,10 @@ test('NVENC auto preset order prioritizes game feel before compatibility fallbac
   ]);
 });
 
+test('H264 encoder auto order prioritizes NVENC, then AMD AMF, then generic Windows fallback', () => {
+  assert.deepEqual(H264_ENCODER_AUTO_ORDER, ['nvh264enc', 'amfh264enc', 'mfh264enc']);
+});
+
 test('builds default resilient 1080p H264 RTP video pipeline for Android TV', () => {
   const config = buildRtpConfig({ host: '192.168.1.50' });
   const pipeline = buildVideoRtpPipeline(config);
@@ -80,6 +85,42 @@ test('builds default resilient 1080p H264 RTP video pipeline for Android TV', ()
   assert.match(pipeline, /h264parse config-interval=-1/);
   assert.match(pipeline, /rtph264pay pt=96 config-interval=-1 aggregate-mode=zero-latency/);
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
+});
+
+test('builds AMD AMF H264 RTP video pipeline without NVIDIA encoder', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    encoder: 'amfh264enc'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.encoder, 'amfh264enc');
+  assert.match(pipeline, /amfh264enc/);
+  assert.match(pipeline, /usage=ultra-low-latency/);
+  assert.match(pipeline, /rate-control=cbr/);
+  assert.match(pipeline, /b-frames=0/);
+  assert.match(pipeline, /bitrate=22000/);
+  assert.match(pipeline, /gop-size=5/);
+  assert.match(pipeline, /video\/x-raw\(memory:D3D11Memory\),format=NV12,width=1920,height=1080,framerate=60\/1/);
+  assert.doesNotMatch(pipeline, /nvh264enc/);
+  assert.doesNotMatch(pipeline, /d3d11download/);
+});
+
+test('builds Media Foundation H264 RTP video pipeline as generic Windows fallback', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    encoder: 'mfh264enc'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.encoder, 'mfh264enc');
+  assert.match(pipeline, /mfh264enc/);
+  assert.match(pipeline, /low-latency=true/);
+  assert.match(pipeline, /rc-mode=cbr/);
+  assert.match(pipeline, /bitrate=22000/);
+  assert.match(pipeline, /gop-size=5/);
+  assert.doesNotMatch(pipeline, /nvh264enc/);
+  assert.doesNotMatch(pipeline, /d3d11download/);
 });
 
 test('builds explicit NVENC encoder preset when configured', () => {

@@ -67,6 +67,12 @@ const NVENC_AUTO_PRESET_ORDER = [
   'hq'
 ];
 
+const H264_ENCODER_AUTO_ORDER = [
+  'nvh264enc',
+  'amfh264enc',
+  'mfh264enc'
+];
+
 function buildRtpConfig(overrides = {}) {
   const profileName = overrides.profile || 'resilient1080';
   const profile = RTP_PROFILES[profileName] || RTP_PROFILES.resilient1080;
@@ -85,6 +91,7 @@ function buildRtpConfig(overrides = {}) {
     h264ConfigInterval: Number(overrides.h264ConfigInterval ?? profile.h264ConfigInterval ?? 1),
     udpBufferSize: Number(overrides.udpBufferSize ?? profile.udpBufferSize ?? 0),
     strictGop: Boolean(overrides.strictGop ?? profile.strictGop ?? false),
+    encoder: overrides.encoder || 'nvh264enc',
     encoderPreset: overrides.encoderPreset || 'default',
     displayIndex: Number(overrides.displayIndex || 0)
   };
@@ -96,6 +103,71 @@ function splitPipeline(pipeline) {
 
 function buildVideoRtpPipeline(config) {
   const fps = `${config.fps}/1`;
+  const udpOptions = [
+    `host=${config.host}`,
+    `port=${config.videoPort}`,
+    'sync=false',
+    'async=false'
+  ];
+  if (config.udpBufferSize > 0) {
+    udpOptions.push(`buffer-size=${config.udpBufferSize}`);
+  }
+  const encoder = buildH264EncoderElement(config);
+  const needsSystemMemory = config.encoder === 'nvh264enc';
+  const d3d11Steps = needsSystemMemory
+    ? [
+        'd3d11download',
+        '!',
+        `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+        '!'
+      ]
+    : [];
+
+  return [
+    `d3d11screencapturesrc show-cursor=true monitor-index=${config.displayIndex}`,
+    '!',
+    `video/x-raw(memory:D3D11Memory),framerate=${fps}`,
+    '!',
+    'd3d11convert',
+    '!',
+    `video/x-raw(memory:D3D11Memory),format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    ...d3d11Steps,
+    'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
+    '!',
+    encoder,
+    '!',
+    `h264parse config-interval=${config.h264ConfigInterval}`,
+    '!',
+    `rtph264pay pt=96 config-interval=${config.h264ConfigInterval} aggregate-mode=zero-latency`,
+    '!',
+    `udpsink ${udpOptions.join(' ')}`
+  ].join(' ');
+}
+
+function buildH264EncoderElement(config) {
+  if (config.encoder === 'amfh264enc') {
+    return [
+      'amfh264enc',
+      'usage=ultra-low-latency',
+      'rate-control=cbr',
+      'preset=speed',
+      `bitrate=${config.bitrateKbps}`,
+      `gop-size=${config.keyframeInterval}`,
+      'b-frames=0'
+    ].join(' ');
+  }
+
+  if (config.encoder === 'mfh264enc') {
+    return [
+      'mfh264enc',
+      'low-latency=true',
+      'rc-mode=cbr',
+      `bitrate=${config.bitrateKbps}`,
+      `gop-size=${config.keyframeInterval}`
+    ].join(' ');
+  }
+
   const encoderOptions = [
     `preset=${config.encoderPreset}`,
     `rc-mode=${config.encoderRcMode}`,
@@ -107,39 +179,7 @@ function buildVideoRtpPipeline(config) {
   if (config.strictGop) {
     encoderOptions.push('strict-gop=true');
   }
-  const udpOptions = [
-    `host=${config.host}`,
-    `port=${config.videoPort}`,
-    'sync=false',
-    'async=false'
-  ];
-  if (config.udpBufferSize > 0) {
-    udpOptions.push(`buffer-size=${config.udpBufferSize}`);
-  }
-
-  return [
-    `d3d11screencapturesrc show-cursor=true monitor-index=${config.displayIndex}`,
-    '!',
-    `video/x-raw(memory:D3D11Memory),framerate=${fps}`,
-    '!',
-    'd3d11convert',
-    '!',
-    `video/x-raw(memory:D3D11Memory),format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
-    '!',
-    'd3d11download',
-    '!',
-    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
-    '!',
-    'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
-    '!',
-    `nvh264enc ${encoderOptions.join(' ')}`,
-    '!',
-    `h264parse config-interval=${config.h264ConfigInterval}`,
-    '!',
-    `rtph264pay pt=96 config-interval=${config.h264ConfigInterval} aggregate-mode=zero-latency`,
-    '!',
-    `udpsink ${udpOptions.join(' ')}`
-  ].join(' ');
+  return `nvh264enc ${encoderOptions.join(' ')}`;
 }
 
 function buildAudioRtpPipeline(config) {
@@ -171,6 +211,24 @@ function buildNvencPresetProbePipeline(config, preset) {
   ].join(' ');
 }
 
+function buildH264EncoderProbePipeline(config, encoder) {
+  const fps = `${config.fps}/1`;
+  const probeConfig = { ...config, encoder };
+  return [
+    'videotestsrc num-buffers=1',
+    '!',
+    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    buildH264EncoderElement(probeConfig),
+    '!',
+    'fakesink sync=false'
+  ].join(' ');
+}
+
+function buildH264EncoderProbeArgs(config, encoder) {
+  return ['-q'].concat(splitPipeline(buildH264EncoderProbePipeline(config, encoder)));
+}
+
 function buildNvencPresetProbeArgs(config, preset) {
   return ['-q'].concat(splitPipeline(buildNvencPresetProbePipeline(config, preset)));
 }
@@ -192,10 +250,14 @@ function buildRtpLaunchCommands(config) {
 
 module.exports = {
   RTP_PROFILES,
+  H264_ENCODER_AUTO_ORDER,
   NVENC_ENCODER_PRESETS,
   NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
   buildVideoRtpPipeline,
+  buildH264EncoderElement,
+  buildH264EncoderProbePipeline,
+  buildH264EncoderProbeArgs,
   buildAudioRtpPipeline,
   buildNvencPresetProbePipeline,
   buildNvencPresetProbeArgs,

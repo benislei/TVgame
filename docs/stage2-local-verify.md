@@ -22,6 +22,8 @@ npm.cmd run stage2:check
 
 确认 GStreamer、RTP 视频插件、RTP 音频插件和 dotnet 状态通过后，启动 InputBridge：
 
+编码器兼容性：NVIDIA 显卡优先使用 `nvh264enc`，AMD 显卡优先使用 `amfh264enc`，通用 Windows 兜底使用 `mfh264enc`。如果 A 卡机器提示缺 `nvh264enc`，这本身不是问题；只要 H.264 编码能力显示通过，并标出 `amfh264enc` 或 `mfh264enc`，就可以继续验证。
+
 ```powershell
 dotnet run --project InputBridge\InputBridge.csproj
 ```
@@ -80,7 +82,7 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile game1080
 
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
 
-发送端默认使用 `--encoder-preset auto`，会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`。如果前面的低延迟 preset 不被当前显卡、驱动或 GStreamer 支持，会自动回退到后面的兼容档。
+发送端默认使用 `--encoder auto --encoder-preset auto`。编码器会按 `nvh264enc`、`amfh264enc`、`mfh264enc` 自动选择；N 卡的 preset 会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`。如果前面的低延迟 preset 不被当前显卡、驱动或 GStreamer 支持，会自动回退到后面的兼容档。
 
 如果发送端提示 `Selected preset not supported` 或 `Could not configure supporting library`，通常是当前显卡/驱动不支持某个 NVENC preset。新版启动脚本会自动回退；如果需要手动排查，可以直接指定兼容 preset：
 
@@ -88,7 +90,7 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile game1080
 npm.cmd run native:rtp -- --host <Android TV IP> --encoder-preset default
 ```
 
-朋友试用包里的 `.bat` 已默认使用 `--encoder-preset auto`，稳定后也可以手动尝试固定 `--encoder-preset low-latency-hq` 或 `--encoder-preset default` 对比体感。
+朋友试用包里的 `.bat` 已默认使用 `--encoder auto --encoder-preset auto`，稳定后也可以手动尝试固定 `--encoder-preset low-latency-hq`、`--encoder-preset default`，或用 `--encoder amf` / `--encoder mf` 对比兼容性和体感。
 
 启动后，电视左上角会显示紧凑状态面板，音视频状态应变为“正常”。面板保留“FPS”“实时丢包”“实时丢帧”“等待关键”“恢复”“队列”“解码”、音视频状态和输入诊断：如果花屏时实时丢包、恢复和等待关键同步增长，说明短暂 RTP 丢包后的关键帧恢复仍在影响体感；如果主要是队列或解码丢帧增长，说明瓶颈更偏接收端解码或渲染。当前低延迟版本只保留最新 1 帧待解码画面，优先压低操作到画面变化的体感延迟。菜单键或 F1 可以隐藏或显示状态面板。
 

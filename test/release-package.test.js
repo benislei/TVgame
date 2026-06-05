@@ -128,11 +128,11 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(check, /未检测到 Node\.js\/npm/);
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
-  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
-  assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile quality1080/);
-  assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
-  assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game1080/);
-  assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game720/);
+  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
+  assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile quality1080/);
+  assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
+  assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game1080/);
+  assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game720/);
 });
 
 test('ViGEmBus installer script stays ASCII-safe for Windows PowerShell 5.1', () => {
@@ -166,6 +166,9 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /安装Node\.js运行环境\.bat/);
   assert.match(readme, /Node\.js\/npm 是发送端基础运行时依赖/);
   assert.match(readme, /重新打开一个新的命令窗口/);
+  assert.match(readme, /N 卡优先使用 `nvh264enc`/);
+  assert.match(readme, /A 卡优先使用 `amfh264enc`/);
+  assert.match(readme, /`mfh264enc` 兜底/);
   assert.match(readme, /ViGEmBus/);
   assert.match(readme, /虚拟 Xbox 手柄/);
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
@@ -216,7 +219,7 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder-preset auto --profile resilient1080/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder auto --encoder-preset auto --profile resilient1080/);
 });
 
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {

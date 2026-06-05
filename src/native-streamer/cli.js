@@ -16,12 +16,27 @@ const {
 const { createStage2Report } = require('../stage2/tooling');
 const {
   RTP_PROFILES,
+  H264_ENCODER_AUTO_ORDER,
   NVENC_ENCODER_PRESETS,
   NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
+  buildH264EncoderProbeArgs,
   buildNvencPresetProbeArgs,
   buildRtpLaunchCommands
 } = require('./rtp-pipeline');
+
+const H264_ENCODER_ALIASES = {
+  auto: 'auto',
+  nvenc: 'nvh264enc',
+  nvidia: 'nvh264enc',
+  nvh264enc: 'nvh264enc',
+  amf: 'amfh264enc',
+  amd: 'amfh264enc',
+  amfh264enc: 'amfh264enc',
+  mf: 'mfh264enc',
+  mediafoundation: 'mfh264enc',
+  mfh264enc: 'mfh264enc'
+};
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -87,7 +102,7 @@ function printStage2Report(report) {
   }
   console.log('');
   console.log('编码能力：');
-  console.log(`  H.264：${report.codecs.h264.ready ? '通过' : `缺失 ${report.codecs.h264.missing.join(', ')}`}`);
+  console.log(`  H.264：${report.codecs.h264.ready ? `通过（${report.codecs.h264.encoder}）` : `缺失 ${report.codecs.h264.missing.join(', ')}`}`);
   console.log(`  HEVC/4K60 预备：${report.codecs.hevc.ready ? '通过' : `缺失 ${report.codecs.hevc.missing.join(', ')}`}`);
   console.log('');
   console.log(report.ready ? '结果：阶段 2 RTP 发送端环境已就绪。' : '结果：阶段 2 RTP 发送端环境未就绪。');
@@ -114,6 +129,7 @@ function printRtpHelp() {
   console.log('  --fps <帧率>          视频帧率，默认 60');
   console.log('  --bitrate <kbps>      H.264 码率，默认 22000');
   console.log('  --gop <帧数>          关键帧间隔，默认 5');
+  console.log('  --encoder <编码器>    H.264 编码器，默认 auto；可选 nvenc, amf, mf');
   console.log('  --encoder-preset <值> NVENC preset，默认 auto；按体验优先自动探测，可手动指定 low-latency-hq 或 default');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
@@ -131,6 +147,11 @@ function parseIntegerOption(value, label, min, max, errors) {
   }
 
   return parsed;
+}
+
+function normalizeH264Encoder(value) {
+  if (typeof value !== 'string') return null;
+  return H264_ENCODER_ALIASES[value.toLowerCase()] || null;
 }
 
 function validateRtpArgs(args) {
@@ -163,6 +184,10 @@ function validateRtpArgs(args) {
   if (typeof encoderPreset !== 'string' || !validEncoderPresets.includes(encoderPreset)) {
     errors.push(`encoder-preset 必须是以下之一：${validEncoderPresets.join(', ')}`);
   }
+  const encoder = args.encoder === undefined ? 'auto' : normalizeH264Encoder(args.encoder);
+  if (!encoder) {
+    errors.push('encoder 必须是以下之一：auto, nvenc, amf, mf, nvh264enc, amfh264enc, mfh264enc');
+  }
 
   return {
     ok: errors.length === 0,
@@ -178,6 +203,7 @@ function validateRtpArgs(args) {
       height,
       fps,
       keyframeInterval,
+      encoder,
       encoderPreset,
       displayIndex
     }
@@ -225,6 +251,62 @@ function selectAutoEncoderPreset(config, gstLaunch, spawnSync) {
   return null;
 }
 
+function probeH264Encoder(config, encoder, gstLaunch, spawnSync) {
+  const args = buildH264EncoderProbeArgs(config, encoder);
+  const result = spawnSync(gstLaunch, args, {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    windowsHide: true
+  });
+  return Boolean(result && result.status === 0);
+}
+
+function selectH264Encoder(config, report, gstLaunch, spawnSync) {
+  const availableEncoders = new Set(
+    report.codecs && report.codecs.h264 && Array.isArray(report.codecs.h264.availableEncoders)
+      ? report.codecs.h264.availableEncoders
+      : H264_ENCODER_AUTO_ORDER.filter(name => report.plugins && report.plugins[name])
+  );
+  const requested = config.encoder || 'auto';
+  const candidates = requested === 'auto'
+    ? H264_ENCODER_AUTO_ORDER.filter(name => availableEncoders.has(name))
+    : [requested];
+
+  if (candidates.length === 0) {
+    console.error('未检测到可用的 H.264 硬件编码器：需要 nvh264enc、amfh264enc 或 mfh264enc 之一。');
+    return false;
+  }
+
+  for (const encoder of candidates) {
+    if (!availableEncoders.has(encoder)) {
+      console.error(`指定的编码器不可用：${encoder}`);
+      continue;
+    }
+
+    if (encoder === 'nvh264enc') {
+      config.encoder = encoder;
+      if (config.encoderPreset === 'auto') {
+        const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
+        if (!selectedPreset) continue;
+        config.encoderPreset = selectedPreset;
+      }
+      console.log(`H.264 编码器自动选择：${encoder}`);
+      return true;
+    }
+
+    console.log(`正在探测 H.264 编码器：${encoder}`);
+    if (probeH264Encoder(config, encoder, gstLaunch, spawnSync)) {
+      config.encoder = encoder;
+      console.log(`H.264 编码器自动选择：${encoder}`);
+      return true;
+    }
+    console.log(`H.264 编码器不可用，继续回退：${encoder}`);
+  }
+
+  console.error('自动探测 H.264 编码器失败：当前显卡、驱动或 GStreamer 无法启动硬件 H.264 编码。');
+  return false;
+}
+
 function runRtpSender(args, options = {}) {
   if (args.help) {
     printRtpHelp();
@@ -250,13 +332,9 @@ function runRtpSender(args, options = {}) {
 
   const config = buildRtpConfig(validation.config);
   const gstLaunch = report.gstreamer.gstLaunch || 'gst-launch-1.0';
-  if (config.encoderPreset === 'auto') {
-    const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
-    if (!selectedPreset) {
-      process.exitCode = 1;
-      return;
-    }
-    config.encoderPreset = selectedPreset;
+  if (!selectH264Encoder(config, report, gstLaunch, spawnSync)) {
+    process.exitCode = 1;
+    return;
   }
 
   const commands = buildRtpLaunchCommands(config);

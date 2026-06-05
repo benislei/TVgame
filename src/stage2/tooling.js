@@ -5,7 +5,6 @@ const { findExecutable, inspectPlugin } = require('../native-streamer/environmen
 const REQUIRED_PLUGINS = [
   'd3d11screencapturesrc',
   'd3d11download',
-  'nvh264enc',
   'rtph264pay',
   'h264parse',
   'wasapi2src',
@@ -13,6 +12,12 @@ const REQUIRED_PLUGINS = [
   'audioresample',
   'rtpL16pay',
   'udpsink'
+];
+
+const H264_ENCODER_PLUGINS = [
+  'nvh264enc',
+  'amfh264enc',
+  'mfh264enc'
 ];
 
 const OPTIONAL_HEVC_PLUGINS = [
@@ -27,9 +32,12 @@ function createStage2Report(options = {}) {
   const gstInspect = find('gst-inspect-1.0');
   const inspect = options.inspectPlugin || (plugin => inspectPlugin(plugin, gstInspect));
   const dotnet = find('dotnet');
-  const plugins = Object.fromEntries(REQUIRED_PLUGINS.map(name => [name, inspect(name)]));
+  const plugins = Object.fromEntries(REQUIRED_PLUGINS.concat(H264_ENCODER_PLUGINS).map(name => [name, inspect(name)]));
   const optionalPlugins = Object.fromEntries(OPTIONAL_HEVC_PLUGINS.map(name => [name, inspect(name)]));
-  const missingPlugins = REQUIRED_PLUGINS.filter(name => !plugins[name]);
+  const availableH264Encoders = H264_ENCODER_PLUGINS.filter(name => plugins[name]);
+  const missingPlugins = REQUIRED_PLUGINS
+    .filter(name => !plugins[name])
+    .concat(availableH264Encoders.length === 0 ? ['H.264 hardware encoder (nvh264enc/amfh264enc/mfh264enc)'] : []);
   const missingHevcPlugins = OPTIONAL_HEVC_PLUGINS.filter(name => !optionalPlugins[name]);
 
   return {
@@ -44,8 +52,14 @@ function createStage2Report(options = {}) {
     optionalPlugins,
     codecs: {
       h264: {
-        ready: Boolean(plugins.nvh264enc && plugins.h264parse && plugins.rtph264pay),
-        missing: ['nvh264enc', 'h264parse', 'rtph264pay'].filter(name => !plugins[name])
+        ready: Boolean(availableH264Encoders.length > 0 && plugins.h264parse && plugins.rtph264pay),
+        encoder: availableH264Encoders[0] || null,
+        availableEncoders: availableH264Encoders,
+        missing: [
+          availableH264Encoders.length === 0 && 'nvh264enc|amfh264enc|mfh264enc',
+          !plugins.h264parse && 'h264parse',
+          !plugins.rtph264pay && 'rtph264pay'
+        ].filter(Boolean)
       },
       hevc: {
         ready: missingHevcPlugins.length === 0,
@@ -64,4 +78,4 @@ function createStage2Report(options = {}) {
   };
 }
 
-module.exports = { REQUIRED_PLUGINS, OPTIONAL_HEVC_PLUGINS, createStage2Report };
+module.exports = { REQUIRED_PLUGINS, H264_ENCODER_PLUGINS, OPTIONAL_HEVC_PLUGINS, createStage2Report };

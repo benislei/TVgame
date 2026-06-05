@@ -40,9 +40,25 @@ function createReadyStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/g
       gstInspect: 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-inspect-1.0.exe'
     },
     dotnet: { ready: true, path: 'C:/Program Files/dotnet/dotnet.exe' },
-    plugins: {},
+    plugins: { nvh264enc: true, amfh264enc: false, mfh264enc: false },
+    codecs: {
+      h264: {
+        ready: true,
+        encoder: 'nvh264enc',
+        availableEncoders: ['nvh264enc'],
+        missing: []
+      }
+    },
     missing: { executables: [], plugins: [] }
   };
+}
+
+function createAmdStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-launch-1.0.exe') {
+  const report = createReadyStage2Report(gstLaunch);
+  report.plugins = { nvh264enc: false, amfh264enc: true, mfh264enc: false };
+  report.codecs.h264.encoder = 'amfh264enc';
+  report.codecs.h264.availableEncoders = ['amfh264enc'];
+  return report;
 }
 
 function createSuccessfulPresetProbe() {
@@ -64,6 +80,9 @@ test('GStreamer installer gives friend-package next steps without QuickVerify wo
   assert.match(source, /npm\.cmd run stage2:check/);
   assert.match(source, /nvh264enc/);
   assert.match(source, /NVIDIA/);
+  assert.match(source, /amfh264enc/);
+  assert.match(source, /AMD/);
+  assert.match(source, /mfh264enc/);
   assert.doesNotMatch(source, /QuickVerify/);
   assert.doesNotMatch(source, /native:check/);
 });
@@ -244,6 +263,35 @@ test('runRtpSender auto probes NVENC presets in game-feel order and launches fir
   assert.deepEqual(probedPresets.slice(0, 2), ['low-latency-hq', 'low-latency-hp']);
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /preset=low-latency-hp/);
+});
+
+test('runRtpSender auto selects AMD AMF encoder when NVENC is unavailable', () => {
+  const spawnedCommands = [];
+  const probeCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--encoder-preset', 'auto']),
+      {
+        createReport: () => createAmdStage2Report(),
+        spawnSync(executable, args) {
+          probeCommands.push(args.join(' '));
+          return { status: 0, stdout: '', stderr: '' };
+        }
+      }
+    );
+  });
+
+  assert.equal(probeCommands.length, 1);
+  assert.match(probeCommands[0], /amfh264enc/);
+  assert.doesNotMatch(probeCommands[0], /nvh264enc/);
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /amfh264enc/);
+  assert.doesNotMatch(videoArgs, /nvh264enc/);
+  assert.match(videoArgs, /usage=ultra-low-latency/);
 });
 
 test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', () => {

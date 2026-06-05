@@ -48,6 +48,52 @@ test('stage2 report keeps H264 ready when optional HEVC plugins are missing', ()
   assert.doesNotMatch(report.missing.plugins.join(','), /nvh265enc/);
 });
 
+test('stage2 report is ready on AMD when AMF H264 encoder exists without NVENC', () => {
+  const report = createStage2Report({
+    findExecutable: name => {
+      if (name === 'gst-launch-1.0' || name === 'gst-inspect-1.0') {
+        return `D:/gstreamer/1.0/msvc_x86_64/bin/${name}.exe`;
+      }
+      if (name === 'dotnet') return 'C:/Program Files/dotnet/dotnet.exe';
+      return null;
+    },
+    inspectPlugin: plugin => plugin !== 'nvh264enc' && plugin !== 'nvh265enc'
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.gstreamer.ready, true);
+  assert.equal(report.plugins.nvh264enc, false);
+  assert.equal(report.plugins.amfh264enc, true);
+  assert.equal(report.codecs.h264.ready, true);
+  assert.equal(report.codecs.h264.encoder, 'amfh264enc');
+  assert.deepEqual(report.codecs.h264.missing, []);
+  assert.doesNotMatch(report.missing.plugins.join(','), /nvh264enc/);
+});
+
+test('stage2 report accepts generic Media Foundation H264 encoder as fallback', () => {
+  const report = createStage2Report({
+    findExecutable: name => name.startsWith('gst-') ? `D:/gstreamer/bin/${name}.exe` : 'C:/dotnet/dotnet.exe',
+    inspectPlugin: plugin => !['nvh264enc', 'amfh264enc', 'nvh265enc'].includes(plugin)
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.codecs.h264.ready, true);
+  assert.equal(report.codecs.h264.encoder, 'mfh264enc');
+  assert.equal(report.plugins.mfh264enc, true);
+});
+
+test('stage2 report explains when no supported H264 hardware encoder exists', () => {
+  const report = createStage2Report({
+    findExecutable: name => name.startsWith('gst-') ? `D:/gstreamer/bin/${name}.exe` : 'C:/dotnet/dotnet.exe',
+    inspectPlugin: plugin => !['nvh264enc', 'amfh264enc', 'mfh264enc', 'nvh265enc'].includes(plugin)
+  });
+
+  assert.equal(report.ready, false);
+  assert.equal(report.codecs.h264.ready, false);
+  assert.deepEqual(report.codecs.h264.missing, ['nvh264enc|amfh264enc|mfh264enc']);
+  assert.ok(report.missing.plugins.includes('H.264 hardware encoder (nvh264enc/amfh264enc/mfh264enc)'));
+});
+
 test('stage2 report does not require Python GStreamer bindings', () => {
   const report = createStage2Report({
     findExecutable: name => name.startsWith('gst-') ? `D:/gstreamer/bin/${name}.exe` : 'C:/dotnet/dotnet.exe',
@@ -93,7 +139,7 @@ test('stage2 report default inspector uses the resolved gst-inspect path', () =>
     });
 
     assert.equal(report.ready, true);
-    assert.equal(seen.length, 13);
+    assert.equal(seen.length, 15);
     assert.deepEqual(seen[0], ['d3d11screencapturesrc', 'D:/gstreamer/bin/gst-inspect-1.0.exe']);
   } finally {
     environment.inspectPlugin = originalInspectPlugin;

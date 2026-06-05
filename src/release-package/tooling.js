@@ -168,7 +168,8 @@ function createReadme() {
     '1. 把 `TVGameReceiver.apk` 安装到 Android 11+ 电视或电视盒子上，然后打开“电视游戏接收端”。接收端 App 打开期间会保持屏幕常亮，避免电视自动休眠后黑屏。',
     '2. 在电脑上运行 `安装npm依赖.bat`。如果提示刚安装 Node.js，请关闭当前窗口，重新打开一个新的命令窗口后再运行一次 `安装npm依赖.bat`。',
     '3. 如果 `检查环境.bat` 提示 GStreamer 缺失，先运行 `安装GStreamer依赖.bat`。安装完成后关闭当前窗口，重新打开一个新的命令窗口，再运行 `检查环境.bat`。',
-    '   如果环境检查只缺 `nvh264enc`，说明 GStreamer 已能运行，但缺 NVIDIA NVENC 编码插件；优先重新运行 `安装GStreamer依赖.bat` 安装 devel 包，并确认电脑是 NVIDIA 显卡且驱动已更新。',
+    '   如果环境检查缺 `nvh264enc` 但电脑是 AMD 显卡，这是正常的；新版发送端会自动尝试 `amfh264enc`。如果 `amfh264enc` 也缺，优先重新运行 `安装GStreamer依赖.bat` 安装 devel 包，并更新 AMD 显卡驱动。',
+    '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
     '6. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。',
@@ -187,7 +188,7 @@ function createReadme() {
     '',
     '## 自动探测 NVENC preset',
     '',
-    '朋友试用包里的发送脚本默认使用 `--encoder-preset auto`，会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`，前面的 preset 不支持时会自动回退。需要排查兼容性时，可以在项目目录手动运行 `npm.cmd run native:rtp -- --host <电视IP> --encoder-preset default`；如果确认显卡和驱动支持更激进的低延迟 preset，也可以手动指定 `--encoder-preset low-latency-hq`。',
+    '朋友试用包里的发送脚本默认使用 `--encoder auto --encoder-preset auto`。编码器会按 `nvh264enc`、`amfh264enc`、`mfh264enc` 的顺序自动选择；N 卡 preset 会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`，前面的 preset 不支持时会自动回退。需要排查兼容性时，可以在项目目录手动运行 `npm.cmd run native:rtp -- --host <电视IP> --encoder amf`、`--encoder mf`，或在 N 卡上固定 `--encoder-preset low-latency-hq`。',
     '',
     '## 端口',
     '',
@@ -217,11 +218,11 @@ if errorlevel 1 (
 call npm.cmd run stage2:check
 `),
     '启动输入桥.bat': createBatchScript('echo 正在启动输入桥，请保持此窗口打开。\r\ndotnet run --project InputBridge\\InputBridge.csproj'),
-    '启动默认发送.bat': createSenderBatch('--encoder-preset auto --profile resilient1080'),
-    '启动高画质发送.bat': createSenderBatch('--encoder-preset auto --profile quality1080'),
-    '启动抗花屏发送.bat': createSenderBatch('--encoder-preset auto --profile resilient1080'),
-    '启动低延迟实验发送.bat': createSenderBatch('--encoder-preset auto --profile game1080'),
-    '启动720回退发送.bat': createSenderBatch('--encoder-preset auto --profile game720')
+    '启动默认发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
+    '启动高画质发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile quality1080'),
+    '启动抗花屏发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
+    '启动低延迟实验发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile game1080'),
+    '启动720回退发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile game720')
   };
 
   for (const [name, text] of Object.entries(launchers)) {
