@@ -25,6 +25,18 @@ const RTP_PROFILES = {
     bitrateKbps: 30000,
     keyframeInterval: 10
   },
+  resilient1080: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    bitrateKbps: 22000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true
+  },
   game4k: {
     codec: 'h265',
     width: 3840,
@@ -69,6 +81,10 @@ function buildRtpConfig(overrides = {}) {
     fps: Number(overrides.fps || profile.fps),
     bitrateKbps: Number(overrides.bitrateKbps || profile.bitrateKbps),
     keyframeInterval: Number(overrides.keyframeInterval || profile.keyframeInterval),
+    encoderRcMode: overrides.encoderRcMode || profile.encoderRcMode || 'cbr',
+    h264ConfigInterval: Number(overrides.h264ConfigInterval ?? profile.h264ConfigInterval ?? 1),
+    udpBufferSize: Number(overrides.udpBufferSize ?? profile.udpBufferSize ?? 0),
+    strictGop: Boolean(overrides.strictGop ?? profile.strictGop ?? false),
     encoderPreset: overrides.encoderPreset || 'default',
     displayIndex: Number(overrides.displayIndex || 0)
   };
@@ -80,6 +96,27 @@ function splitPipeline(pipeline) {
 
 function buildVideoRtpPipeline(config) {
   const fps = `${config.fps}/1`;
+  const encoderOptions = [
+    `preset=${config.encoderPreset}`,
+    `rc-mode=${config.encoderRcMode}`,
+    `bitrate=${config.bitrateKbps}`,
+    `gop-size=${config.keyframeInterval}`,
+    'bframes=0',
+    'zerolatency=true'
+  ];
+  if (config.strictGop) {
+    encoderOptions.push('strict-gop=true');
+  }
+  const udpOptions = [
+    `host=${config.host}`,
+    `port=${config.videoPort}`,
+    'sync=false',
+    'async=false'
+  ];
+  if (config.udpBufferSize > 0) {
+    udpOptions.push(`buffer-size=${config.udpBufferSize}`);
+  }
+
   return [
     `d3d11screencapturesrc show-cursor=true monitor-index=${config.displayIndex}`,
     '!',
@@ -95,13 +132,13 @@ function buildVideoRtpPipeline(config) {
     '!',
     'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
     '!',
-    `nvh264enc preset=${config.encoderPreset} rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
+    `nvh264enc ${encoderOptions.join(' ')}`,
     '!',
-    'h264parse config-interval=1',
+    `h264parse config-interval=${config.h264ConfigInterval}`,
     '!',
-    'rtph264pay pt=96 config-interval=1 aggregate-mode=zero-latency',
+    `rtph264pay pt=96 config-interval=${config.h264ConfigInterval} aggregate-mode=zero-latency`,
     '!',
-    `udpsink host=${config.host} port=${config.videoPort} sync=false async=false`
+    `udpsink ${udpOptions.join(' ')}`
   ].join(' ');
 }
 
@@ -128,7 +165,7 @@ function buildNvencPresetProbePipeline(config, preset) {
     '!',
     `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
     '!',
-    `nvh264enc preset=${preset} rc-mode=cbr bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
+    `nvh264enc preset=${preset} rc-mode=${config.encoderRcMode} bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
     '!',
     'fakesink sync=false'
   ].join(' ');

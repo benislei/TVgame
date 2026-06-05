@@ -22,6 +22,7 @@ public final class StatsModel {
     private long lastRealtimeDroppedFrames;
     private long lastRealtimeQueueDrops;
     private long lastRealtimeDecoderDrops;
+    private long lastRealtimeVideoRtpLossPackets;
 
     public String render() {
         return render(System.currentTimeMillis());
@@ -32,6 +33,7 @@ public final class StatsModel {
         return "视频包: " + videoPackets
             + "\n视频帧: " + videoFrames
             + "\n实时FPS: " + realtime.fps
+            + "\n实时视频丢包: " + realtime.videoRtpLossPackets
             + "\n实时丢帧: " + realtime.droppedFrames
             + "\n实时丢帧率: " + formatDropRate(realtime.droppedFrames, realtime.videoFrames)
             + "\n实时队列丢帧: " + realtime.queueDrops
@@ -56,7 +58,8 @@ public final class StatsModel {
             lastRealtimeDroppedFrames = droppedFrames;
             lastRealtimeQueueDrops = videoQueueDrops;
             lastRealtimeDecoderDrops = videoDecoderDrops;
-            return new RealtimeStats(0, 0, 0, 0, 0);
+            lastRealtimeVideoRtpLossPackets = videoRtpLossPackets;
+            return new RealtimeStats(0, 0, 0, 0, 0, 0);
         }
 
         long elapsedMs = nowMs - lastRealtimeAtMs;
@@ -64,15 +67,17 @@ public final class StatsModel {
         long droppedDelta = Math.max(0, droppedFrames - lastRealtimeDroppedFrames);
         long queueDelta = Math.max(0, videoQueueDrops - lastRealtimeQueueDrops);
         long decoderDelta = Math.max(0, videoDecoderDrops - lastRealtimeDecoderDrops);
+        long videoRtpLossDelta = Math.max(0, videoRtpLossPackets - lastRealtimeVideoRtpLossPackets);
 
         lastRealtimeAtMs = nowMs;
         lastRealtimeVideoFrames = videoFrames;
         lastRealtimeDroppedFrames = droppedFrames;
         lastRealtimeQueueDrops = videoQueueDrops;
         lastRealtimeDecoderDrops = videoDecoderDrops;
+        lastRealtimeVideoRtpLossPackets = videoRtpLossPackets;
 
         long fps = Math.round((frameDelta * 1000.0) / elapsedMs);
-        return new RealtimeStats(frameDelta, fps, droppedDelta, queueDelta, decoderDelta);
+        return new RealtimeStats(frameDelta, fps, droppedDelta, queueDelta, decoderDelta, videoRtpLossDelta);
     }
 
     private static String formatDropRate(long droppedFrames, long videoFrames) {
@@ -102,13 +107,15 @@ public final class StatsModel {
         private final long droppedFrames;
         private final long queueDrops;
         private final long decoderDrops;
+        private final long videoRtpLossPackets;
 
-        private RealtimeStats(long videoFrames, long fps, long droppedFrames, long queueDrops, long decoderDrops) {
+        private RealtimeStats(long videoFrames, long fps, long droppedFrames, long queueDrops, long decoderDrops, long videoRtpLossPackets) {
             this.videoFrames = videoFrames;
             this.fps = fps;
             this.droppedFrames = droppedFrames;
             this.queueDrops = queueDrops;
             this.decoderDrops = decoderDrops;
+            this.videoRtpLossPackets = videoRtpLossPackets;
         }
     }
 }

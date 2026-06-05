@@ -230,15 +230,18 @@ public final class StatsModelHarness {
         stats.droppedFrames = 6;
         stats.videoQueueDrops = 4;
         stats.videoDecoderDrops = 2;
+        stats.videoRtpLossPackets = 1;
         stats.render(1000);
 
         stats.videoFrames = 120;
         stats.droppedFrames = 9;
         stats.videoQueueDrops = 6;
         stats.videoDecoderDrops = 3;
+        stats.videoRtpLossPackets = 4;
         String text = stats.render(2000);
 
         assertContains(text, "实时FPS: 60");
+        assertContains(text, "实时视频丢包: 3");
         assertContains(text, "实时丢帧: 3");
         assertContains(text, "实时丢帧率: 4.8%");
         assertContains(text, "实时队列丢帧: 2");

@@ -56,6 +56,12 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile game720
 npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
 ```
 
+如果快速画面或鼠标移动时出现小范围花屏，优先测试 `resilient1080` 抗花屏档：1080p、60fps、22Mbps、GOP5、低延迟 CBR HQ、每个 IDR 携带参数集，并增大发送端 UDP 缓冲。这个档位的目标是缩短丢包后的可见花屏恢复时间：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --profile resilient1080
+```
+
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
 
 发送端默认使用 `--encoder-preset auto`，会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`。如果前面的低延迟 preset 不被当前显卡、驱动或 GStreamer 支持，会自动回退到后面的兼容档。
@@ -68,7 +74,7 @@ npm.cmd run native:rtp -- --host <Android TV IP> --encoder-preset default
 
 朋友试用包里的 `.bat` 已默认使用 `--encoder-preset auto`，稳定后也可以手动尝试固定 `--encoder-preset low-latency-hq` 或 `--encoder-preset default` 对比体感。
 
-启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“实时FPS”“实时丢帧”“实时丢帧率”“实时队列丢帧”“实时解码丢帧”“视频丢包”“等待关键帧”“恢复丢帧”“队列丢帧”和“解码丢帧”：如果卡顿时恢复丢帧和等待关键帧同步增长，说明短暂丢包后的关键帧恢复仍在影响体感；如果主要是实时队列丢帧或实时解码丢帧增长，说明瓶颈更偏接收端解码或渲染。当前低延迟版本只保留最新 1 帧待解码画面，优先压低操作到画面变化的体感延迟。菜单键或 F1 可以隐藏或显示状态面板。
+启动后，电视左上角的视频包、音频包、音频字节和最近接收状态应增长或变为“正常”。新的状态面板还会显示“实时FPS”“实时视频丢包”“实时丢帧”“实时丢帧率”“实时队列丢帧”“实时解码丢帧”“视频丢包”“等待关键帧”“恢复丢帧”“队列丢帧”和“解码丢帧”：如果花屏时实时视频丢包、恢复丢帧和等待关键帧同步增长，说明短暂 RTP 丢包后的关键帧恢复仍在影响体感；如果主要是实时队列丢帧或实时解码丢帧增长，说明瓶颈更偏接收端解码或渲染。当前低延迟版本只保留最新 1 帧待解码画面，优先压低操作到画面变化的体感延迟。菜单键或 F1 可以隐藏或显示状态面板。
 
 ## 输入回传
 

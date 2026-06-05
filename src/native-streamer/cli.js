@@ -108,7 +108,7 @@ function printRtpHelp() {
   console.log('  --host <IP>           Android TV IP，默认 127.0.0.1');
   console.log('  --video-port <端口>   视频 RTP UDP 端口，默认 5004');
   console.log('  --audio-port <端口>   音频 RTP UDP 端口，默认 5006');
-  console.log('  --profile <档位>      默认 game1080，可选 game720, quality1080, game4k');
+  console.log('  --profile <档位>      默认 game1080，可选 game720, quality1080, resilient1080, game4k');
   console.log('  --width <宽度>        视频宽度，默认 1920');
   console.log('  --height <高度>       视频高度，默认 1080');
   console.log('  --fps <帧率>          视频帧率，默认 60');

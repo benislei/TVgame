@@ -136,6 +136,7 @@ function createReadme() {
     '- `启动输入桥.bat`：启动键鼠/手柄输入回传桥。',
     '- `启动默认发送.bat`：1080p60 默认低延迟档，优先用这个验证手感。',
     '- `启动高画质发送.bat`：1080p60 高画质档，画质更高但对网络和解码更敏感。',
+    '- `启动抗花屏发送.bat`：1080p60 抗花屏档，使用短 GOP、参数集随 IDR 发送和更大的 UDP 发送缓冲，优先减少丢包后的可见花屏恢复时间。',
     '- `启动720回退发送.bat`：720p60 回退档，用于排查网络或设备压力。',
     '',
     '## 快速验证步骤',
@@ -146,7 +147,7 @@ function createReadme() {
     '4. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
     '5. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。',
     '6. 电视上看到画面和声音后，优先用真实游戏验证移动、转向、开火、菜单等操作体感。',
-    '7. 如果默认档稳定，再试 `启动高画质发送.bat`；如果出现花屏或卡顿，试 `启动720回退发送.bat` 对比。',
+    '7. 如果默认档稳定，再试 `启动高画质发送.bat`；如果快速画面或鼠标移动时出现小范围花屏，优先试 `启动抗花屏发送.bat`；如果仍然花屏或卡顿，试 `启动720回退发送.bat` 对比。',
     '',
     '## 状态面板',
     '',
@@ -175,6 +176,7 @@ function writeLaunchers(packageDir) {
     '启动输入桥.bat': createBatchScript('echo 正在启动输入桥，请保持此窗口打开。\r\ndotnet run --project InputBridge\\InputBridge.csproj'),
     '启动默认发送.bat': createSenderBatch('--encoder-preset auto'),
     '启动高画质发送.bat': createSenderBatch('--encoder-preset auto --profile quality1080'),
+    '启动抗花屏发送.bat': createSenderBatch('--encoder-preset auto --profile resilient1080'),
     '启动720回退发送.bat': createSenderBatch('--encoder-preset auto --profile game720')
   };
 
