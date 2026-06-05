@@ -134,6 +134,7 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /启动高画质发送\.bat/);
   assert.match(readme, /启动抗花屏发送\.bat/);
   assert.match(readme, /短 GOP/);
+  assert.match(readme, /紧凑状态面板/);
   assert.match(readme, /菜单键或 F1/);
   assert.match(readme, /自动探测 NVENC preset/);
   assert.match(readme, /--encoder-preset low-latency-hq/);

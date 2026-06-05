@@ -33,7 +33,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private final Runnable updateOverlay = new Runnable() {
         @Override
         public void run() {
-            overlay.setText(TITLE + "\n" + RECEIVER_MODE + "（API " + Build.VERSION.SDK_INT + "）\n" + stats.render());
+            overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n" + stats.renderCompact());
             handler.postDelayed(this, 500);
         }
     };
@@ -61,10 +61,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
         overlay = new TextView(this);
         overlay.setTextColor(0xFFFFFFFF);
-        overlay.setTextSize(16);
-        overlay.setBackgroundColor(0x99000000);
-        overlay.setPadding(16, 12, 16, 12);
-        overlay.setText(TITLE + "\n" + RECEIVER_MODE + "（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
+        overlay.setTextSize(12);
+        overlay.setBackgroundColor(0x77000000);
+        overlay.setPadding(8, 6, 8, 6);
+        overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
 
         FrameLayout root = new FrameLayout(this);
         root.addView(surfaceView, new FrameLayout.LayoutParams(

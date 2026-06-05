@@ -260,6 +260,80 @@ public final class StatsModelHarness {
   execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.StatsModelHarness'], { stdio: 'pipe' });
 });
 
+test('StatsModel renders compact diagnostics for smaller TV overlay', (t) => {
+  if (!commandExists('javac') || !commandExists('java')) {
+    t.skip('javac/java not available; keeping StatsModel behavior covered by static checks in this environment');
+    return;
+  }
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tvgame-stats-model-compact-'));
+  const packageDir = path.join(tempRoot, 'com', 'tvgame', 'receiver');
+  const classDir = path.join(tempRoot, 'classes');
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.mkdirSync(classDir, { recursive: true });
+
+  const statsSource = path.join(root, `${javaRoot}/StatsModel.java`);
+  const harnessSource = path.join(packageDir, 'StatsModelCompactHarness.java');
+  fs.writeFileSync(harnessSource, `
+package com.tvgame.receiver;
+
+public final class StatsModelCompactHarness {
+    public static void main(String[] args) {
+        StatsModel stats = new StatsModel();
+        stats.lastVideoAtMs = 1000;
+        stats.lastAudioAtMs = 1000;
+        stats.videoPackets = 1000;
+        stats.videoFrames = 60;
+        stats.videoRtpLossPackets = 2;
+        stats.videoRecoveryWaits = 3;
+        stats.videoRecoveryDrops = 4;
+        stats.videoQueueDrops = 5;
+        stats.videoDecoderDrops = 6;
+        stats.audioPackets = 700;
+        stats.audioBytes = 1048576;
+        stats.renderCompact(1000);
+
+        stats.videoFrames = 120;
+        stats.videoRtpLossPackets = 5;
+        stats.videoQueueDrops = 8;
+        stats.videoDecoderDrops = 7;
+        String text = stats.renderCompact(2000);
+
+        assertContains(text, "FPS 60");
+        assertContains(text, "实时丢包 3");
+        assertContains(text, "等待关键 3");
+        assertContains(text, "恢复 4");
+        assertContains(text, "队列 8");
+        assertContains(text, "解码 7");
+        assertContains(text, "音频 正常");
+
+        int lines = text.split("\\\\n", -1).length;
+        if (lines > 5) {
+            throw new AssertionError("Compact stats should use at most 5 lines, got " + lines + ": " + text);
+        }
+    }
+
+    private static void assertContains(String text, String expected) {
+        if (!text.contains(expected)) {
+            throw new AssertionError("Expected text to contain [" + expected + "] but got [" + text + "]");
+        }
+    }
+}
+`, 'utf8');
+
+  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, statsSource, harnessSource], { stdio: 'pipe' });
+  execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.StatsModelCompactHarness'], { stdio: 'pipe' });
+});
+
+test('MainActivity uses a compact smaller overlay by default', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /overlay\.setTextSize\(12\)/);
+  assert.match(source, /overlay\.setPadding\(8,\s*6,\s*8,\s*6\)/);
+  assert.match(source, /stats\.renderCompact\(\)/);
+  assert.doesNotMatch(source, /stats\.render\(\)/);
+});
+
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
   const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
 
@@ -367,6 +441,14 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(audio, /socket\.close\(\)/);
 });
 
+test('H264 receiver waits for next IDR after dropping queued compressed frames', () => {
+  const video = readProjectFile(`${javaRoot}/H264VideoReceiver.java`);
+
+  assert.match(video, /stats\.videoQueueDrops\+\+;[\s\S]*?waitingForKeyframe\s*=\s*true/);
+  assert.match(video, /if\s*\(\s*droppedQueuedFrame\s*&&\s*waitingForKeyframe\s*&&\s*!accessUnitContainsIdr\(accessUnit\)\s*\)[\s\S]*?stats\.videoRecoveryWaits\+\+/);
+  assert.match(video, /if\s*\(\s*droppedQueuedFrame\s*&&\s*waitingForKeyframe\s*&&\s*accessUnitContainsIdr\(accessUnit\)\s*\)[\s\S]*?waitingForKeyframe\s*=\s*false/);
+});
+
 test('MainActivity starts receivers once and stops them on surface or activity teardown', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
@@ -427,7 +509,7 @@ test('MainActivity shows Android 11 plus extreme receiver mode in Chinese', () =
   assert.match(source, /TITLE\s*=\s*"电视游戏接收端"/);
   assert.match(source, /RECEIVER_MODE\s*=\s*"接收端档位：Android 11\+ 极致模式"/);
   assert.match(source, /Build\.VERSION\.SDK_INT/);
-  assert.match(source, /TITLE\s*\+\s*"\\n"\s*\+\s*RECEIVER_MODE/);
+  assert.match(source, /TITLE\s*\+\s*"\s*\|\s*Android 11\+（API "/);
 });
 
 test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {

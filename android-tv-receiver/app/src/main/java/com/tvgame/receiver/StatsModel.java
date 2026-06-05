@@ -28,6 +28,10 @@ public final class StatsModel {
         return render(System.currentTimeMillis());
     }
 
+    public String renderCompact() {
+        return renderCompact(System.currentTimeMillis());
+    }
+
     String render(long nowMs) {
         RealtimeStats realtime = takeRealtimeSnapshot(nowMs);
         return "视频包: " + videoPackets
@@ -49,6 +53,25 @@ public final class StatsModel {
             + "\n丢帧: " + droppedFrames
             + "\n视频状态: " + statusText(lastVideoAtMs, nowMs)
             + "\n音频状态: " + statusText(lastAudioAtMs, nowMs);
+    }
+
+    String renderCompact(long nowMs) {
+        RealtimeStats realtime = takeRealtimeSnapshot(nowMs);
+        return "FPS " + realtime.fps
+            + " | 实时丢包 " + realtime.videoRtpLossPackets
+            + " | 实时丢帧 " + realtime.droppedFrames
+            + "（" + formatDropRate(realtime.droppedFrames, realtime.videoFrames) + "）"
+            + "\n等待关键 " + videoRecoveryWaits
+            + " | 恢复 " + videoRecoveryDrops
+            + " | 队列 " + videoQueueDrops
+            + " | 解码 " + videoDecoderDrops
+            + "\n视频 包 " + videoPackets
+            + " / 帧 " + videoFrames
+            + " | 丢包 " + videoRtpLossPackets
+            + "\n音频 " + statusText(lastAudioAtMs, nowMs)
+            + " | 包 " + audioPackets
+            + " | " + formatBytes(audioBytes)
+            + "\n视频 " + statusText(lastVideoAtMs, nowMs);
     }
 
     private synchronized RealtimeStats takeRealtimeSnapshot(long nowMs) {
@@ -86,6 +109,13 @@ public final class StatsModel {
             return "0.0%";
         }
         return String.format(Locale.US, "%.1f%%", (droppedFrames * 100.0) / totalFrames);
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024 * 1024) {
+            return bytes + "B";
+        }
+        return String.format(Locale.US, "%.1fMB", bytes / (1024.0 * 1024.0));
     }
 
     private static String statusText(long timestampMs, long nowMs) {
