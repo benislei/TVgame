@@ -75,6 +75,28 @@ public final class InputClient {
         enqueueLine(line);
     }
 
+    public void sendMouseMove(int dx, int dy) {
+        if (closed || (dx == 0 && dy == 0)) {
+            return;
+        }
+
+        enqueueLine(buildMouseMoveJsonLine(dx, dy));
+    }
+
+    public void sendMouseButton(String action, int button) {
+        if (closed) {
+            return;
+        }
+        final String line;
+        try {
+            line = buildMouseButtonJsonLine(action, button);
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+
+        enqueueLine(line);
+    }
+
     private void enqueueLine(final String line) {
         try {
             executor.execute(new Runnable() {
@@ -123,6 +145,29 @@ public final class InputClient {
             + "\",\"code\":\""
             + code
             + "\"}\n";
+    }
+
+    static String buildMouseMoveJsonLine(int dx, int dy) {
+        return "{\"type\":\"input\",\"kind\":\"mouse\",\"action\":\"move\",\"dx\":"
+            + dx
+            + ",\"dy\":"
+            + dy
+            + "}\n";
+    }
+
+    static String buildMouseButtonJsonLine(String action, int button) {
+        if (!("down".equals(action) || "up".equals(action))) {
+            throw new IllegalArgumentException("action must be down or up");
+        }
+        if (button < 0 || button > 2) {
+            throw new IllegalArgumentException("button out of range");
+        }
+
+        return "{\"type\":\"input\",\"kind\":\"mouse\",\"action\":\""
+            + action
+            + "\",\"button\":"
+            + button
+            + "}\n";
     }
 
     private void sendLine(String line) {

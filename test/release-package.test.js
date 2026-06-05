@@ -140,6 +140,11 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /短 GOP/);
   assert.match(readme, /紧凑状态面板/);
   assert.match(readme, /菜单键或 F1/);
+  assert.match(readme, /USB 手柄会被接收端 App 消费/);
+  assert.match(readme, /左摇杆和 D-pad 映射 WASD/);
+  assert.match(readme, /右摇杆映射鼠标移动/);
+  assert.match(readme, /R1\/右扳机映射鼠标左键/);
+  assert.match(readme, /L1\/左扳机映射鼠标右键/);
   assert.match(readme, /自动探测 NVENC preset/);
   assert.match(readme, /--encoder-preset low-latency-hq/);
   assert.match(readme, /UDP 5004/);

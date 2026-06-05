@@ -27,6 +27,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
+    private static final int GAMEPAD_MOUSE_SCALE = 18;
 
     private final Object lifecycleLock = new Object();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -50,6 +51,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private boolean keyDActive;
     private boolean keyWActive;
     private boolean keySActive;
+    private boolean leftTriggerActive;
+    private boolean rightTriggerActive;
     private boolean overlayVisible = true;
 
     @Override
@@ -120,6 +123,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             toggleOverlay();
             return true;
         }
+        if (isGamepadKeyEvent(event)) {
+            if (event.getRepeatCount() == 0) {
+                sendGamepadButton("down", keyCode);
+            }
+            return true;
+        }
         if (inputClient != null && event.getRepeatCount() == 0) {
             inputClient.sendKey("down", keyCode);
         }
@@ -131,6 +140,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (isOverlayToggleKey(keyCode)) {
             return true;
         }
+        if (isGamepadKeyEvent(event)) {
+            sendGamepadButton("up", keyCode);
+            return true;
+        }
         if (inputClient != null) {
             inputClient.sendKey("up", keyCode);
         }
@@ -139,6 +152,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     private static boolean isOverlayToggleKey(int keyCode) {
         return keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_F1;
+    }
+
+    private static boolean isGamepadKeyEvent(KeyEvent event) {
+        int source = event.getSource();
+        return (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+            || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
     }
 
     private void toggleOverlay() {
@@ -170,7 +189,97 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         keyDActive = updateMappedKey("KeyD", keyDActive, axisX >= GAMEPAD_AXIS_DEADZONE);
         keyWActive = updateMappedKey("KeyW", keyWActive, axisY <= -GAMEPAD_AXIS_DEADZONE);
         keySActive = updateMappedKey("KeyS", keySActive, axisY >= GAMEPAD_AXIS_DEADZONE);
+
+        float rightX = firstActiveAxis(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX);
+        float rightY = firstActiveAxis(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY);
+        int mouseDx = axisToMouseDelta(rightX);
+        int mouseDy = axisToMouseDelta(rightY);
+        if (mouseDx != 0 || mouseDy != 0) {
+            inputClient.sendMouseMove(mouseDx, mouseDy);
+        }
+
+        float leftTrigger = event.getAxisValue(MotionEvent.AXIS_LTRIGGER);
+        float rightTrigger = event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
+        leftTriggerActive = updateMappedMouseButton(2, leftTriggerActive, leftTrigger >= GAMEPAD_AXIS_DEADZONE);
+        rightTriggerActive = updateMappedMouseButton(0, rightTriggerActive, rightTrigger >= GAMEPAD_AXIS_DEADZONE);
         return true;
+    }
+
+    private static float firstActiveAxis(MotionEvent event, int firstAxis, int fallbackAxis) {
+        float value = event.getAxisValue(firstAxis);
+        if (Math.abs(value) >= GAMEPAD_AXIS_DEADZONE) {
+            return value;
+        }
+        return event.getAxisValue(fallbackAxis);
+    }
+
+    private static int axisToMouseDelta(float value) {
+        if (Math.abs(value) < GAMEPAD_AXIS_DEADZONE) {
+            return 0;
+        }
+        return Math.round(value * GAMEPAD_MOUSE_SCALE);
+    }
+
+    private void sendGamepadButton(String action, int keyCode) {
+        if (inputClient == null) {
+            return;
+        }
+
+        if (sendGamepadMouseButton(action, keyCode)) {
+            return;
+        }
+
+        String code = mapGamepadKeyCode(keyCode);
+        if (code != null) {
+            inputClient.sendCode(action, code);
+        }
+    }
+
+    private boolean sendGamepadMouseButton(String action, int keyCode) {
+        if (inputClient == null) {
+            return false;
+        }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_R1) {
+            inputClient.sendMouseButton(action, 0);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
+            inputClient.sendMouseButton(action, 2);
+            return true;
+        }
+        return false;
+    }
+
+    private static String mapGamepadKeyCode(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_UP:
+                return "KeyW";
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                return "KeyS";
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return "KeyA";
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                return "KeyD";
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_BUTTON_A:
+                return "Space";
+            case KeyEvent.KEYCODE_BUTTON_B:
+                return "Escape";
+            case KeyEvent.KEYCODE_BUTTON_X:
+                return "KeyE";
+            case KeyEvent.KEYCODE_BUTTON_Y:
+                return "KeyQ";
+            case KeyEvent.KEYCODE_BUTTON_L2:
+                return "ShiftLeft";
+            case KeyEvent.KEYCODE_BUTTON_R2:
+                return "ControlLeft";
+            case KeyEvent.KEYCODE_BUTTON_START:
+                return "Enter";
+            case KeyEvent.KEYCODE_BUTTON_SELECT:
+                return "Tab";
+            default:
+                return null;
+        }
     }
 
     private boolean updateMappedKey(String code, boolean wasActive, boolean shouldBeActive) {
@@ -181,11 +290,21 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         return shouldBeActive;
     }
 
+    private boolean updateMappedMouseButton(int button, boolean wasActive, boolean shouldBeActive) {
+        if (inputClient == null || wasActive == shouldBeActive) {
+            return wasActive;
+        }
+        inputClient.sendMouseButton(shouldBeActive ? "down" : "up", button);
+        return shouldBeActive;
+    }
+
     private void releaseMappedKeys() {
         keyAActive = updateMappedKey("KeyA", keyAActive, false);
         keyDActive = updateMappedKey("KeyD", keyDActive, false);
         keyWActive = updateMappedKey("KeyW", keyWActive, false);
         keySActive = updateMappedKey("KeyS", keySActive, false);
+        leftTriggerActive = updateMappedMouseButton(2, leftTriggerActive, false);
+        rightTriggerActive = updateMappedMouseButton(0, rightTriggerActive, false);
     }
 
     private void startReceivers(Surface surface) {

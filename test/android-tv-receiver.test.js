@@ -141,6 +141,20 @@ test('InputClient can send browser-style keyboard code JSON for mapped gamepad a
   assert.match(source, /\+\s*code\s*\+\s*"\\?"/);
 });
 
+test('InputClient can send mouse JSON for mapped gamepad right stick and triggers', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /public\s+void\s+sendMouseMove\(int\s+dx,\s*int\s+dy\)/);
+  assert.match(source, /public\s+void\s+sendMouseButton\(String\s+action,\s*int\s+button\)/);
+  assert.match(source, /buildMouseMoveJsonLine\(dx,\s*dy\)/);
+  assert.match(source, /buildMouseButtonJsonLine\(action,\s*button\)/);
+  assert.match(source, /\\"kind\\":\\"mouse\\"/);
+  assert.match(source, /\\"action\\":\\"move\\"/);
+  assert.match(source, /\\"dx\\":/);
+  assert.match(source, /\\"dy\\":/);
+  assert.match(source, /button\s*<\s*0\s*\|\|\s*button\s*>\s*2/);
+});
+
 test('InputClient.buildKeyJsonLine returns exact JSON lines and rejects invalid input', (t) => {
   if (!commandExists('javac') || !commandExists('java')) {
     t.skip('javac/java not available; keeping InputClient behavior covered by static checks in this environment');
@@ -163,6 +177,9 @@ public final class InputClientHarness {
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"down\\",\\"keyCode\\":66}\\n", InputClient.buildKeyJsonLine("down", 66));
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"up\\",\\"keyCode\\":23}\\n", InputClient.buildKeyJsonLine("up", 23));
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"keyboard\\",\\"action\\":\\"down\\",\\"code\\":\\"KeyW\\"}\\n", InputClient.buildCodeJsonLine("down", "KeyW"));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"move\\",\\"dx\\":7,\\"dy\\":-5}\\n", InputClient.buildMouseMoveJsonLine(7, -5));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"down\\",\\"button\\":0}\\n", InputClient.buildMouseButtonJsonLine("down", 0));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"up\\",\\"button\\":2}\\n", InputClient.buildMouseButtonJsonLine("up", 2));
         assertThrows(new Runnable() {
             @Override
             public void run() {
@@ -179,6 +196,12 @@ public final class InputClientHarness {
             @Override
             public void run() {
                 InputClient.buildKeyJsonLine("up", 10001);
+            }
+        });
+        assertThrows(new Runnable() {
+            @Override
+            public void run() {
+                InputClient.buildMouseButtonJsonLine("down", 3);
             }
         });
     }
@@ -497,6 +520,38 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /stopReceivers\(\)/);
 });
 
+test('MainActivity consumes USB gamepad key events so the TV UI does not handle them', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /isGamepadKeyEvent\(event\)/);
+  assert.match(source, /private\s+static\s+boolean\s+isGamepadKeyEvent\(KeyEvent\s+event\)/);
+  assert.match(source, /InputDevice\.SOURCE_GAMEPAD/);
+  assert.match(source, /InputDevice\.SOURCE_JOYSTICK/);
+  assert.match(source, /sendGamepadButton\("down",\s*keyCode\)/);
+  assert.match(source, /sendGamepadButton\("up",\s*keyCode\)/);
+  assert.match(source, /if\s*\(\s*isGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+true/);
+});
+
+test('MainActivity maps USB gamepad buttons to PC keyboard and mouse controls', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /private\s+void\s+sendGamepadButton\(String\s+action,\s*int\s+keyCode\)/);
+  assert.match(source, /private\s+static\s+String\s+mapGamepadKeyCode\(int\s+keyCode\)/);
+  assert.match(source, /KeyEvent\.KEYCODE_DPAD_UP[\s\S]*"KeyW"/);
+  assert.match(source, /KeyEvent\.KEYCODE_DPAD_DOWN[\s\S]*"KeyS"/);
+  assert.match(source, /KeyEvent\.KEYCODE_DPAD_LEFT[\s\S]*"KeyA"/);
+  assert.match(source, /KeyEvent\.KEYCODE_DPAD_RIGHT[\s\S]*"KeyD"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_A[\s\S]*"Space"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_B[\s\S]*"Escape"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_X[\s\S]*"KeyE"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_Y[\s\S]*"KeyQ"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_START[\s\S]*"Enter"/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_SELECT[\s\S]*"Tab"/);
+  assert.match(source, /sendGamepadMouseButton\(action,\s*keyCode\)/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_R1[\s\S]*sendMouseButton\(action,\s*0\)/);
+  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_L1[\s\S]*sendMouseButton\(action,\s*2\)/);
+});
+
 test('MainActivity toggles overlay with MENU or F1 without forwarding those keys', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
@@ -535,6 +590,23 @@ test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
   assert.match(source, /updateMappedKey\("KeyS"/);
 });
 
+test('MainActivity maps USB gamepad right stick and triggers to PC mouse input', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /AXIS_Z/);
+  assert.match(source, /AXIS_RZ/);
+  assert.match(source, /AXIS_RX/);
+  assert.match(source, /AXIS_RY/);
+  assert.match(source, /AXIS_LTRIGGER/);
+  assert.match(source, /AXIS_RTRIGGER/);
+  assert.match(source, /GAMEPAD_MOUSE_SCALE/);
+  assert.match(source, /axisToMouseDelta\(rightX\)/);
+  assert.match(source, /axisToMouseDelta\(rightY\)/);
+  assert.match(source, /inputClient\.sendMouseMove\(mouseDx,\s*mouseDy\)/);
+  assert.match(source, /updateMappedMouseButton\(2,\s*leftTriggerActive/);
+  assert.match(source, /updateMappedMouseButton\(0,\s*rightTriggerActive/);
+});
+
 test('stage 2 verification guide documents input return and acceptance checklist in Chinese', () => {
   const doc = readProjectFile('docs/stage2-local-verify.md');
 
@@ -544,6 +616,11 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /## 输入回传/);
   assert.match(doc, /Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789/);
   assert.match(doc, /接收端 App 打开期间会保持屏幕常亮/);
+  assert.match(doc, /USB 手柄会被接收端 App 消费/);
+  assert.match(doc, /左摇杆和 D-pad 映射 WASD/);
+  assert.match(doc, /右摇杆映射鼠标移动/);
+  assert.match(doc, /R1\/右扳机映射鼠标左键/);
+  assert.match(doc, /L1\/左扳机映射鼠标右键/);
   assert.match(doc, /PC 端需要启动 InputBridge\/SendInput/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /菜单键或 F1 可以隐藏或显示状态面板/);
