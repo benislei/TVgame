@@ -125,6 +125,13 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game720/);
 });
 
+test('ViGEmBus installer script stays ASCII-safe for Windows PowerShell 5.1', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'install-vigembus.ps1'), 'utf8');
+  assert.match(source, /winget install --id ViGEm\.ViGEmBus/);
+  assert.match(source, /Test-ViGEmBusInstalled/);
+  assert.doesNotMatch(source, /[^\x00-\x7F]/);
+});
+
 test('friend preview README explains Chinese validation steps and overlay hiding', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();

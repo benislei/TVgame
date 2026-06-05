@@ -9,27 +9,28 @@ function Test-ViGEmBusInstalled {
   return Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\ViGEmBus"
 }
 
-Write-Host "正在检查 ViGEmBus 虚拟手柄驱动..."
+Write-Host "Checking ViGEmBus virtual gamepad driver..."
 
 if (Test-ViGEmBusInstalled) {
-  Write-Host "已检测到 ViGEmBus 虚拟手柄驱动。"
+  Write-Host "ViGEmBus is already installed."
   exit 0
 }
 
 if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-  throw "未找到 winget。请先安装 App Installer，或手动安装 ViGEmBus：winget install --id ViGEm.ViGEmBus"
+  throw "winget was not found. Install App Installer first, or manually run: winget install --id ViGEm.ViGEmBus"
 }
 
-Write-Host "未检测到 ViGEmBus，正在通过 winget 安装..."
+Write-Host "ViGEmBus was not found. Installing through winget..."
 winget install --id ViGEm.ViGEmBus --silent --accept-package-agreements --accept-source-agreements
 if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
 if (Test-ViGEmBusInstalled) {
-  Write-Host "ViGEmBus 安装完成。请重新启动输入桥。"
+  Write-Host "ViGEmBus installed. Restart the input bridge."
   exit 0
 }
 
-Write-Host "安装命令已完成，但尚未检测到 ViGEmBus 服务。请重启电脑后再启动输入桥。"
+Write-Host "Install command finished, but ViGEmBus service was not detected yet."
+Write-Host "Restart Windows, then start the input bridge again."
 exit 0
