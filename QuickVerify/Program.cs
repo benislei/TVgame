@@ -292,7 +292,7 @@ while (true)
         if (tvIp == null) continue;
         StartCommandWindow(
             "阶段 2 RTP 发送端",
-            $"{Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",
+            $"{Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)} --profile resilient1080",
             root);
         Console.WriteLine($"已打开阶段 2 RTP 发送端窗口，目标 IP：{tvIp}");
     }
@@ -303,7 +303,7 @@ while (true)
         if (tvIp == null) continue;
         StartCommandWindow(
             "阶段 2 检测和 RTP 发送端",
-            $"{Quote(NpmCmd())} run stage2:check && {Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)}",
+            $"{Quote(NpmCmd())} run stage2:check && {Quote(NpmCmd())} run native:rtp -- --host {Quote(tvIp)} --profile resilient1080",
             root);
         Console.WriteLine($"已打开阶段 2 检测和 RTP 发送端窗口，目标 IP：{tvIp}");
     }

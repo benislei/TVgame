@@ -68,8 +68,8 @@ const NVENC_AUTO_PRESET_ORDER = [
 ];
 
 function buildRtpConfig(overrides = {}) {
-  const profileName = overrides.profile || 'game1080';
-  const profile = RTP_PROFILES[profileName] || RTP_PROFILES.game1080;
+  const profileName = overrides.profile || 'resilient1080';
+  const profile = RTP_PROFILES[profileName] || RTP_PROFILES.resilient1080;
   return {
     profile: profileName,
     host: overrides.host || '127.0.0.1',

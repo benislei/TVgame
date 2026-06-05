@@ -28,7 +28,7 @@ dotnet run --project InputBridge\InputBridge.csproj
 
 ## Android TV 端准备
 
-构建并安装 `android-tv-receiver` 生成的 APK，启动应用“电视游戏接收端”。首屏应显示全屏画面层和左上角半透明中文状态面板，并包含“接收端档位：Android 11+ 极致模式”。
+构建并安装 `android-tv-receiver` 生成的 APK，启动应用“电视游戏接收端”。首屏应显示全屏画面层和左上角半透明中文状态面板，并包含“接收端档位：Android 11+ 极致模式”。接收端 App 打开期间会保持屏幕常亮，避免电视或盒子自动休眠后黑屏。
 
 默认端口规划：
 
@@ -38,7 +38,7 @@ dotnet run --project InputBridge\InputBridge.csproj
 
 ## 启动发送端
 
-默认发送档位已经按阶段 2 目标调整为 `game1080`：1080p、24Mbps、60fps、GOP10。优先用默认游戏档验证 1080p 底线画质和手感：
+默认发送档位已经按当前实测最佳体验调整为 `resilient1080`：1080p、22Mbps、60fps、GOP5、低延迟 CBR HQ、每个 IDR 携带参数集，并增大发送端 UDP 缓冲。优先用默认游戏档验证 1080p 底线画质、抗花屏和手感：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP>
@@ -56,10 +56,16 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile game720
 npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
 ```
 
-如果快速画面或鼠标移动时出现小范围花屏，优先测试 `resilient1080` 抗花屏档：1080p、60fps、22Mbps、GOP5、低延迟 CBR HQ、每个 IDR 携带参数集，并增大发送端 UDP 缓冲。这个档位的目标是缩短丢包后的可见花屏恢复时间：
+`resilient1080` 仍然可以显式指定，方便确认当前使用的是抗花屏档：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP> --profile resilient1080
+```
+
+如果想和旧默认低延迟参数做 A/B 对比，可以测试 `game1080` 实验档：1080p、24Mbps、60fps、GOP10。这个档位可能更激进，但在你和朋友的当前测试里，综合体验不如默认抗花屏档：
+
+```powershell
+npm.cmd run native:rtp -- --host <Android TV IP> --profile game1080
 ```
 
 `game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
@@ -129,7 +135,7 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动默认发送.bat`、`启动高画质发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动默认发送.bat` 验证 1080p60 基础手感；默认档稳定后再尝试高画质档。如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动默认发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动默认发送.bat` 验证 1080p60 基础手感；默认档已经等同抗花屏推荐档。想对比旧低延迟参数时再用 `启动低延迟实验发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
 
 ## 验收记录
 

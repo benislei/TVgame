@@ -31,16 +31,20 @@ test('RTP profiles include 720p fallback, 1080p game baseline, quality 1080p and
   assert.equal(RTP_PROFILES.game4k.codec, 'h265');
 });
 
-test('default RTP game profile uses 1080p60 baseline settings', () => {
+test('default RTP profile uses resilient 1080p anti-artifact settings', () => {
   const config = buildRtpConfig({ host: '192.168.1.50' });
 
-  assert.equal(config.profile, 'game1080');
+  assert.equal(config.profile, 'resilient1080');
   assert.equal(config.width, 1920);
   assert.equal(config.height, 1080);
   assert.equal(config.fps, 60);
-  assert.equal(config.bitrateKbps, 24000);
-  assert.equal(config.keyframeInterval, 10);
+  assert.equal(config.bitrateKbps, 22000);
+  assert.equal(config.keyframeInterval, 5);
   assert.equal(config.codec, 'h264');
+  assert.equal(config.encoderRcMode, 'cbr-ld-hq');
+  assert.equal(config.h264ConfigInterval, -1);
+  assert.equal(config.udpBufferSize, 4194304);
+  assert.equal(config.strictGop, true);
   assert.equal(config.encoderPreset, 'default');
 });
 
@@ -55,7 +59,7 @@ test('NVENC auto preset order prioritizes game feel before compatibility fallbac
   ]);
 });
 
-test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
+test('builds default resilient 1080p H264 RTP video pipeline for Android TV', () => {
   const config = buildRtpConfig({ host: '192.168.1.50' });
   const pipeline = buildVideoRtpPipeline(config);
 
@@ -65,14 +69,17 @@ test('builds default 1080p game H264 RTP video pipeline for Android TV', () => {
   assert.match(pipeline, /video\/x-raw,format=NV12,width=1920,height=1080,framerate=60\/1/);
   assert.match(pipeline, /nvh264enc/);
   assert.match(pipeline, /preset=default/);
+  assert.match(pipeline, /rc-mode=cbr-ld-hq/);
   assert.match(pipeline, /bframes=0/);
-  assert.match(pipeline, /bitrate=24000/);
-  assert.match(pipeline, /gop-size=10/);
+  assert.match(pipeline, /bitrate=22000/);
+  assert.match(pipeline, /gop-size=5/);
   assert.match(pipeline, /zerolatency=true/);
+  assert.match(pipeline, /strict-gop=true/);
   assert.match(pipeline, /queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream/);
   assert.doesNotMatch(pipeline, /zero-reorder-delay/);
-  assert.match(pipeline, /rtph264pay pt=96 config-interval=1/);
-  assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false/);
+  assert.match(pipeline, /h264parse config-interval=-1/);
+  assert.match(pipeline, /rtph264pay pt=96 config-interval=-1 aggregate-mode=zero-latency/);
+  assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
 });
 
 test('builds explicit NVENC encoder preset when configured', () => {

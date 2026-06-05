@@ -180,7 +180,7 @@ test('parseArgs accepts Android TV RTP target options', () => {
   assert.equal(args.gop, '30');
 });
 
-test('runRtpSender default RTP options use 1080p game profile', () => {
+test('runRtpSender default RTP options use resilient anti-artifact profile', () => {
   const spawnedCommands = [];
 
   withPatchedSpawn((executable, args) => {
@@ -199,8 +199,11 @@ test('runRtpSender default RTP options use 1080p game profile', () => {
   const videoArgs = spawnedCommands[0].args.join(' ');
   assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
   assert.match(videoArgs, /preset=low-latency-hq/);
-  assert.match(videoArgs, /bitrate=24000/);
-  assert.match(videoArgs, /gop-size=10/);
+  assert.match(videoArgs, /bitrate=22000/);
+  assert.match(videoArgs, /gop-size=5/);
+  assert.match(videoArgs, /strict-gop=true/);
+  assert.match(videoArgs, /h264parse config-interval=-1/);
+  assert.match(videoArgs, /buffer-size=4194304/);
 });
 
 test('runRtpSender auto probes NVENC presets in game-feel order and launches first supported', () => {

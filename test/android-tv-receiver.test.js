@@ -334,6 +334,13 @@ test('MainActivity uses a compact smaller overlay by default', () => {
   assert.doesNotMatch(source, /stats\.render\(\)/);
 });
 
+test('MainActivity keeps the TV screen awake while the receiver is open', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /import\s+android\.view\.WindowManager/);
+  assert.match(source, /getWindow\(\)\.addFlags\(WindowManager\.LayoutParams\.FLAG_KEEP_SCREEN_ON\)/);
+});
+
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
   const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
 
@@ -536,6 +543,7 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /Android 9\/10 暂不作为当前优化目标/);
   assert.match(doc, /## 输入回传/);
   assert.match(doc, /Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789/);
+  assert.match(doc, /接收端 App 打开期间会保持屏幕常亮/);
   assert.match(doc, /PC 端需要启动 InputBridge\/SendInput/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /菜单键或 F1 可以隐藏或显示状态面板/);

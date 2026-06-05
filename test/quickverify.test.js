@@ -16,7 +16,7 @@ test('QuickVerify offers a one-click stage 2 check and RTP sender entry', () => 
 
   assert.match(source, /一键阶段 2：检测环境 \+ 启动 RTP 发送端/);
   assert.match(source, /if \(choice == "13"\)/);
-  assert.match(source, /run stage2:check && .*run native:rtp -- --host/);
+  assert.match(source, /run stage2:check && .*run native:rtp -- --host .* --profile resilient1080/);
 });
 
 test('QuickVerify uses localhost as the default Android TV IP', () => {
@@ -39,7 +39,7 @@ test('QuickVerify validates Android TV IP as IPv4 before command launch', () => 
 test('QuickVerify rejects dangerous Android TV IP input before building npm command', () => {
   const source = readProgram();
 
-  assert.match(source, /var tvIp = ReadValidatedAndroidTvIpOrDefault\(\);\s+if \(tvIp == null\) continue;\s+StartCommandWindow\([\s\S]+?--host \{Quote\(tvIp\)\}/);
+  assert.match(source, /var tvIp = ReadValidatedAndroidTvIpOrDefault\(\);\s+if \(tvIp == null\) continue;\s+StartCommandWindow\([\s\S]+?--host \{Quote\(tvIp\)\} --profile resilient1080/);
 });
 
 test('QuickVerify offers Android APK build check, install and build menu entries', () => {

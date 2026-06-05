@@ -62,6 +62,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     '启动默认发送.bat',
     '启动高画质发送.bat',
     '启动抗花屏发送.bat',
+    '启动低延迟实验发送.bat',
     '启动720回退发送.bat',
     path.join('app', 'package.json'),
     path.join('app', 'package-lock.json'),
@@ -97,9 +98,10 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const defaultSender = read('启动默认发送.bat');
   const qualitySender = read('启动高画质发送.bat');
   const resilientSender = read('启动抗花屏发送.bat');
+  const experimentalSender = read('启动低延迟实验发送.bat');
   const fallbackSender = read('启动720回退发送.bat');
 
-  for (const text of [installNpm, installGstreamer, check, bridge, defaultSender, qualitySender, resilientSender, fallbackSender]) {
+  for (const text of [installNpm, installGstreamer, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -111,9 +113,10 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(installGstreamer, /powershell\.exe[\s\S]+scripts\\install-gstreamer\.ps1[\s\S]+-InstallDevel/);
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
-  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto/);
+  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
   assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile quality1080/);
   assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
+  assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game1080/);
   assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile game720/);
 });
 
@@ -133,6 +136,7 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /启动默认发送\.bat/);
   assert.match(readme, /启动高画质发送\.bat/);
   assert.match(readme, /启动抗花屏发送\.bat/);
+  assert.match(readme, /启动低延迟实验发送\.bat/);
   assert.match(readme, /短 GOP/);
   assert.match(readme, /紧凑状态面板/);
   assert.match(readme, /菜单键或 F1/);
@@ -165,7 +169,7 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder-preset auto/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder-preset auto --profile resilient1080/);
 });
 
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {
