@@ -17,6 +17,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public final class H264VideoReceiver implements Runnable {
+    public interface SenderAddressListener {
+        void onSenderAddress(String host);
+    }
+
     private static final int VIDEO_PORT = 5004;
     private static final int SOCKET_TIMEOUT_MS = 250;
     private static final int VIDEO_RECEIVE_BUFFER_BYTES = 4 * 1024 * 1024;
@@ -29,6 +33,7 @@ public final class H264VideoReceiver implements Runnable {
 
     private final Surface surface;
     private final StatsModel stats;
+    private final SenderAddressListener senderAddressListener;
     private final H264RtpDepacketizer depacketizer = new H264RtpDepacketizer();
     private final ByteArrayOutputStream accessUnitBuffer = new ByteArrayOutputStream(512 * 1024);
     private final ArrayBlockingQueue<EncodedFrame> pendingAccessUnits =
@@ -42,10 +47,16 @@ public final class H264VideoReceiver implements Runnable {
     private int expectedVideoSequenceNumber = -1;
     private boolean accessUnitDamaged;
     private boolean waitingForKeyframe;
+    private String lastSenderHost;
 
     public H264VideoReceiver(Surface surface, StatsModel stats) {
+        this(surface, stats, null);
+    }
+
+    public H264VideoReceiver(Surface surface, StatsModel stats, SenderAddressListener senderAddressListener) {
         this.surface = surface;
         this.stats = stats;
+        this.senderAddressListener = senderAddressListener;
     }
 
     @Override
@@ -65,6 +76,7 @@ public final class H264VideoReceiver implements Runnable {
                 try {
                     datagram.setLength(buffer.length);
                     socket.receive(datagram);
+                    recordSenderAddress(datagram);
                     RtpPacket packet = RtpPacket.parse(datagram.getData(), datagram.getLength());
                     stats.videoPackets++;
                     recordVideoSequence(packet.sequenceNumber);
@@ -101,6 +113,20 @@ public final class H264VideoReceiver implements Runnable {
         if (currentDecoderThread != null) {
             currentDecoderThread.interrupt();
         }
+    }
+
+    private void recordSenderAddress(DatagramPacket datagram) {
+        if (senderAddressListener == null || datagram.getAddress() == null) {
+            return;
+        }
+
+        String host = datagram.getAddress().getHostAddress();
+        if (host == null || host.length() == 0 || host.equals(lastSenderHost)) {
+            return;
+        }
+
+        lastSenderHost = host;
+        senderAddressListener.onSenderAddress(host);
     }
 
     private void startDecoderThread() {

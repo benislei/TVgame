@@ -13,7 +13,7 @@ android {
         versionCode 1
         versionName "0.1.0"
         manifestPlaceholders = [
-            inputRelayHost: project.findProperty("inputRelayHost") ?: "192.168.50.148"
+            inputRelayHost: project.findProperty("inputRelayHost") ?: ""
         ]
     }
 }

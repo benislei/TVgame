@@ -74,6 +74,46 @@ function copyItemIfExists(projectRoot, packageDir, relativePath) {
   return target;
 }
 
+function publishInputBridgeRuntime(projectRoot, packageDir, spawnSync = childProcess.spawnSync) {
+  const projectFile = path.join(projectRoot, 'InputBridge', 'InputBridge.csproj');
+  if (!fs.existsSync(projectFile)) {
+    throw new Error(`缺少输入桥项目文件：${projectFile}`);
+  }
+
+  const outputDir = path.join(packageDir, 'app', 'InputBridgeRuntime');
+  ensureDirectory(outputDir);
+  const result = spawnSync('dotnet', [
+    'publish',
+    projectFile,
+    '-c',
+    'Release',
+    '-r',
+    'win-x64',
+    '--self-contained',
+    'true',
+    '-p:PublishSingleFile=true',
+    '-o',
+    outputDir
+  ], {
+    stdio: 'inherit',
+    windowsHide: true
+  });
+
+  if (result.error) {
+    throw new Error(`输入桥运行时发布失败：${result.error.message}`);
+  }
+  if (typeof result.status === 'number' && result.status !== 0) {
+    throw new Error(`输入桥运行时发布失败，退出码：${result.status}`);
+  }
+
+  const executable = path.join(outputDir, 'InputBridge.exe');
+  if (!fs.existsSync(executable)) {
+    throw new Error(`输入桥运行时发布失败，未生成文件：${executable}`);
+  }
+
+  return outputDir;
+}
+
 function toWindowsNewlines(text) {
   return String(text)
     .replace(/\r\n/g, '\n')
@@ -126,6 +166,7 @@ ${nextCommand.trim()}
 function createSenderBatch(profileArgs) {
   return createBatchScript(createNpmGuardBody(`
 echo 请输入电视或盒子的局域网 IP。
+echo 注意：这里填电视/盒子自身 IP，不要填接收端左上角的“输入目标”。
 echo 示例：192.168.50.140
 set "TV_IP="
 set /p "TV_IP=电视/盒子 IP（留空为 127.0.0.1）："
@@ -145,7 +186,7 @@ function createReadme() {
     '## 适用设备',
     '',
     '- 接收端：Android 11+ 电视或电视盒子，推荐小米盒子 5 Max、同级或更高性能设备。',
-    '- 发送端：Windows 电脑，推荐 NVIDIA 显卡，并已安装 Node.js、.NET SDK、GStreamer MSVC x86_64 运行环境；如果要让电视端 USB 手柄控制 PC 游戏，还需要 ViGEmBus 虚拟手柄驱动。',
+    '- 发送端：Windows 电脑，推荐 NVIDIA 显卡，并已安装 Node.js、GStreamer MSVC x86_64 运行环境；输入桥已随包发布到 `InputBridgeRuntime`，朋友电脑不需要额外安装 .NET SDK。如果要让电视端 USB 手柄控制 PC 游戏，还需要 ViGEmBus 虚拟手柄驱动。',
     '- 网络：电视/盒子和电脑在同一个局域网，优先使用有线或高质量 5GHz/6GHz Wi-Fi。',
     '',
     '## 文件说明',
@@ -156,7 +197,7 @@ function createReadme() {
     '- `安装GStreamer依赖.bat`：尝试安装 GStreamer 依赖。',
     '- `安装ViGEmBus手柄驱动.bat`：安装 PC 端虚拟 Xbox 手柄驱动，电视或盒子上的 USB 手柄需要它才能被 PC 游戏识别。',
     '- `检查环境.bat`：检查电脑端 GStreamer、编码器、音频捕获和 .NET 环境。',
-    '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥。',
+    '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥，默认运行包内 `InputBridgeRuntime\\InputBridge.exe`。',
     '- `启动默认发送.bat`：1080p60 默认抗花屏推荐档，包含短 GOP、参数集随 IDR 发送和更大的 UDP 发送缓冲，也就是当前测试里画面、花屏和操作延迟综合最佳的档位。',
     '- `启动高画质发送.bat`：1080p60 高画质档，画质更高但对网络和解码更敏感。',
     '- `启动抗花屏发送.bat`：1080p60 抗花屏档，和默认发送使用同一套参数，保留这个入口方便明确选择。',
@@ -172,7 +213,7 @@ function createReadme() {
     '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
-    '6. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。',
+    '6. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
     '7. 电视上看到画面和声音后，优先用真实游戏验证移动、转向、开火、菜单等操作体感。游戏里请选择 Xbox 手柄或控制器输入。',
     '8. 默认档已经是抗花屏推荐档。想追求更清晰时再试 `启动高画质发送.bat`；想和旧低延迟参数对比时试 `启动低延迟实验发送.bat`；如果仍然花屏或卡顿，试 `启动720回退发送.bat` 判断是不是接收端或网络压力。',
     '',
@@ -217,7 +258,16 @@ if errorlevel 1 (
 )
 call npm.cmd run stage2:check
 `),
-    '启动输入桥.bat': createBatchScript('echo 正在启动输入桥，请保持此窗口打开。\r\ndotnet run --project InputBridge\\InputBridge.csproj'),
+    '启动输入桥.bat': createBatchScript(`
+echo 正在启动输入桥，请保持此窗口打开。
+if not exist "InputBridgeRuntime\\InputBridge.exe" (
+  echo 未找到 InputBridgeRuntime\\InputBridge.exe。
+  echo 请重新生成朋友试用包，或联系发送方获取完整包。
+  exit /b 1
+)
+"InputBridgeRuntime\\InputBridge.exe"
+exit /b %ERRORLEVEL%
+`),
     '启动默认发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
     '启动高画质发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile quality1080'),
     '启动抗花屏发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
@@ -288,6 +338,7 @@ function createFriendPreviewPackage(options = {}) {
   const basePackageName = options.packageName || PACKAGE_NAME;
   const apkSource = options.apkSource || path.join(projectRoot, APK_SOURCE_RELATIVE);
   const createZip = options.createZip !== false;
+  const publishInputBridge = options.publishInputBridge === true;
 
   if (!fs.existsSync(apkSource)) {
     throw new Error(`缺少 Android TV APK，请先运行 npm.cmd run android:build。缺失文件：${apkSource}`);
@@ -305,6 +356,11 @@ function createFriendPreviewPackage(options = {}) {
   for (const item of APP_ITEMS) {
     const copied = copyItemIfExists(projectRoot, packageDir, item);
     if (copied) appFiles.push(copied);
+  }
+
+  let inputBridgeRuntimePath = null;
+  if (publishInputBridge) {
+    inputBridgeRuntimePath = publishInputBridgeRuntime(projectRoot, packageDir, options.spawnSync);
   }
 
   const readmePath = path.join(packageDir, 'README-朋友试用.md');
@@ -327,6 +383,7 @@ function createFriendPreviewPackage(options = {}) {
     apkTarget,
     readmePath,
     launcherPaths,
+    inputBridgeRuntimePath,
     appFiles
   };
 }
@@ -335,5 +392,6 @@ module.exports = {
   createFriendPreviewPackage,
   createReadme,
   createZipArchive,
+  publishInputBridgeRuntime,
   preparePackageDirectory
 };

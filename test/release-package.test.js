@@ -127,12 +127,43 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(check, /where npm\.cmd/);
   assert.match(check, /未检测到 Node\.js\/npm/);
   assert.match(check, /npm\.cmd run stage2:check/);
-  assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
+  assert.match(bridge, /InputBridgeRuntime\\InputBridge\.exe/);
+  assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
+  assert.match(defaultSender, /不要填接收端左上角的“输入目标”/);
   assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile quality1080/);
   assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
   assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game1080/);
   assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game720/);
+});
+
+test('friend preview package can publish InputBridge runtime so friends do not need the .NET SDK', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const outputRoot = path.join(projectRoot, 'dist-test');
+  const calls = [];
+
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot,
+    createZip: false,
+    publishInputBridge: true,
+    spawnSync(command, args) {
+      calls.push({ command, args });
+      assert.equal(command, 'dotnet');
+      assert.equal(args[0], 'publish');
+      const outputIndex = args.indexOf('-o');
+      assert.notEqual(outputIndex, -1);
+      writeFile(path.join(args[outputIndex + 1], 'InputBridge.exe'), 'published exe');
+      return { status: 0 };
+    }
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(
+    fs.existsSync(path.join(report.packageDir, 'app', 'InputBridgeRuntime', 'InputBridge.exe')),
+    true
+  );
 });
 
 test('ViGEmBus installer script stays ASCII-safe for Windows PowerShell 5.1', () => {
@@ -170,6 +201,8 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /A 卡优先使用 `amfh264enc`/);
   assert.match(readme, /`mfh264enc` 兜底/);
   assert.match(readme, /ViGEmBus/);
+  assert.match(readme, /InputBridgeRuntime/);
+  assert.match(readme, /\.NET SDK/);
   assert.match(readme, /虚拟 Xbox 手柄/);
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(readme, /启动输入桥\.bat/);

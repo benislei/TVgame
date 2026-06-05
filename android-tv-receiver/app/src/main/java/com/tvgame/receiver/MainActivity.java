@@ -23,7 +23,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final String TITLE = "电视游戏接收端";
     private static final String RECEIVER_MODE = "接收端档位：Android 11+ 极致模式";
     private static final String INPUT_RELAY_HOST_METADATA = "com.tvgame.receiver.INPUT_RELAY_HOST";
-    private static final String DEFAULT_INPUT_RELAY_HOST = "192.168.50.148";
+    private static final String INPUT_RELAY_AUTO_TEXT = "自动识别中";
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
@@ -87,9 +87,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        String inputRelayHost = resolveInputRelayHost();
-        stats.inputRelayHost = inputRelayHost;
-        inputClient = new InputClient(inputRelayHost, INPUT_RELAY_PORT, stats);
+        String configuredInputRelayHost = resolveInputRelayHost();
+        if (configuredInputRelayHost.length() > 0) {
+            setInputRelayHost(configuredInputRelayHost);
+        } else {
+            stats.inputRelayHost = INPUT_RELAY_AUTO_TEXT;
+        }
 
         surfaceView = new SurfaceView(this);
         surfaceView.setFocusable(true);
@@ -397,13 +400,52 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         sendGamepadState();
     }
 
+    private void updateInputRelayHost(String host) {
+        if (host == null || host.trim().length() == 0) {
+            return;
+        }
+
+        final String trimmedHost = host.trim();
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                setInputRelayHost(trimmedHost);
+            }
+        });
+    }
+
+    private void setInputRelayHost(String host) {
+        if (host == null || host.trim().length() == 0) {
+            return;
+        }
+
+        host = host.trim();
+        if (host.equals(stats.inputRelayHost)) {
+            return;
+        }
+
+        InputClient oldClient = inputClient;
+        if (oldClient != null) {
+            releaseMappedKeys();
+            oldClient.close();
+        }
+
+        stats.inputRelayHost = host;
+        inputClient = new InputClient(host, INPUT_RELAY_PORT, stats);
+    }
+
     private void startReceivers(Surface surface) {
         synchronized (lifecycleLock) {
             if (hasRunningReceiverThreads()) {
                 return;
             }
 
-            videoReceiver = new H264VideoReceiver(surface, stats);
+            videoReceiver = new H264VideoReceiver(surface, stats, new H264VideoReceiver.SenderAddressListener() {
+                @Override
+                public void onSenderAddress(String host) {
+                    updateInputRelayHost(host);
+                }
+            });
             audioReceiver = new L16AudioReceiver(stats);
             videoThread = new Thread(videoReceiver, "RTP 视频接收");
             audioThread = new Thread(audioReceiver, "RTP 音频接收");
@@ -467,8 +509,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 }
             }
         } catch (PackageManager.NameNotFoundException ex) {
-            // Fall back to the documented MVP address.
+            // Keep automatic discovery enabled when no explicit build-time host is configured.
         }
-        return DEFAULT_INPUT_RELAY_HOST;
+        return "";
     }
 }

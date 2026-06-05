@@ -36,7 +36,10 @@ function main(argv = process.argv.slice(2), options = {}) {
   }
 
   try {
-    const report = createFriendPreviewPackage(options);
+    const report = createFriendPreviewPackage({
+      ...options,
+      publishInputBridge: options.publishInputBridge !== false
+    });
     printReport(report);
   } catch (error) {
     console.error(`朋友试用包生成失败：${error.message}`);

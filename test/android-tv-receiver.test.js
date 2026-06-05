@@ -61,7 +61,7 @@ test('Android TV receiver Gradle files use the required app identity and SDKs', 
   assert.match(appBuild, /targetSdk\s+35/);
   assert.match(appBuild, /manifestPlaceholders/);
   assert.match(appBuild, /inputRelayHost/);
-  assert.match(appBuild, /192\.168\.50\.148/);
+  assert.doesNotMatch(appBuild, /192\.168\.50\.148/);
   assert.match(appBuild, /versionName\s+"0\.1\.0"/);
 });
 
@@ -503,6 +503,9 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /dequeueInputBuffer\(DECODER_INPUT_TIMEOUT_US\)/);
   assert.match(video, /new\s+Thread\([\s\S]*,\s*"H264 解码"\)/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
+  assert.match(video, /interface\s+SenderAddressListener/);
+  assert.match(video, /datagram\.getAddress\(\)\.getHostAddress\(\)/);
+  assert.match(video, /senderAddressListener\.onSenderAddress\(host\)/);
   assert.match(video, /ByteArrayOutputStream\s+accessUnitBuffer/);
   assert.match(video, /MAX_ACCESS_UNIT_SIZE/);
   assert.match(video, /appendNalUnits\(packet\.timestamp,\s*nalUnits\)/);
@@ -568,14 +571,15 @@ test('MainActivity starts receivers once and stops them on surface or activity t
 test('MainActivity wires key events to InputClient without disrupting receiver lifecycle', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
-  assert.match(source, /DEFAULT_INPUT_RELAY_HOST\s*=\s*"192\.168\.50\.148"/);
+  assert.doesNotMatch(source, /DEFAULT_INPUT_RELAY_HOST\s*=\s*"192\.168\.50\.148"/);
   assert.match(source, /INPUT_RELAY_PORT\s*=\s*8789/);
   assert.match(source, /INPUT_RELAY_HOST_METADATA\s*=\s*"com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
   assert.match(source, /InputClient\s+inputClient/);
-  assert.match(source, /String\s+inputRelayHost\s*=\s*resolveInputRelayHost\(\)/);
-  assert.match(source, /stats\.inputRelayHost\s*=\s*inputRelayHost/);
-  assert.match(source, /new\s+InputClient\(inputRelayHost,\s*INPUT_RELAY_PORT,\s*stats\)/);
-  assert.match(source, /return\s+DEFAULT_INPUT_RELAY_HOST/);
+  assert.match(source, /INPUT_RELAY_AUTO_TEXT/);
+  assert.match(source, /String\s+configuredInputRelayHost\s*=\s*resolveInputRelayHost\(\)/);
+  assert.match(source, /setInputRelayHost\(configuredInputRelayHost\)/);
+  assert.match(source, /new\s+InputClient\(host,\s*INPUT_RELAY_PORT,\s*stats\)/);
+  assert.doesNotMatch(source, /return\s+DEFAULT_INPUT_RELAY_HOST/);
   assert.match(source, /boolean\s+onKeyDown\(int\s+keyCode,\s*KeyEvent\s+event\)/);
   assert.match(source, /inputClient\.sendKey\("down",\s*keyCode\)/);
   assert.match(source, /return\s+super\.onKeyDown\(keyCode,\s*event\)/);
@@ -584,6 +588,19 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /return\s+super\.onKeyUp\(keyCode,\s*event\)/);
   assert.match(source, /inputClient\.close\(\)/);
   assert.match(source, /stopReceivers\(\)/);
+});
+
+test('MainActivity auto-detects the PC input bridge IP from the first video RTP sender', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /new\s+H264VideoReceiver\(surface,\s*stats,\s*new\s+H264VideoReceiver\.SenderAddressListener\(\)/);
+  assert.match(source, /public\s+void\s+onSenderAddress\(String\s+host\)/);
+  assert.match(source, /updateInputRelayHost\(host\)/);
+  assert.match(source, /handler\.post\(new\s+Runnable\(\)/);
+  assert.match(source, /if\s*\(\s*host\s*==\s*null\s*\|\|\s*host\.trim\(\)\.length\(\)\s*==\s*0\s*\)/);
+  assert.match(source, /if\s*\(\s*host\.equals\(stats\.inputRelayHost\)\s*\)/);
+  assert.match(source, /stats\.inputRelayHost\s*=\s*host/);
+  assert.match(source, /inputClient\s*=\s*new\s+InputClient\(host,\s*INPUT_RELAY_PORT,\s*stats\)/);
 });
 
 test('MainActivity consumes USB gamepad key events so the TV UI does not handle them', () => {
@@ -694,6 +711,11 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /ViGEmBus 虚拟 Xbox 手柄/);
   assert.match(doc, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(doc, /PC 端需要启动 InputBridge/);
+  assert.match(doc, /InputBridgeRuntime/);
+  assert.match(doc, /不需要安装 \.NET SDK/);
+  assert.match(doc, /自动识别 PC 输入 relay 地址/);
+  assert.match(doc, /输入目标/);
+  assert.doesNotMatch(doc, /当前 APK 的 PC 输入 relay 地址来自构建时/);
   assert.doesNotMatch(doc, /左摇杆和 D-pad 映射 WASD/);
   assert.doesNotMatch(doc, /右摇杆映射鼠标移动/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
