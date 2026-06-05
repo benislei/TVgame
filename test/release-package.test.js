@@ -25,6 +25,7 @@ function createFakeProject() {
   writeFile(path.join(root, 'README.md'), '# TVGame');
   writeFile(path.join(root, 'src', 'native-streamer', 'cli.js'), 'console.log("native");');
   writeFile(path.join(root, 'src', 'stage2', 'tooling.js'), 'module.exports = {};');
+  writeFile(path.join(root, 'scripts', 'install-nodejs.ps1'), 'Write-Host "node"');
   writeFile(path.join(root, 'scripts', 'install-gstreamer.ps1'), 'Write-Host "install"');
   writeFile(path.join(root, 'scripts', 'install-vigembus.ps1'), 'Write-Host "vigem"');
   writeFile(path.join(root, 'InputBridge', 'InputBridge.csproj'), '<Project />');
@@ -56,6 +57,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
 
   const requiredFiles = [
     'README-朋友试用.md',
+    '安装Node.js运行环境.bat',
     '安装npm依赖.bat',
     '安装GStreamer依赖.bat',
     '安装ViGEmBus手柄驱动.bat',
@@ -69,6 +71,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     path.join('app', 'package.json'),
     path.join('app', 'package-lock.json'),
     path.join('app', 'src', 'native-streamer', 'cli.js'),
+    path.join('app', 'scripts', 'install-nodejs.ps1'),
     path.join('app', 'scripts', 'install-gstreamer.ps1'),
     path.join('app', 'scripts', 'install-vigembus.ps1'),
     path.join('app', 'InputBridge', 'InputBridge.csproj'),
@@ -94,6 +97,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
   });
 
   const read = name => fs.readFileSync(path.join(report.packageDir, name), 'utf8');
+  const installNode = read('安装Node.js运行环境.bat');
   const installNpm = read('安装npm依赖.bat');
   const installGstreamer = read('安装GStreamer依赖.bat');
   const installVigemBus = read('安装ViGEmBus手柄驱动.bat');
@@ -105,7 +109,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const experimentalSender = read('启动低延迟实验发送.bat');
   const fallbackSender = read('启动720回退发送.bat');
 
-  for (const text of [installNpm, installGstreamer, installVigemBus, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
+  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -113,9 +117,15 @@ test('friend preview launchers run the expected low-latency commands', () => {
     assert.match(text, /cd \/d "%~dp0app"/);
   }
 
+  assert.match(installNode, /scripts\\install-nodejs\.ps1/);
+  assert.match(installNode, /请关闭当前窗口，重新打开后再运行/);
+  assert.match(installNpm, /where npm\.cmd/);
+  assert.match(installNpm, /scripts\\install-nodejs\.ps1/);
   assert.match(installNpm, /npm\.cmd install/);
   assert.match(installGstreamer, /powershell\.exe[\s\S]+scripts\\install-gstreamer\.ps1[\s\S]+-InstallDevel/);
   assert.match(installVigemBus, /powershell\.exe[\s\S]+scripts\\install-vigembus\.ps1/);
+  assert.match(check, /where npm\.cmd/);
+  assert.match(check, /未检测到 Node\.js\/npm/);
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
@@ -132,6 +142,15 @@ test('ViGEmBus installer script stays ASCII-safe for Windows PowerShell 5.1', ()
   assert.doesNotMatch(source, /[^\x00-\x7F]/);
 });
 
+test('Node.js installer script stays ASCII-safe and uses winget LTS package', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'install-nodejs.ps1'), 'utf8');
+  assert.match(source, /OpenJS\.NodeJS\.LTS/);
+  assert.match(source, /winget\.exe install --id \$PackageId/);
+  assert.match(source, /Test-NodeReady/);
+  assert.match(source, /npm\.cmd/);
+  assert.doesNotMatch(source, /[^\x00-\x7F]/);
+});
+
 test('friend preview README explains Chinese validation steps and overlay hiding', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();
@@ -144,6 +163,9 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   const readme = fs.readFileSync(path.join(report.packageDir, 'README-朋友试用.md'), 'utf8');
   assert.match(readme, /Android 11\+/);
   assert.match(readme, /TVGameReceiver\.apk/);
+  assert.match(readme, /安装Node\.js运行环境\.bat/);
+  assert.match(readme, /Node\.js\/npm 是发送端基础运行时依赖/);
+  assert.match(readme, /重新打开一个新的命令窗口/);
   assert.match(readme, /ViGEmBus/);
   assert.match(readme, /虚拟 Xbox 手柄/);
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);

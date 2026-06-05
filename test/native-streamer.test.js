@@ -2,6 +2,8 @@
 
 const EventEmitter = require('node:events');
 const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
@@ -53,6 +55,17 @@ test('GStreamer download URLs point at official 64-bit MSVC installers', () => {
   assert.equal(GSTREAMER_VERSION, '1.24.13');
   assert.match(urls.runtime, /^https:\/\/gstreamer\.freedesktop\.org\/pkg\/windows\/1\.24\.13\/msvc\/gstreamer-1\.0-msvc-x86_64-1\.24\.13\.msi$/);
   assert.match(urls.devel, /^https:\/\/gstreamer\.freedesktop\.org\/pkg\/windows\/1\.24\.13\/msvc\/gstreamer-1\.0-devel-msvc-x86_64-1\.24\.13\.msi$/);
+});
+
+test('GStreamer installer gives friend-package next steps without QuickVerify wording', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'install-gstreamer.ps1'), 'utf8');
+
+  assert.match(source, /检查环境\.bat/);
+  assert.match(source, /npm\.cmd run stage2:check/);
+  assert.match(source, /nvh264enc/);
+  assert.match(source, /NVIDIA/);
+  assert.doesNotMatch(source, /QuickVerify/);
+  assert.doesNotMatch(source, /native:check/);
 });
 
 test('environment report marks missing executables and plugins', () => {

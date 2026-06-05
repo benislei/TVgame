@@ -102,8 +102,29 @@ function createBatchScript(body) {
   return toWindowsNewlines(text);
 }
 
+function createNpmGuardBody(nextCommand) {
+  return `
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+  echo 未检测到 Node.js/npm。
+  echo 正在尝试安装 Node.js LTS...
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-nodejs.ps1"
+  if exist "%ProgramFiles%\\nodejs\\npm.cmd" set "PATH=%ProgramFiles%\\nodejs;%PATH%"
+)
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo 仍未检测到 Node.js/npm。
+  echo 请关闭当前窗口，重新打开后再运行本脚本。
+  echo 也可以手动运行：安装Node.js运行环境.bat
+  exit /b 1
+)
+${nextCommand.trim()}
+`;
+}
+
 function createSenderBatch(profileArgs) {
-  return createBatchScript(`
+  return createBatchScript(createNpmGuardBody(`
 echo 请输入电视或盒子的局域网 IP。
 echo 示例：192.168.50.140
 set "TV_IP="
@@ -112,7 +133,7 @@ if "%TV_IP%"=="" set "TV_IP=127.0.0.1"
 echo.
 echo 正在启动发送端，目标：%TV_IP%
 call npm.cmd run native:rtp -- --host "%TV_IP%"${profileArgs ? ` ${profileArgs}` : ''}
-`);
+`));
 }
 
 function createReadme() {
@@ -130,7 +151,8 @@ function createReadme() {
     '## 文件说明',
     '',
     '- `TVGameReceiver.apk`：安装到电视或电视盒子的接收端 App。',
-    '- `安装npm依赖.bat`：在电脑端安装 Node.js 依赖。',
+    '- `安装Node.js运行环境.bat`：安装发送端基础运行时 Node.js/npm。Node.js/npm 是发送端基础运行时依赖，没有它无法运行检查环境和发送端脚本。',
+    '- `安装npm依赖.bat`：在电脑端安装项目 npm 依赖；如果没有 Node.js/npm，会先自动尝试安装 Node.js LTS。',
     '- `安装GStreamer依赖.bat`：尝试安装 GStreamer 依赖。',
     '- `安装ViGEmBus手柄驱动.bat`：安装 PC 端虚拟 Xbox 手柄驱动，电视或盒子上的 USB 手柄需要它才能被 PC 游戏识别。',
     '- `检查环境.bat`：检查电脑端 GStreamer、编码器、音频捕获和 .NET 环境。',
@@ -144,8 +166,9 @@ function createReadme() {
     '## 快速验证步骤',
     '',
     '1. 把 `TVGameReceiver.apk` 安装到 Android 11+ 电视或电视盒子上，然后打开“电视游戏接收端”。接收端 App 打开期间会保持屏幕常亮，避免电视自动休眠后黑屏。',
-    '2. 在电脑上运行 `安装npm依赖.bat`。',
-    '3. 如果 `检查环境.bat` 提示 GStreamer 缺失，先运行 `安装GStreamer依赖.bat`，完成后重新打开一个命令窗口再检查。',
+    '2. 在电脑上运行 `安装npm依赖.bat`。如果提示刚安装 Node.js，请关闭当前窗口，重新打开一个新的命令窗口后再运行一次 `安装npm依赖.bat`。',
+    '3. 如果 `检查环境.bat` 提示 GStreamer 缺失，先运行 `安装GStreamer依赖.bat`。安装完成后关闭当前窗口，重新打开一个新的命令窗口，再运行 `检查环境.bat`。',
+    '   如果环境检查只缺 `nvh264enc`，说明 GStreamer 已能运行，但缺 NVIDIA NVENC 编码插件；优先重新运行 `安装GStreamer依赖.bat` 安装 devel 包，并确认电脑是 NVIDIA 显卡且驱动已更新。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
     '6. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。',
@@ -179,10 +202,20 @@ function createReadme() {
 
 function writeLaunchers(packageDir) {
   const launchers = {
-    '安装npm依赖.bat': createBatchScript('echo 正在安装 Node.js 依赖...\r\ncall npm.cmd install'),
+    '安装Node.js运行环境.bat': createBatchScript('echo 正在安装 Node.js 运行环境...\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-nodejs.ps1"\r\necho.\r\necho 如果刚安装 Node.js，请关闭当前窗口，重新打开后再运行 安装npm依赖.bat。'),
+    '安装npm依赖.bat': createBatchScript(createNpmGuardBody('echo 正在安装 npm 依赖...\r\ncall npm.cmd install')),
     '安装GStreamer依赖.bat': createBatchScript('echo 正在安装 GStreamer 依赖...\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-gstreamer.ps1" -InstallDevel'),
     '安装ViGEmBus手柄驱动.bat': createBatchScript('echo 正在安装 ViGEmBus 虚拟手柄驱动...\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-vigembus.ps1"'),
-    '检查环境.bat': createBatchScript('echo 正在检查发送端环境...\r\ncall npm.cmd run stage2:check'),
+    '检查环境.bat': createBatchScript(`
+echo 正在检查发送端环境...
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+  echo 未检测到 Node.js/npm。
+  echo 请先运行 安装Node.js运行环境.bat，安装完成后关闭当前窗口，重新打开再检查。
+  exit /b 1
+)
+call npm.cmd run stage2:check
+`),
     '启动输入桥.bat': createBatchScript('echo 正在启动输入桥，请保持此窗口打开。\r\ndotnet run --project InputBridge\\InputBridge.csproj'),
     '启动默认发送.bat': createSenderBatch('--encoder-preset auto --profile resilient1080'),
     '启动高画质发送.bat': createSenderBatch('--encoder-preset auto --profile quality1080'),

@@ -105,9 +105,12 @@ if ($gstreamerRoot) {
     [Environment]::SetEnvironmentVariable("Path", "$currentPath;$defaultBin", "User")
   }
 } else {
-  Write-Host "未找到 GStreamer 安装目录，请重新打开终端后运行：npm.cmd run native:check"
+  Write-Host "未找到 GStreamer 安装目录。请关闭当前窗口，重新打开一个新的命令窗口后再运行检查。"
 }
 
 Write-Host ""
-Write-Host "安装流程完成。请重新打开终端，或重启 QuickVerify。"
-Write-Host "然后运行：npm.cmd run native:check"
+Write-Host "安装流程完成。"
+Write-Host "请关闭当前 .bat/PowerShell 窗口，重新打开一个新的命令窗口。"
+Write-Host "朋友试用包用户：重新运行 检查环境.bat。"
+Write-Host "项目目录用户：运行 npm.cmd run stage2:check。"
+Write-Host "如果仍提示缺失 nvh264enc，请确认安装的是 MSVC x86_64 runtime + devel，并更新 NVIDIA 显卡驱动。"
