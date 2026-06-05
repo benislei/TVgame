@@ -4,6 +4,9 @@ using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Nefarius.ViGEm.Client;
+using Nefarius.ViGEm.Client.Targets;
+using Nefarius.ViGEm.Client.Targets.Xbox360;
 
 const string Prefix = "http://127.0.0.1:8788/";
 const int AndroidTcpInputPort = 8789;
@@ -12,6 +15,7 @@ var listener = new HttpListener();
 listener.Prefixes.Add(Prefix);
 listener.Start();
 _ = RunTcpInputServerAsync();
+InputInjector.TryStartGamepad();
 
 Console.WriteLine("电视游戏输入桥已启动");
 Console.WriteLine($"监听地址：ws://127.0.0.1:8788/input");
@@ -117,7 +121,7 @@ static class InputInjector
                 HandleMouse(input);
                 break;
             case "gamepad":
-                Console.WriteLine("收到手柄状态。虚拟手柄注入将在下一步接入 ViGEm。");
+                HandleGamepad(input);
                 break;
         }
     }
@@ -176,6 +180,23 @@ static class InputInjector
         }
     }
 
+    public static void TryStartGamepad()
+    {
+        _ = Gamepad.Value;
+    }
+
+    private static void HandleGamepad(JsonElement input)
+    {
+        var gamepad = Gamepad.Value;
+        if (gamepad == null)
+        {
+            WarnMissingVirtualGamepadOnce();
+            return;
+        }
+
+        gamepad.HandleGamepad(input);
+    }
+
     private static void SendKeyboard(ushort vk, uint flags)
     {
         var input = new INPUT
@@ -230,6 +251,13 @@ static class InputInjector
         return TryGetInt(element, name, out var value) ? value : 0;
     }
 
+    private static double GetDouble(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var property)) return 0;
+        if (property.ValueKind != JsonValueKind.Number) return 0;
+        return property.GetDouble();
+    }
+
     private static bool TryGetInt(JsonElement element, string name, out int value)
     {
         value = 0;
@@ -243,6 +271,117 @@ static class InputInjector
 
     private static readonly Dictionary<string, ushort> KeyMap = BuildKeyMap();
     private static readonly Dictionary<int, ushort> AndroidKeyCodeMap = BuildAndroidKeyCodeMap();
+    private static readonly Lazy<VirtualGamepadInjector?> Gamepad = new(CreateVirtualGamepadInjector);
+    private static bool missingVirtualGamepadWarningPrinted;
+
+    private static VirtualGamepadInjector? CreateVirtualGamepadInjector()
+    {
+        try
+        {
+            return new VirtualGamepadInjector();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"虚拟 Xbox 手柄启动失败：{ex.Message}");
+            Console.WriteLine("请先安装 ViGEmBus 虚拟手柄驱动，然后重新启动输入桥。");
+            return null;
+        }
+    }
+
+    private static void WarnMissingVirtualGamepadOnce()
+    {
+        if (missingVirtualGamepadWarningPrinted) return;
+        missingVirtualGamepadWarningPrinted = true;
+        Console.WriteLine("已收到手柄状态，但虚拟 Xbox 手柄未启动。请安装 ViGEmBus 后重启输入桥。");
+    }
+
+    private sealed class VirtualGamepadInjector : IDisposable
+    {
+        private const int BUTTON_A = 1 << 0;
+        private const int BUTTON_B = 1 << 1;
+        private const int BUTTON_X = 1 << 2;
+        private const int BUTTON_Y = 1 << 3;
+        private const int BUTTON_LB = 1 << 4;
+        private const int BUTTON_RB = 1 << 5;
+        private const int BUTTON_BACK = 1 << 6;
+        private const int BUTTON_START = 1 << 7;
+        private const int BUTTON_LS = 1 << 8;
+        private const int BUTTON_RS = 1 << 9;
+        private const int BUTTON_DPAD_UP = 1 << 10;
+        private const int BUTTON_DPAD_DOWN = 1 << 11;
+        private const int BUTTON_DPAD_LEFT = 1 << 12;
+        private const int BUTTON_DPAD_RIGHT = 1 << 13;
+        private const int BUTTON_GUIDE = 1 << 14;
+
+        private readonly ViGEmClient client;
+        private readonly IXbox360Controller controller;
+
+        public VirtualGamepadInjector()
+        {
+            client = new ViGEmClient();
+            controller = client.CreateXbox360Controller();
+            controller.AutoSubmitReport = false;
+            controller.Connect();
+            Console.WriteLine("虚拟 Xbox 手柄已连接。");
+        }
+
+        public void HandleGamepad(JsonElement input)
+        {
+            var buttons = GetInt(input, "buttons");
+            controller.SetAxisValue(Xbox360Axis.LeftThumbX, StickToShort(GetDouble(input, "lx"), false));
+            controller.SetAxisValue(Xbox360Axis.LeftThumbY, StickToShort(GetDouble(input, "ly"), true));
+            controller.SetAxisValue(Xbox360Axis.RightThumbX, StickToShort(GetDouble(input, "rx"), false));
+            controller.SetAxisValue(Xbox360Axis.RightThumbY, StickToShort(GetDouble(input, "ry"), true));
+            controller.SetSliderValue(Xbox360Slider.LeftTrigger, TriggerToByte(GetDouble(input, "lt")));
+            controller.SetSliderValue(Xbox360Slider.RightTrigger, TriggerToByte(GetDouble(input, "rt")));
+
+            SetButton(Xbox360Button.A, buttons, BUTTON_A);
+            SetButton(Xbox360Button.B, buttons, BUTTON_B);
+            SetButton(Xbox360Button.X, buttons, BUTTON_X);
+            SetButton(Xbox360Button.Y, buttons, BUTTON_Y);
+            SetButton(Xbox360Button.LeftShoulder, buttons, BUTTON_LB);
+            SetButton(Xbox360Button.RightShoulder, buttons, BUTTON_RB);
+            SetButton(Xbox360Button.Back, buttons, BUTTON_BACK);
+            SetButton(Xbox360Button.Start, buttons, BUTTON_START);
+            SetButton(Xbox360Button.LeftThumb, buttons, BUTTON_LS);
+            SetButton(Xbox360Button.RightThumb, buttons, BUTTON_RS);
+            SetButton(Xbox360Button.Up, buttons, BUTTON_DPAD_UP);
+            SetButton(Xbox360Button.Down, buttons, BUTTON_DPAD_DOWN);
+            SetButton(Xbox360Button.Left, buttons, BUTTON_DPAD_LEFT);
+            SetButton(Xbox360Button.Right, buttons, BUTTON_DPAD_RIGHT);
+            SetButton(Xbox360Button.Guide, buttons, BUTTON_GUIDE);
+            controller.SubmitReport();
+        }
+
+        private void SetButton(Xbox360Button button, int buttons, int bit)
+        {
+            controller.SetButtonState(button, (buttons & bit) != 0);
+        }
+
+        private static short StickToShort(double value, bool invert)
+        {
+            var clamped = Clamp(value, -1, 1);
+            if (invert) clamped = -clamped;
+            return (short)Math.Round(clamped * short.MaxValue);
+        }
+
+        private static byte TriggerToByte(double value)
+        {
+            return (byte)Math.Round(Clamp(value, 0, 1) * byte.MaxValue);
+        }
+
+        private static double Clamp(double value, double min, double max)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value)) return 0;
+            return Math.Min(max, Math.Max(min, value));
+        }
+
+        public void Dispose()
+        {
+            controller.Disconnect();
+            client.Dispose();
+        }
+    }
 
     private static Dictionary<string, ushort> BuildKeyMap()
     {

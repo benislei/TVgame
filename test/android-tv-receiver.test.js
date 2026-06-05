@@ -155,6 +155,19 @@ test('InputClient can send mouse JSON for mapped gamepad right stick and trigger
   assert.match(source, /button\s*<\s*0\s*\|\|\s*button\s*>\s*2/);
 });
 
+test('InputClient can send raw gamepad state JSON for virtual Xbox injection', () => {
+  const source = readProjectFile(`${javaRoot}/InputClient.java`);
+
+  assert.match(source, /public\s+void\s+sendGamepadState\(float\s+lx,\s*float\s+ly,\s*float\s+rx,\s*float\s+ry,\s*float\s+lt,\s*float\s+rt,\s*int\s+buttons\)/);
+  assert.match(source, /buildGamepadStateJsonLine\(lx,\s*ly,\s*rx,\s*ry,\s*lt,\s*rt,\s*buttons\)/);
+  assert.match(source, /\\"kind\\":\\"gamepad\\"/);
+  assert.match(source, /\\"action\\":\\"state\\"/);
+  assert.match(source, /\\"lx\\":/);
+  assert.match(source, /\\"buttons\\":/);
+  assert.match(source, /clampStick/);
+  assert.match(source, /clampTrigger/);
+});
+
 test('InputClient.buildKeyJsonLine returns exact JSON lines and rejects invalid input', (t) => {
   if (!commandExists('javac') || !commandExists('java')) {
     t.skip('javac/java not available; keeping InputClient behavior covered by static checks in this environment');
@@ -180,6 +193,7 @@ public final class InputClientHarness {
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"move\\",\\"dx\\":7,\\"dy\\":-5}\\n", InputClient.buildMouseMoveJsonLine(7, -5));
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"down\\",\\"button\\":0}\\n", InputClient.buildMouseButtonJsonLine("down", 0));
         assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"mouse\\",\\"action\\":\\"up\\",\\"button\\":2}\\n", InputClient.buildMouseButtonJsonLine("up", 2));
+        assertEquals("{\\"type\\":\\"input\\",\\"kind\\":\\"gamepad\\",\\"action\\":\\"state\\",\\"lx\\":1.0,\\"ly\\":-1.0,\\"rx\\":0.25,\\"ry\\":0.0,\\"lt\\":1.0,\\"rt\\":0.0,\\"buttons\\":33}\\n", InputClient.buildGamepadStateJsonLine(2.0f, -2.0f, 0.25f, 0.0f, 1.5f, -0.5f, 33));
         assertThrows(new Runnable() {
             @Override
             public void run() {
@@ -523,33 +537,35 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
 test('MainActivity consumes USB gamepad key events so the TV UI does not handle them', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
+  assert.match(source, /boolean\s+dispatchKeyEvent\(KeyEvent\s+event\)/);
+  assert.match(source, /handleGamepadKeyEvent\(event\)/);
   assert.match(source, /isGamepadKeyEvent\(event\)/);
   assert.match(source, /private\s+static\s+boolean\s+isGamepadKeyEvent\(KeyEvent\s+event\)/);
   assert.match(source, /InputDevice\.SOURCE_GAMEPAD/);
   assert.match(source, /InputDevice\.SOURCE_JOYSTICK/);
-  assert.match(source, /sendGamepadButton\("down",\s*keyCode\)/);
-  assert.match(source, /sendGamepadButton\("up",\s*keyCode\)/);
-  assert.match(source, /if\s*\(\s*isGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+true/);
+  assert.match(source, /InputDevice\.SOURCE_DPAD/);
+  assert.match(source, /isGamepadButtonKey\(keyCode\)/);
+  assert.match(source, /if\s*\(\s*handleGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+true/);
+  assert.match(source, /if\s*\(\s*!isGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+false/);
 });
 
-test('MainActivity maps USB gamepad buttons to PC keyboard and mouse controls', () => {
+test('MainActivity sends USB gamepad buttons as raw virtual-controller state', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
-  assert.match(source, /private\s+void\s+sendGamepadButton\(String\s+action,\s*int\s+keyCode\)/);
-  assert.match(source, /private\s+static\s+String\s+mapGamepadKeyCode\(int\s+keyCode\)/);
-  assert.match(source, /KeyEvent\.KEYCODE_DPAD_UP[\s\S]*"KeyW"/);
-  assert.match(source, /KeyEvent\.KEYCODE_DPAD_DOWN[\s\S]*"KeyS"/);
-  assert.match(source, /KeyEvent\.KEYCODE_DPAD_LEFT[\s\S]*"KeyA"/);
-  assert.match(source, /KeyEvent\.KEYCODE_DPAD_RIGHT[\s\S]*"KeyD"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_A[\s\S]*"Space"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_B[\s\S]*"Escape"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_X[\s\S]*"KeyE"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_Y[\s\S]*"KeyQ"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_START[\s\S]*"Enter"/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_SELECT[\s\S]*"Tab"/);
-  assert.match(source, /sendGamepadMouseButton\(action,\s*keyCode\)/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_R1[\s\S]*sendMouseButton\(action,\s*0\)/);
-  assert.match(source, /KeyEvent\.KEYCODE_BUTTON_L1[\s\S]*sendMouseButton\(action,\s*2\)/);
+  assert.match(source, /private\s+boolean\s+handleGamepadKeyEvent\(KeyEvent\s+event\)/);
+  assert.match(source, /private\s+static\s+int\s+mapGamepadButtonBit\(int\s+keyCode\)/);
+  assert.match(source, /gamepadButtons\s*\|=/);
+  assert.match(source, /gamepadButtons\s*&=/);
+  assert.match(source, /sendGamepadState\(\)/);
+  assert.match(source, /BUTTON_A/);
+  assert.match(source, /BUTTON_B/);
+  assert.match(source, /BUTTON_X/);
+  assert.match(source, /BUTTON_Y/);
+  assert.match(source, /BUTTON_LB/);
+  assert.match(source, /BUTTON_RB/);
+  assert.match(source, /BUTTON_DPAD_UP/);
+  assert.match(source, /BUTTON_DPAD_RIGHT/);
+  assert.doesNotMatch(source, /sendGamepadMouseButton\(action,\s*keyCode\)/);
 });
 
 test('MainActivity toggles overlay with MENU or F1 without forwarding those keys', () => {
@@ -562,7 +578,7 @@ test('MainActivity toggles overlay with MENU or F1 without forwarding those keys
   assert.match(source, /KeyEvent\.KEYCODE_F1/);
   assert.match(source, /toggleOverlay\(\)/);
   assert.match(source, /overlay\.setVisibility\(overlayVisible\s*\?\s*View\.VISIBLE\s*:\s*View\.GONE\)/);
-  assert.match(source, /if\s*\(\s*event\.getRepeatCount\(\)\s*==\s*0\s*&&\s*isOverlayToggleKey\(keyCode\)\s*\)[\s\S]*?return\s+true/);
+  assert.match(source, /if\s*\(\s*action\s*==\s*KeyEvent\.ACTION_DOWN\s*&&\s*event\.getRepeatCount\(\)\s*==\s*0\s*&&\s*isOverlayToggleKey\(keyCode\)\s*\)[\s\S]*?return\s+true/);
 });
 
 test('MainActivity shows Android 11 plus extreme receiver mode in Chinese', () => {
@@ -574,7 +590,7 @@ test('MainActivity shows Android 11 plus extreme receiver mode in Chinese', () =
   assert.match(source, /TITLE\s*\+\s*"\s*\|\s*Android 11\+（API "/);
 });
 
-test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
+test('MainActivity maps USB gamepad joystick axes to raw gamepad state', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
   assert.match(source, /import\s+android\.view\.MotionEvent/);
@@ -583,28 +599,23 @@ test('MainActivity maps USB gamepad joystick axes to WASD input codes', () => {
   assert.match(source, /SOURCE_GAMEPAD/);
   assert.match(source, /AXIS_X/);
   assert.match(source, /AXIS_Y/);
-  assert.match(source, /GAMEPAD_AXIS_DEADZONE/);
-  assert.match(source, /updateMappedKey\("KeyA"/);
-  assert.match(source, /updateMappedKey\("KeyD"/);
-  assert.match(source, /updateMappedKey\("KeyW"/);
-  assert.match(source, /updateMappedKey\("KeyS"/);
-});
-
-test('MainActivity maps USB gamepad right stick and triggers to PC mouse input', () => {
-  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
-
   assert.match(source, /AXIS_Z/);
   assert.match(source, /AXIS_RZ/);
   assert.match(source, /AXIS_RX/);
   assert.match(source, /AXIS_RY/);
   assert.match(source, /AXIS_LTRIGGER/);
   assert.match(source, /AXIS_RTRIGGER/);
-  assert.match(source, /GAMEPAD_MOUSE_SCALE/);
-  assert.match(source, /axisToMouseDelta\(rightX\)/);
-  assert.match(source, /axisToMouseDelta\(rightY\)/);
-  assert.match(source, /inputClient\.sendMouseMove\(mouseDx,\s*mouseDy\)/);
-  assert.match(source, /updateMappedMouseButton\(2,\s*leftTriggerActive/);
-  assert.match(source, /updateMappedMouseButton\(0,\s*rightTriggerActive/);
+  assert.match(source, /GAMEPAD_AXIS_DEADZONE/);
+  assert.match(source, /gamepadLx\s*=/);
+  assert.match(source, /gamepadLy\s*=/);
+  assert.match(source, /gamepadRx\s*=/);
+  assert.match(source, /gamepadRy\s*=/);
+  assert.match(source, /gamepadLt\s*=/);
+  assert.match(source, /gamepadRt\s*=/);
+  assert.match(source, /updateHatButton/);
+  assert.match(source, /inputClient\.sendGamepadState\(gamepadLx,\s*gamepadLy,\s*gamepadRx,\s*gamepadRy,\s*gamepadLt,\s*gamepadRt,\s*gamepadButtons\)/);
+  assert.doesNotMatch(source, /updateMappedKey\("KeyA"/);
+  assert.doesNotMatch(source, /inputClient\.sendMouseMove/);
 });
 
 test('stage 2 verification guide documents input return and acceptance checklist in Chinese', () => {
@@ -617,11 +628,12 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789/);
   assert.match(doc, /接收端 App 打开期间会保持屏幕常亮/);
   assert.match(doc, /USB 手柄会被接收端 App 消费/);
-  assert.match(doc, /左摇杆和 D-pad 映射 WASD/);
-  assert.match(doc, /右摇杆映射鼠标移动/);
-  assert.match(doc, /R1\/右扳机映射鼠标左键/);
-  assert.match(doc, /L1\/左扳机映射鼠标右键/);
-  assert.match(doc, /PC 端需要启动 InputBridge\/SendInput/);
+  assert.match(doc, /回传原始手柄状态/);
+  assert.match(doc, /ViGEmBus 虚拟 Xbox 手柄/);
+  assert.match(doc, /安装ViGEmBus手柄驱动\.bat/);
+  assert.match(doc, /PC 端需要启动 InputBridge/);
+  assert.doesNotMatch(doc, /左摇杆和 D-pad 映射 WASD/);
+  assert.doesNotMatch(doc, /右摇杆映射鼠标移动/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /菜单键或 F1 可以隐藏或显示状态面板/);
   assert.match(doc, /## 验收记录/);

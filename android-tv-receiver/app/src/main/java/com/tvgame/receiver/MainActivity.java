@@ -27,7 +27,21 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
-    private static final int GAMEPAD_MOUSE_SCALE = 18;
+    private static final int BUTTON_A = 1 << 0;
+    private static final int BUTTON_B = 1 << 1;
+    private static final int BUTTON_X = 1 << 2;
+    private static final int BUTTON_Y = 1 << 3;
+    private static final int BUTTON_LB = 1 << 4;
+    private static final int BUTTON_RB = 1 << 5;
+    private static final int BUTTON_BACK = 1 << 6;
+    private static final int BUTTON_START = 1 << 7;
+    private static final int BUTTON_LS = 1 << 8;
+    private static final int BUTTON_RS = 1 << 9;
+    private static final int BUTTON_DPAD_UP = 1 << 10;
+    private static final int BUTTON_DPAD_DOWN = 1 << 11;
+    private static final int BUTTON_DPAD_LEFT = 1 << 12;
+    private static final int BUTTON_DPAD_RIGHT = 1 << 13;
+    private static final int BUTTON_GUIDE = 1 << 14;
 
     private final Object lifecycleLock = new Object();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -47,12 +61,13 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private InputClient inputClient;
     private Thread videoThread;
     private Thread audioThread;
-    private boolean keyAActive;
-    private boolean keyDActive;
-    private boolean keyWActive;
-    private boolean keySActive;
-    private boolean leftTriggerActive;
-    private boolean rightTriggerActive;
+    private float gamepadLx;
+    private float gamepadLy;
+    private float gamepadRx;
+    private float gamepadRy;
+    private float gamepadLt;
+    private float gamepadRt;
+    private int gamepadButtons;
     private boolean overlayVisible = true;
 
     @Override
@@ -72,6 +87,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
 
         FrameLayout root = new FrameLayout(this);
+        root.setFocusable(true);
+        root.setFocusableInTouchMode(true);
         root.addView(surfaceView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -85,6 +102,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(overlay, overlayParams);
 
         setContentView(root);
+        root.requestFocus();
         handler.postDelayed(updateOverlay, 500);
     }
 
@@ -118,17 +136,24 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (event.getRepeatCount() == 0 && isOverlayToggleKey(keyCode)) {
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        int action = event.getAction();
+        if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && isOverlayToggleKey(keyCode)) {
             toggleOverlay();
             return true;
         }
-        if (isGamepadKeyEvent(event)) {
-            if (event.getRepeatCount() == 0) {
-                sendGamepadButton("down", keyCode);
-            }
+        if (isOverlayToggleKey(keyCode)) {
             return true;
         }
+        if (handleGamepadKeyEvent(event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (inputClient != null && event.getRepeatCount() == 0) {
             inputClient.sendKey("down", keyCode);
         }
@@ -137,13 +162,6 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (isOverlayToggleKey(keyCode)) {
-            return true;
-        }
-        if (isGamepadKeyEvent(event)) {
-            sendGamepadButton("up", keyCode);
-            return true;
-        }
         if (inputClient != null) {
             inputClient.sendKey("up", keyCode);
         }
@@ -156,8 +174,20 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     private static boolean isGamepadKeyEvent(KeyEvent event) {
         int source = event.getSource();
+        int keyCode = event.getKeyCode();
         return (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
-            || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+            || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+            || (source & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD
+            || isGamepadButtonKey(keyCode);
+    }
+
+    private static boolean isGamepadButtonKey(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_DPAD_UP
+            || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+            || keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+            || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+            || keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+            || (keyCode >= KeyEvent.KEYCODE_BUTTON_A && keyCode <= KeyEvent.KEYCODE_BUTTON_MODE);
     }
 
     private void toggleOverlay() {
@@ -176,32 +206,41 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             return super.onGenericMotionEvent(event);
         }
 
-        float axisX = event.getAxisValue(MotionEvent.AXIS_X);
-        float axisY = event.getAxisValue(MotionEvent.AXIS_Y);
-        if (Math.abs(axisX) < GAMEPAD_AXIS_DEADZONE) {
-            axisX = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+        gamepadLx = normalizeAxis(event.getAxisValue(MotionEvent.AXIS_X));
+        gamepadLy = normalizeAxis(event.getAxisValue(MotionEvent.AXIS_Y));
+        gamepadRx = normalizeAxis(firstActiveAxis(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX));
+        gamepadRy = normalizeAxis(firstActiveAxis(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY));
+        gamepadLt = normalizeTrigger(event.getAxisValue(MotionEvent.AXIS_LTRIGGER));
+        gamepadRt = normalizeTrigger(event.getAxisValue(MotionEvent.AXIS_RTRIGGER));
+
+        float hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X);
+        float hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+        gamepadButtons = updateHatButton(gamepadButtons, BUTTON_DPAD_LEFT, hatX <= -GAMEPAD_AXIS_DEADZONE);
+        gamepadButtons = updateHatButton(gamepadButtons, BUTTON_DPAD_RIGHT, hatX >= GAMEPAD_AXIS_DEADZONE);
+        gamepadButtons = updateHatButton(gamepadButtons, BUTTON_DPAD_UP, hatY <= -GAMEPAD_AXIS_DEADZONE);
+        gamepadButtons = updateHatButton(gamepadButtons, BUTTON_DPAD_DOWN, hatY >= GAMEPAD_AXIS_DEADZONE);
+        sendGamepadState();
+        return true;
+    }
+
+    private boolean handleGamepadKeyEvent(KeyEvent event) {
+        if (!isGamepadKeyEvent(event)) {
+            return false;
         }
-        if (Math.abs(axisY) < GAMEPAD_AXIS_DEADZONE) {
-            axisY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+        int action = event.getAction();
+        if (action != KeyEvent.ACTION_DOWN && action != KeyEvent.ACTION_UP) {
+            return true;
         }
 
-        keyAActive = updateMappedKey("KeyA", keyAActive, axisX <= -GAMEPAD_AXIS_DEADZONE);
-        keyDActive = updateMappedKey("KeyD", keyDActive, axisX >= GAMEPAD_AXIS_DEADZONE);
-        keyWActive = updateMappedKey("KeyW", keyWActive, axisY <= -GAMEPAD_AXIS_DEADZONE);
-        keySActive = updateMappedKey("KeyS", keySActive, axisY >= GAMEPAD_AXIS_DEADZONE);
-
-        float rightX = firstActiveAxis(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX);
-        float rightY = firstActiveAxis(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY);
-        int mouseDx = axisToMouseDelta(rightX);
-        int mouseDy = axisToMouseDelta(rightY);
-        if (mouseDx != 0 || mouseDy != 0) {
-            inputClient.sendMouseMove(mouseDx, mouseDy);
+        int buttonBit = mapGamepadButtonBit(event.getKeyCode());
+        if (buttonBit != 0 && (action == KeyEvent.ACTION_UP || event.getRepeatCount() == 0)) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                gamepadButtons |= buttonBit;
+            } else {
+                gamepadButtons &= ~buttonBit;
+            }
+            sendGamepadState();
         }
-
-        float leftTrigger = event.getAxisValue(MotionEvent.AXIS_LTRIGGER);
-        float rightTrigger = event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
-        leftTriggerActive = updateMappedMouseButton(2, leftTriggerActive, leftTrigger >= GAMEPAD_AXIS_DEADZONE);
-        rightTriggerActive = updateMappedMouseButton(0, rightTriggerActive, rightTrigger >= GAMEPAD_AXIS_DEADZONE);
         return true;
     }
 
@@ -213,98 +252,81 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         return event.getAxisValue(fallbackAxis);
     }
 
-    private static int axisToMouseDelta(float value) {
+    private static float normalizeAxis(float value) {
         if (Math.abs(value) < GAMEPAD_AXIS_DEADZONE) {
-            return 0;
+            return 0.0f;
         }
-        return Math.round(value * GAMEPAD_MOUSE_SCALE);
+        return Math.max(-1.0f, Math.min(1.0f, value));
     }
 
-    private void sendGamepadButton(String action, int keyCode) {
-        if (inputClient == null) {
-            return;
+    private static float normalizeTrigger(float value) {
+        if (value < GAMEPAD_AXIS_DEADZONE) {
+            return 0.0f;
         }
-
-        if (sendGamepadMouseButton(action, keyCode)) {
-            return;
-        }
-
-        String code = mapGamepadKeyCode(keyCode);
-        if (code != null) {
-            inputClient.sendCode(action, code);
-        }
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
-    private boolean sendGamepadMouseButton(String action, int keyCode) {
-        if (inputClient == null) {
-            return false;
-        }
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_R1) {
-            inputClient.sendMouseButton(action, 0);
-            return true;
-        }
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
-            inputClient.sendMouseButton(action, 2);
-            return true;
-        }
-        return false;
+    private static int updateHatButton(int buttons, int buttonBit, boolean pressed) {
+        return pressed ? (buttons | buttonBit) : (buttons & ~buttonBit);
     }
 
-    private static String mapGamepadKeyCode(int keyCode) {
+    private static int mapGamepadButtonBit(int keyCode) {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_UP:
-                return "KeyW";
+                return BUTTON_DPAD_UP;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                return "KeyS";
+                return BUTTON_DPAD_DOWN;
             case KeyEvent.KEYCODE_DPAD_LEFT:
-                return "KeyA";
+                return BUTTON_DPAD_LEFT;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                return "KeyD";
+                return BUTTON_DPAD_RIGHT;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_BUTTON_A:
-                return "Space";
+                return BUTTON_A;
             case KeyEvent.KEYCODE_BUTTON_B:
-                return "Escape";
+                return BUTTON_B;
             case KeyEvent.KEYCODE_BUTTON_X:
-                return "KeyE";
+                return BUTTON_X;
             case KeyEvent.KEYCODE_BUTTON_Y:
-                return "KeyQ";
+                return BUTTON_Y;
+            case KeyEvent.KEYCODE_BUTTON_L1:
+                return BUTTON_LB;
+            case KeyEvent.KEYCODE_BUTTON_R1:
+                return BUTTON_RB;
             case KeyEvent.KEYCODE_BUTTON_L2:
-                return "ShiftLeft";
+                return BUTTON_LB;
             case KeyEvent.KEYCODE_BUTTON_R2:
-                return "ControlLeft";
+                return BUTTON_RB;
             case KeyEvent.KEYCODE_BUTTON_START:
-                return "Enter";
+                return BUTTON_START;
             case KeyEvent.KEYCODE_BUTTON_SELECT:
-                return "Tab";
+                return BUTTON_BACK;
+            case KeyEvent.KEYCODE_BUTTON_THUMBL:
+                return BUTTON_LS;
+            case KeyEvent.KEYCODE_BUTTON_THUMBR:
+                return BUTTON_RS;
+            case KeyEvent.KEYCODE_BUTTON_MODE:
+                return BUTTON_GUIDE;
             default:
-                return null;
+                return 0;
         }
     }
 
-    private boolean updateMappedKey(String code, boolean wasActive, boolean shouldBeActive) {
-        if (inputClient == null || wasActive == shouldBeActive) {
-            return wasActive;
+    private void sendGamepadState() {
+        if (inputClient != null) {
+            inputClient.sendGamepadState(gamepadLx, gamepadLy, gamepadRx, gamepadRy, gamepadLt, gamepadRt, gamepadButtons);
         }
-        inputClient.sendCode(shouldBeActive ? "down" : "up", code);
-        return shouldBeActive;
-    }
-
-    private boolean updateMappedMouseButton(int button, boolean wasActive, boolean shouldBeActive) {
-        if (inputClient == null || wasActive == shouldBeActive) {
-            return wasActive;
-        }
-        inputClient.sendMouseButton(shouldBeActive ? "down" : "up", button);
-        return shouldBeActive;
     }
 
     private void releaseMappedKeys() {
-        keyAActive = updateMappedKey("KeyA", keyAActive, false);
-        keyDActive = updateMappedKey("KeyD", keyDActive, false);
-        keyWActive = updateMappedKey("KeyW", keyWActive, false);
-        keySActive = updateMappedKey("KeyS", keySActive, false);
-        leftTriggerActive = updateMappedMouseButton(2, leftTriggerActive, false);
-        rightTriggerActive = updateMappedMouseButton(0, rightTriggerActive, false);
+        gamepadLx = 0.0f;
+        gamepadLy = 0.0f;
+        gamepadRx = 0.0f;
+        gamepadRy = 0.0f;
+        gamepadLt = 0.0f;
+        gamepadRt = 0.0f;
+        gamepadButtons = 0;
+        sendGamepadState();
     }
 
     private void startReceivers(Surface surface) {

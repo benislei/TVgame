@@ -26,6 +26,7 @@ function createFakeProject() {
   writeFile(path.join(root, 'src', 'native-streamer', 'cli.js'), 'console.log("native");');
   writeFile(path.join(root, 'src', 'stage2', 'tooling.js'), 'module.exports = {};');
   writeFile(path.join(root, 'scripts', 'install-gstreamer.ps1'), 'Write-Host "install"');
+  writeFile(path.join(root, 'scripts', 'install-vigembus.ps1'), 'Write-Host "vigem"');
   writeFile(path.join(root, 'InputBridge', 'InputBridge.csproj'), '<Project />');
   writeFile(path.join(root, 'InputBridge', 'Program.cs'), 'Console.WriteLine("bridge");');
   writeFile(path.join(root, 'InputBridge', 'bin', 'Debug', 'ignored.txt'), 'ignored');
@@ -57,6 +58,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     'README-朋友试用.md',
     '安装npm依赖.bat',
     '安装GStreamer依赖.bat',
+    '安装ViGEmBus手柄驱动.bat',
     '检查环境.bat',
     '启动输入桥.bat',
     '启动默认发送.bat',
@@ -68,6 +70,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     path.join('app', 'package-lock.json'),
     path.join('app', 'src', 'native-streamer', 'cli.js'),
     path.join('app', 'scripts', 'install-gstreamer.ps1'),
+    path.join('app', 'scripts', 'install-vigembus.ps1'),
     path.join('app', 'InputBridge', 'InputBridge.csproj'),
     path.join('app', 'docs', 'stage2-local-verify.md'),
     path.join('app', 'public', 'receiver-utils.js')
@@ -93,6 +96,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const read = name => fs.readFileSync(path.join(report.packageDir, name), 'utf8');
   const installNpm = read('安装npm依赖.bat');
   const installGstreamer = read('安装GStreamer依赖.bat');
+  const installVigemBus = read('安装ViGEmBus手柄驱动.bat');
   const check = read('检查环境.bat');
   const bridge = read('启动输入桥.bat');
   const defaultSender = read('启动默认发送.bat');
@@ -101,7 +105,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const experimentalSender = read('启动低延迟实验发送.bat');
   const fallbackSender = read('启动720回退发送.bat');
 
-  for (const text of [installNpm, installGstreamer, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
+  for (const text of [installNpm, installGstreamer, installVigemBus, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -111,6 +115,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
 
   assert.match(installNpm, /npm\.cmd install/);
   assert.match(installGstreamer, /powershell\.exe[\s\S]+scripts\\install-gstreamer\.ps1[\s\S]+-InstallDevel/);
+  assert.match(installVigemBus, /powershell\.exe[\s\S]+scripts\\install-vigembus\.ps1/);
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder-preset auto --profile resilient1080/);
@@ -132,6 +137,9 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   const readme = fs.readFileSync(path.join(report.packageDir, 'README-朋友试用.md'), 'utf8');
   assert.match(readme, /Android 11\+/);
   assert.match(readme, /TVGameReceiver\.apk/);
+  assert.match(readme, /ViGEmBus/);
+  assert.match(readme, /虚拟 Xbox 手柄/);
+  assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(readme, /启动输入桥\.bat/);
   assert.match(readme, /启动默认发送\.bat/);
   assert.match(readme, /启动高画质发送\.bat/);
@@ -141,10 +149,10 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /紧凑状态面板/);
   assert.match(readme, /菜单键或 F1/);
   assert.match(readme, /USB 手柄会被接收端 App 消费/);
-  assert.match(readme, /左摇杆和 D-pad 映射 WASD/);
-  assert.match(readme, /右摇杆映射鼠标移动/);
-  assert.match(readme, /R1\/右扳机映射鼠标左键/);
-  assert.match(readme, /L1\/左扳机映射鼠标右键/);
+  assert.match(readme, /回传原始手柄状态/);
+  assert.match(readme, /游戏里请选择 Xbox 手柄或控制器输入/);
+  assert.doesNotMatch(readme, /左摇杆和 D-pad 映射 WASD/);
+  assert.doesNotMatch(readme, /右摇杆映射鼠标移动/);
   assert.match(readme, /自动探测 NVENC preset/);
   assert.match(readme, /--encoder-preset low-latency-hq/);
   assert.match(readme, /UDP 5004/);

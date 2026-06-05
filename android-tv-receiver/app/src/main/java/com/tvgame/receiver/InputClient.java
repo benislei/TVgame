@@ -97,6 +97,14 @@ public final class InputClient {
         enqueueLine(line);
     }
 
+    public void sendGamepadState(float lx, float ly, float rx, float ry, float lt, float rt, int buttons) {
+        if (closed) {
+            return;
+        }
+
+        enqueueLine(buildGamepadStateJsonLine(lx, ly, rx, ry, lt, rt, buttons));
+    }
+
     private void enqueueLine(final String line) {
         try {
             executor.execute(new Runnable() {
@@ -168,6 +176,32 @@ public final class InputClient {
             + "\",\"button\":"
             + button
             + "}\n";
+    }
+
+    static String buildGamepadStateJsonLine(float lx, float ly, float rx, float ry, float lt, float rt, int buttons) {
+        return "{\"type\":\"input\",\"kind\":\"gamepad\",\"action\":\"state\",\"lx\":"
+            + Float.toString(clampStick(lx))
+            + ",\"ly\":"
+            + Float.toString(clampStick(ly))
+            + ",\"rx\":"
+            + Float.toString(clampStick(rx))
+            + ",\"ry\":"
+            + Float.toString(clampStick(ry))
+            + ",\"lt\":"
+            + Float.toString(clampTrigger(lt))
+            + ",\"rt\":"
+            + Float.toString(clampTrigger(rt))
+            + ",\"buttons\":"
+            + Math.max(0, buttons)
+            + "}\n";
+    }
+
+    private static float clampStick(float value) {
+        return Math.max(-1.0f, Math.min(1.0f, value));
+    }
+
+    private static float clampTrigger(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
     private void sendLine(String line) {

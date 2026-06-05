@@ -34,3 +34,38 @@ test('InputBridge maps Android TV keyCode values to Windows virtual keys', () =>
   assert.match(source, /\[96\]\s*=\s*0x20/);
   assert.match(source, /\[97\]\s*=\s*0x1B/);
 });
+
+test('InputBridge injects raw Android gamepad state as a virtual Xbox controller', () => {
+  const project = readProjectFile('InputBridge/InputBridge.csproj');
+  const source = readProjectFile('InputBridge/Program.cs');
+
+  assert.match(project, /Nefarius\.ViGEm\.Client/);
+  assert.match(source, /using\s+Nefarius\.ViGEm\.Client/);
+  assert.match(source, /using\s+Nefarius\.ViGEm\.Client\.Targets\.Xbox360/);
+  assert.match(source, /VirtualGamepadInjector/);
+  assert.match(source, /ViGEmClient/);
+  assert.match(source, /CreateXbox360Controller\(\)/);
+  assert.match(source, /controller\.Connect\(\)/);
+  assert.match(source, /HandleGamepad\(input\)/);
+  assert.match(source, /Xbox360Button\.A/);
+  assert.match(source, /Xbox360Button\.B/);
+  assert.match(source, /Xbox360Button\.LeftShoulder/);
+  assert.match(source, /Xbox360Axis\.LeftThumbX/);
+  assert.match(source, /Xbox360Axis\.RightThumbY/);
+  assert.match(source, /Xbox360Slider\.LeftTrigger/);
+  assert.match(source, /Xbox360Slider\.RightTrigger/);
+  assert.match(source, /SubmitReport\(\)/);
+  assert.doesNotMatch(source, /虚拟手柄注入将在下一步/);
+});
+
+test('InputBridge uses bounded conversion from normalized gamepad values to Xbox report values', () => {
+  const source = readProjectFile('InputBridge/Program.cs');
+
+  assert.match(source, /StickToShort\(double\s+value,\s+bool\s+invert/);
+  assert.match(source, /TriggerToByte\(double\s+value\)/);
+  assert.match(source, /Clamp\(value,\s*-1,\s*1\)/);
+  assert.match(source, /short\.MaxValue/);
+  assert.match(source, /byte\.MaxValue/);
+  assert.match(source, /GetDouble\(input,\s*"lx"/);
+  assert.match(source, /GetInt\(input,\s*"buttons"/);
+});

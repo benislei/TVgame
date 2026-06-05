@@ -26,6 +26,14 @@ dotnet run --project InputBridge\InputBridge.csproj
 
 保持这个窗口打开。若游戏以管理员权限运行，InputBridge 也建议用管理员 PowerShell 启动。
 
+如果要测试电视端 USB 手柄控制 PC 游戏，请先安装 ViGEmBus 虚拟 Xbox 手柄驱动。朋友试用包里可以直接运行 `安装ViGEmBus手柄驱动.bat`；在项目目录也可以运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\install-vigembus.ps1
+```
+
+安装完成后重新启动 InputBridge，正常情况下会看到“虚拟 Xbox 手柄已连接”。游戏里请选择 Xbox 手柄或控制器输入。
+
 ## Android TV 端准备
 
 构建并安装 `android-tv-receiver` 生成的 APK，启动应用“电视游戏接收端”。首屏应显示全屏画面层和左上角半透明中文状态面板，并包含“接收端档位：Android 11+ 极致模式”。接收端 App 打开期间会保持屏幕常亮，避免电视或盒子自动休眠后黑屏。
@@ -84,13 +92,13 @@ npm.cmd run native:rtp -- --host <Android TV IP> --encoder-preset default
 
 ## 输入回传
 
-Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789。发送内容是一行 UTF-8 JSON，字段包含 `type=input`、`kind=keyboard`、`action=down/up`，以及 Android `keyCode` 或浏览器风格 `code`。
+Android TV App 会把遥控器、键盘和 USB 手柄事件发送到 PC 端 TCP 8789。发送内容是一行 UTF-8 JSON，键盘字段包含 `type=input`、`kind=keyboard`、`action=down/up`，以及 Android `keyCode` 或浏览器风格 `code`；手柄字段包含 `kind=gamepad`、摇杆、扳机和按钮位图。
 
-PC 端需要启动 InputBridge/SendInput，才能把这些 JSON 输入事件转换为 Windows 输入。当前 APK 的 PC 输入 relay 地址来自构建时的 `inputRelayHost` 配置；回家测试前请确认它等于 PC 当前局域网 IP。
+PC 端需要启动 InputBridge，才能把这些 JSON 输入事件转换为 Windows 输入。键盘和鼠标仍使用 SendInput；USB 手柄会通过 ViGEmBus 虚拟 Xbox 手柄注入，让支持手柄的 PC 游戏直接识别为 Xbox 控制器。当前 APK 的 PC 输入 relay 地址来自构建时的 `inputRelayHost` 配置；回家测试前请确认它等于 PC 当前局域网 IP。
 
 Android TV 输入客户端会复用一个持久 TCP 连接，并开启 `TCP_NODELAY`，避免每次按键都重新建连或被 Nagle 算法合并等待。若 InputBridge 重启，下一次输入事件会自动重连。
 
-USB 手柄会被接收端 App 消费，不再继续交给电视系统处理，避免手柄操作电视 UI。当前映射：左摇杆和 D-pad 映射 WASD；右摇杆映射鼠标移动；R1/右扳机映射鼠标左键；L1/左扳机映射鼠标右键；A/确认映射 Space，B 映射 Escape，X 映射 E，Y 映射 Q，START 映射 Enter，SELECT 映射 Tab。
+USB 手柄会被接收端 App 消费，不再继续交给电视系统处理，避免手柄操作电视 UI。接收端会回传原始手柄状态，PC 端 InputBridge 通过 ViGEmBus 虚拟 Xbox 手柄注入，不再把手柄强行转换成 WASD 或鼠标。电视系统保留的 HOME 等系统键可能仍无法被 App 截获，这是 Android TV 的系统级限制。
 
 键盘和遥控器按键仍会保留 Android 系统默认处理结果，因此不会吞掉系统 BACK/HOME 行为。BACK 也可能被发给 PC relay，后续 relay 可以按需要过滤。
 
@@ -137,7 +145,7 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动默认发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动默认发送.bat` 验证 1080p60 基础手感；默认档已经等同抗花屏推荐档。想对比旧低延迟参数时再用 `启动低延迟实验发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动默认发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动默认发送.bat` 验证 1080p60 基础手感；默认档已经等同抗花屏推荐档。想对比旧低延迟参数时再用 `启动低延迟实验发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
 
 ## 验收记录
 
