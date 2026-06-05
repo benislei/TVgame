@@ -69,3 +69,16 @@ test('InputBridge uses bounded conversion from normalized gamepad values to Xbox
   assert.match(source, /GetDouble\(input,\s*"lx"/);
   assert.match(source, /GetInt\(input,\s*"buttons"/);
 });
+
+test('InputBridge logs throttled gamepad state diagnostics for Android input tracing', () => {
+  const source = readProjectFile('InputBridge/Program.cs');
+
+  assert.match(source, /gamepadPacketCount\+\+/);
+  assert.match(source, /lastGamepadLogAt/);
+  assert.match(source, /lastLoggedButtons/);
+  assert.match(source, /LogGamepadState\(input,\s*buttons\)/);
+  assert.match(source, /收到手柄状态/);
+  assert.match(source, /buttons=/);
+  assert.match(source, /lx=/);
+  assert.match(source, /rt=/);
+});

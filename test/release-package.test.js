@@ -158,6 +158,11 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /USB 手柄会被接收端 App 消费/);
   assert.match(readme, /回传原始手柄状态/);
   assert.match(readme, /游戏里请选择 Xbox 手柄或控制器输入/);
+  assert.match(readme, /Steam 提示连接 Xbox 控制器/);
+  assert.match(readme, /手柄 包/);
+  assert.match(readme, /输入 发/);
+  assert.match(readme, /收到手柄状态/);
+  assert.match(readme, /输入失败/);
   assert.doesNotMatch(readme, /左摇杆和 D-pad 映射 WASD/);
   assert.doesNotMatch(readme, /右摇杆映射鼠标移动/);
   assert.match(readme, /自动探测 NVENC preset/);

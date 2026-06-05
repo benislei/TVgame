@@ -16,6 +16,17 @@ public final class StatsModel {
     public volatile long droppedFrames;
     public volatile long lastVideoAtMs;
     public volatile long lastAudioAtMs;
+    public volatile String inputRelayHost = "";
+    public volatile long inputPackets;
+    public volatile long inputFailures;
+    public volatile long lastInputAtMs;
+    public volatile long gamepadEvents;
+    public volatile long lastGamepadAtMs;
+    public volatile int lastGamepadButtons;
+    public volatile float lastGamepadLx;
+    public volatile float lastGamepadLy;
+    public volatile float lastGamepadLt;
+    public volatile float lastGamepadRt;
 
     private long lastRealtimeAtMs = -1;
     private long lastRealtimeVideoFrames;
@@ -50,9 +61,16 @@ public final class StatsModel {
             + "\n解码丢帧: " + videoDecoderDrops
             + "\n音频包: " + audioPackets
             + "\n音频字节: " + audioBytes
+            + "\n输入目标: " + inputRelayHost
+            + "\n输入发送: " + inputPackets
+            + "\n输入失败: " + inputFailures
+            + "\n手柄包: " + gamepadEvents
+            + "\n手柄按钮: " + lastGamepadButtons
             + "\n丢帧: " + droppedFrames
             + "\n视频状态: " + statusText(lastVideoAtMs, nowMs)
-            + "\n音频状态: " + statusText(lastAudioAtMs, nowMs);
+            + "\n音频状态: " + statusText(lastAudioAtMs, nowMs)
+            + "\n输入状态: " + statusText(lastInputAtMs, nowMs)
+            + "\n手柄状态: " + statusText(lastGamepadAtMs, nowMs);
     }
 
     String renderCompact(long nowMs) {
@@ -65,13 +83,31 @@ public final class StatsModel {
             + " | 恢复 " + videoRecoveryDrops
             + " | 队列 " + videoQueueDrops
             + " | 解码 " + videoDecoderDrops
-            + "\n视频 包 " + videoPackets
+            + "\n视频 " + statusText(lastVideoAtMs, nowMs)
+            + " | 包" + videoPackets
             + " / 帧 " + videoFrames
             + " | 丢包 " + videoRtpLossPackets
             + "\n音频 " + statusText(lastAudioAtMs, nowMs)
             + " | 包 " + audioPackets
             + " | " + formatBytes(audioBytes)
-            + "\n视频 " + statusText(lastVideoAtMs, nowMs);
+            + "\n输入 " + inputRelayHost + " " + statusText(lastInputAtMs, nowMs)
+            + " | 发" + inputPackets
+            + " | 失败" + inputFailures
+            + " | 手柄 " + statusText(lastGamepadAtMs, nowMs)
+            + " | 包" + gamepadEvents
+            + " | B" + lastGamepadButtons
+            + " | L" + formatAxis(lastGamepadLx) + "," + formatAxis(lastGamepadLy)
+            + " | T" + formatAxis(lastGamepadLt) + "," + formatAxis(lastGamepadRt);
+    }
+
+    public void recordGamepadState(float lx, float ly, float rx, float ry, float lt, float rt, int buttons, long nowMs) {
+        gamepadEvents++;
+        lastGamepadAtMs = nowMs;
+        lastGamepadButtons = buttons;
+        lastGamepadLx = lx;
+        lastGamepadLy = ly;
+        lastGamepadLt = lt;
+        lastGamepadRt = rt;
     }
 
     private synchronized RealtimeStats takeRealtimeSnapshot(long nowMs) {
@@ -116,6 +152,10 @@ public final class StatsModel {
             return bytes + "B";
         }
         return String.format(Locale.US, "%.1fMB", bytes / (1024.0 * 1024.0));
+    }
+
+    private static String formatAxis(float value) {
+        return String.format(Locale.US, "%.2f", value);
     }
 
     private static String statusText(long timestampMs, long nowMs) {

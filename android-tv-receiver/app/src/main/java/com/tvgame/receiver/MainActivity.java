@@ -61,6 +61,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private InputClient inputClient;
     private Thread videoThread;
     private Thread audioThread;
+    private FrameLayout rootView;
     private float gamepadLx;
     private float gamepadLy;
     private float gamepadRx;
@@ -69,14 +70,32 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private float gamepadRt;
     private int gamepadButtons;
     private boolean overlayVisible = true;
+    private final View.OnKeyListener gamepadKeyListener = new View.OnKeyListener() {
+        @Override
+        public boolean onKey(View view, int keyCode, KeyEvent event) {
+            return handleGamepadKeyEvent(event);
+        }
+    };
+    private final View.OnGenericMotionListener gamepadMotionListener = new View.OnGenericMotionListener() {
+        @Override
+        public boolean onGenericMotion(View view, MotionEvent event) {
+            return handleGamepadMotionEvent(event);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        inputClient = new InputClient(resolveInputRelayHost(), INPUT_RELAY_PORT);
+        String inputRelayHost = resolveInputRelayHost();
+        stats.inputRelayHost = inputRelayHost;
+        inputClient = new InputClient(inputRelayHost, INPUT_RELAY_PORT, stats);
 
         surfaceView = new SurfaceView(this);
+        surfaceView.setFocusable(true);
+        surfaceView.setFocusableInTouchMode(true);
+        surfaceView.setOnKeyListener(gamepadKeyListener);
+        surfaceView.setOnGenericMotionListener(gamepadMotionListener);
         surfaceView.getHolder().addCallback(this);
 
         overlay = new TextView(this);
@@ -87,8 +106,11 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
 
         FrameLayout root = new FrameLayout(this);
+        rootView = root;
         root.setFocusable(true);
         root.setFocusableInTouchMode(true);
+        root.setOnKeyListener(gamepadKeyListener);
+        root.setOnGenericMotionListener(gamepadMotionListener);
         root.addView(surfaceView, new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -102,7 +124,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(overlay, overlayParams);
 
         setContentView(root);
-        root.requestFocus();
+        applyImmersiveFlags();
+        requestInputFocus();
         handler.postDelayed(updateOverlay, 500);
     }
 
@@ -153,6 +176,23 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent event) {
+        if (handleGamepadMotionEvent(event)) {
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(event);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyImmersiveFlags();
+            requestInputFocus();
+        }
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (inputClient != null && event.getRepeatCount() == 0) {
             inputClient.sendKey("down", keyCode);
@@ -199,11 +239,18 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
+        if (handleGamepadMotionEvent(event)) {
+            return true;
+        }
+        return super.onGenericMotionEvent(event);
+    }
+
+    private boolean handleGamepadMotionEvent(MotionEvent event) {
         int source = event.getSource();
         boolean isGamepad = (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
             || (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD;
         if (!isGamepad || event.getAction() != MotionEvent.ACTION_MOVE || inputClient == null) {
-            return super.onGenericMotionEvent(event);
+            return false;
         }
 
         gamepadLx = normalizeAxis(event.getAxisValue(MotionEvent.AXIS_X));
@@ -314,8 +361,29 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     private void sendGamepadState() {
         if (inputClient != null) {
+            stats.recordGamepadState(gamepadLx, gamepadLy, gamepadRx, gamepadRy, gamepadLt, gamepadRt, gamepadButtons, System.currentTimeMillis());
             inputClient.sendGamepadState(gamepadLx, gamepadLy, gamepadRx, gamepadRy, gamepadLt, gamepadRt, gamepadButtons);
         }
+    }
+
+    private void requestInputFocus() {
+        if (rootView != null) {
+            rootView.requestFocus();
+        }
+        if (surfaceView != null) {
+            surfaceView.requestFocus();
+        }
+    }
+
+    private void applyImmersiveFlags() {
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        );
     }
 
     private void releaseMappedKeys() {

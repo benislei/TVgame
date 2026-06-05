@@ -181,6 +181,7 @@ test('InputClient.buildKeyJsonLine returns exact JSON lines and rejects invalid 
   fs.mkdirSync(classDir, { recursive: true });
 
   const inputClientSource = path.join(root, `${javaRoot}/InputClient.java`);
+  const statsSource = path.join(root, `${javaRoot}/StatsModel.java`);
   const harnessSource = path.join(packageDir, 'InputClientHarness.java');
   fs.writeFileSync(harnessSource, `
 package com.tvgame.receiver;
@@ -237,7 +238,7 @@ public final class InputClientHarness {
 }
 `, 'utf8');
 
-  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, inputClientSource, harnessSource], { stdio: 'pipe' });
+  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, statsSource, inputClientSource, harnessSource], { stdio: 'pipe' });
   execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.InputClientHarness'], { stdio: 'pipe' });
 });
 
@@ -360,6 +361,55 @@ public final class StatsModelCompactHarness {
 
   execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, statsSource, harnessSource], { stdio: 'pipe' });
   execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.StatsModelCompactHarness'], { stdio: 'pipe' });
+});
+
+test('StatsModel renders input relay and gamepad diagnostics', (t) => {
+  if (!commandExists('javac') || !commandExists('java')) {
+    t.skip('javac/java not available; keeping StatsModel behavior covered by static checks in this environment');
+    return;
+  }
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'tvgame-stats-input-'));
+  const packageDir = path.join(tempRoot, 'com', 'tvgame', 'receiver');
+  const classDir = path.join(tempRoot, 'classes');
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.mkdirSync(classDir, { recursive: true });
+
+  const statsSource = path.join(root, `${javaRoot}/StatsModel.java`);
+  const harnessSource = path.join(packageDir, 'StatsModelInputHarness.java');
+  fs.writeFileSync(harnessSource, `
+package com.tvgame.receiver;
+
+public final class StatsModelInputHarness {
+    public static void main(String[] args) {
+        StatsModel stats = new StatsModel();
+        stats.inputRelayHost = "192.168.50.148";
+        stats.inputPackets = 7;
+        stats.inputFailures = 2;
+        stats.lastInputAtMs = 1000;
+        stats.recordGamepadState(0.5f, -0.25f, 0.0f, 0.0f, 1.0f, 0.0f, 33, 1000);
+
+        String text = stats.renderCompact(1200);
+        assertContains(text, "输入 192.168.50.148 正常");
+        assertContains(text, "发7");
+        assertContains(text, "失败2");
+        assertContains(text, "手柄 正常");
+        assertContains(text, "包1");
+        assertContains(text, "B33");
+        assertContains(text, "L0.50,-0.25");
+        assertContains(text, "T1.00,0.00");
+    }
+
+    private static void assertContains(String text, String expected) {
+        if (!text.contains(expected)) {
+            throw new AssertionError("Expected text to contain [" + expected + "] but got [" + text + "]");
+        }
+    }
+}
+`, 'utf8');
+
+  execFileSync('javac', ['-encoding', 'UTF-8', '-d', classDir, statsSource, harnessSource], { stdio: 'pipe' });
+  execFileSync('java', ['-cp', classDir, 'com.tvgame.receiver.StatsModelInputHarness'], { stdio: 'pipe' });
 });
 
 test('MainActivity uses a compact smaller overlay by default', () => {
@@ -522,7 +572,9 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
   assert.match(source, /INPUT_RELAY_PORT\s*=\s*8789/);
   assert.match(source, /INPUT_RELAY_HOST_METADATA\s*=\s*"com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
   assert.match(source, /InputClient\s+inputClient/);
-  assert.match(source, /new\s+InputClient\(resolveInputRelayHost\(\),\s*INPUT_RELAY_PORT\)/);
+  assert.match(source, /String\s+inputRelayHost\s*=\s*resolveInputRelayHost\(\)/);
+  assert.match(source, /stats\.inputRelayHost\s*=\s*inputRelayHost/);
+  assert.match(source, /new\s+InputClient\(inputRelayHost,\s*INPUT_RELAY_PORT,\s*stats\)/);
   assert.match(source, /return\s+DEFAULT_INPUT_RELAY_HOST/);
   assert.match(source, /boolean\s+onKeyDown\(int\s+keyCode,\s*KeyEvent\s+event\)/);
   assert.match(source, /inputClient\.sendKey\("down",\s*keyCode\)/);
@@ -537,6 +589,13 @@ test('MainActivity wires key events to InputClient without disrupting receiver l
 test('MainActivity consumes USB gamepad key events so the TV UI does not handle them', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
+  assert.match(source, /FrameLayout\s+rootView/);
+  assert.match(source, /surfaceView\.setFocusable\(true\)/);
+  assert.match(source, /setOnKeyListener/);
+  assert.match(source, /setOnGenericMotionListener/);
+  assert.match(source, /requestInputFocus\(\)/);
+  assert.match(source, /onWindowFocusChanged\(boolean\s+hasFocus\)/);
+  assert.match(source, /SYSTEM_UI_FLAG_IMMERSIVE_STICKY/);
   assert.match(source, /boolean\s+dispatchKeyEvent\(KeyEvent\s+event\)/);
   assert.match(source, /handleGamepadKeyEvent\(event\)/);
   assert.match(source, /isGamepadKeyEvent\(event\)/);
@@ -594,7 +653,9 @@ test('MainActivity maps USB gamepad joystick axes to raw gamepad state', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
   assert.match(source, /import\s+android\.view\.MotionEvent/);
+  assert.match(source, /boolean\s+dispatchGenericMotionEvent\(MotionEvent\s+event\)/);
   assert.match(source, /boolean\s+onGenericMotionEvent\(MotionEvent\s+event\)/);
+  assert.match(source, /handleGamepadMotionEvent\(event\)/);
   assert.match(source, /SOURCE_JOYSTICK/);
   assert.match(source, /SOURCE_GAMEPAD/);
   assert.match(source, /AXIS_X/);
@@ -613,6 +674,7 @@ test('MainActivity maps USB gamepad joystick axes to raw gamepad state', () => {
   assert.match(source, /gamepadLt\s*=/);
   assert.match(source, /gamepadRt\s*=/);
   assert.match(source, /updateHatButton/);
+  assert.match(source, /stats\.recordGamepadState\(gamepadLx,\s*gamepadLy,\s*gamepadRx,\s*gamepadRy,\s*gamepadLt,\s*gamepadRt,\s*gamepadButtons/);
   assert.match(source, /inputClient\.sendGamepadState\(gamepadLx,\s*gamepadLy,\s*gamepadRx,\s*gamepadRy,\s*gamepadLt,\s*gamepadRt,\s*gamepadButtons\)/);
   assert.doesNotMatch(source, /updateMappedKey\("KeyA"/);
   assert.doesNotMatch(source, /inputClient\.sendMouseMove/);
@@ -636,6 +698,10 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.doesNotMatch(doc, /右摇杆映射鼠标移动/);
   assert.match(doc, /BACK 也可能被发给 PC relay/);
   assert.match(doc, /菜单键或 F1 可以隐藏或显示状态面板/);
+  assert.match(doc, /Steam 提示连接 Xbox 控制器/);
+  assert.match(doc, /手柄 包/);
+  assert.match(doc, /输入 发/);
+  assert.match(doc, /收到手柄状态/);
   assert.match(doc, /## 验收记录/);
   for (const item of [
     'App 启动中文状态面板',
@@ -644,7 +710,7 @@ test('stage 2 verification guide documents input return and acceptance checklist
     '电视视频包计数增长',
     '音频包计数增长',
     '播放 PC 系统声音',
-    '输入回传到达 PC relay'
+    '输入回传到达 PC relay，面板“手柄 包”和“输入 发”会增长'
   ]) {
     assert.match(doc, new RegExp(item));
   }

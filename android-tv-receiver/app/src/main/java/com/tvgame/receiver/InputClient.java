@@ -21,14 +21,20 @@ public final class InputClient {
 
     private final String host;
     private final int port;
+    private final StatsModel stats;
     private final ExecutorService executor;
     private volatile boolean closed;
     private Socket socket;
     private OutputStream output;
 
     public InputClient(String host, int port) {
+        this(host, port, null);
+    }
+
+    public InputClient(String host, int port, StatsModel stats) {
         this.host = host;
         this.port = port;
+        this.stats = stats;
         this.executor = new ThreadPoolExecutor(
             1,
             1,
@@ -213,7 +219,14 @@ public final class InputClient {
             OutputStream currentOutput = getOrCreateSocket();
             currentOutput.write(line.getBytes(StandardCharsets.UTF_8));
             currentOutput.flush();
+            if (stats != null) {
+                stats.inputPackets++;
+                stats.lastInputAtMs = System.currentTimeMillis();
+            }
         } catch (IOException ex) {
+            if (stats != null) {
+                stats.inputFailures++;
+            }
             closeSocket();
             // The PC relay is optional in this stage; input failures must not crash playback.
         }

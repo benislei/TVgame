@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -315,6 +316,9 @@ static class InputInjector
 
         private readonly ViGEmClient client;
         private readonly IXbox360Controller controller;
+        private int gamepadPacketCount;
+        private int lastLoggedButtons = -1;
+        private DateTime lastGamepadLogAt = DateTime.MinValue;
 
         public VirtualGamepadInjector()
         {
@@ -328,12 +332,19 @@ static class InputInjector
         public void HandleGamepad(JsonElement input)
         {
             var buttons = GetInt(input, "buttons");
-            controller.SetAxisValue(Xbox360Axis.LeftThumbX, StickToShort(GetDouble(input, "lx"), false));
-            controller.SetAxisValue(Xbox360Axis.LeftThumbY, StickToShort(GetDouble(input, "ly"), true));
-            controller.SetAxisValue(Xbox360Axis.RightThumbX, StickToShort(GetDouble(input, "rx"), false));
-            controller.SetAxisValue(Xbox360Axis.RightThumbY, StickToShort(GetDouble(input, "ry"), true));
-            controller.SetSliderValue(Xbox360Slider.LeftTrigger, TriggerToByte(GetDouble(input, "lt")));
-            controller.SetSliderValue(Xbox360Slider.RightTrigger, TriggerToByte(GetDouble(input, "rt")));
+            var lx = GetDouble(input, "lx");
+            var ly = GetDouble(input, "ly");
+            var rx = GetDouble(input, "rx");
+            var ry = GetDouble(input, "ry");
+            var lt = GetDouble(input, "lt");
+            var rt = GetDouble(input, "rt");
+
+            controller.SetAxisValue(Xbox360Axis.LeftThumbX, StickToShort(lx, false));
+            controller.SetAxisValue(Xbox360Axis.LeftThumbY, StickToShort(ly, true));
+            controller.SetAxisValue(Xbox360Axis.RightThumbX, StickToShort(rx, false));
+            controller.SetAxisValue(Xbox360Axis.RightThumbY, StickToShort(ry, true));
+            controller.SetSliderValue(Xbox360Slider.LeftTrigger, TriggerToByte(lt));
+            controller.SetSliderValue(Xbox360Slider.RightTrigger, TriggerToByte(rt));
 
             SetButton(Xbox360Button.A, buttons, BUTTON_A);
             SetButton(Xbox360Button.B, buttons, BUTTON_B);
@@ -351,6 +362,40 @@ static class InputInjector
             SetButton(Xbox360Button.Right, buttons, BUTTON_DPAD_RIGHT);
             SetButton(Xbox360Button.Guide, buttons, BUTTON_GUIDE);
             controller.SubmitReport();
+            LogGamepadState(input, buttons);
+        }
+
+        private void LogGamepadState(JsonElement input, int buttons)
+        {
+            gamepadPacketCount++;
+            var now = DateTime.UtcNow;
+            if (gamepadPacketCount != 1
+                && buttons == lastLoggedButtons
+                && (now - lastGamepadLogAt).TotalMilliseconds < 1000)
+            {
+                return;
+            }
+
+            lastLoggedButtons = buttons;
+            lastGamepadLogAt = now;
+            Console.WriteLine(
+                "收到手柄状态 #"
+                    + gamepadPacketCount
+                    + ": buttons="
+                    + buttons
+                    + " lx="
+                    + FormatDouble(GetDouble(input, "lx"))
+                    + " ly="
+                    + FormatDouble(GetDouble(input, "ly"))
+                    + " rx="
+                    + FormatDouble(GetDouble(input, "rx"))
+                    + " ry="
+                    + FormatDouble(GetDouble(input, "ry"))
+                    + " lt="
+                    + FormatDouble(GetDouble(input, "lt"))
+                    + " rt="
+                    + FormatDouble(GetDouble(input, "rt"))
+            );
         }
 
         private void SetButton(Xbox360Button button, int buttons, int bit)
@@ -374,6 +419,11 @@ static class InputInjector
         {
             if (double.IsNaN(value) || double.IsInfinity(value)) return 0;
             return Math.Min(max, Math.Max(min, value));
+        }
+
+        private static string FormatDouble(double value)
+        {
+            return value.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
         public void Dispose()
