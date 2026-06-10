@@ -37,6 +37,16 @@ const RTP_PROFILES = {
     udpBufferSize: 4194304,
     strictGop: true
   },
+  tvbox1080: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    bitrateKbps: 12000,
+    keyframeInterval: 30,
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304
+  },
   game4k: {
     codec: 'h265',
     width: 3840,

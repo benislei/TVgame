@@ -341,6 +341,29 @@ test('runRtpSender can select 720p fallback profile explicitly', () => {
   assert.match(videoArgs, /gop-size=15/);
 });
 
+test('runRtpSender can select TV box stable 1080p30 profile explicitly', () => {
+  const spawnedCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'tvbox1080']),
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync: createSuccessfulPresetProbe()
+      }
+    );
+  });
+
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /width=1920,height=1080,framerate=30\/1/);
+  assert.match(videoArgs, /bitrate=12000/);
+  assert.match(videoArgs, /gop-size=30/);
+  assert.match(videoArgs, /h264parse config-interval=-1/);
+});
+
 test('runRtpSender rejects unknown RTP profiles before spawning', () => {
   let spawnCount = 0;
 

@@ -12,8 +12,8 @@ const {
   buildRtpLaunchCommands
 } = require('../src/native-streamer/rtp-pipeline');
 
-test('RTP profiles include 720p fallback, 1080p game baseline, quality 1080p and 4K roadmap', () => {
-  assert.deepEqual(Object.keys(RTP_PROFILES), ['game720', 'game1080', 'quality1080', 'resilient1080', 'game4k']);
+test('RTP profiles include 720p fallback, 1080p game baseline, TV box stable mode and 4K roadmap', () => {
+  assert.deepEqual(Object.keys(RTP_PROFILES), ['game720', 'game1080', 'quality1080', 'resilient1080', 'tvbox1080', 'game4k']);
   assert.equal(RTP_PROFILES.game720.width, 1280);
   assert.equal(RTP_PROFILES.game720.height, 720);
   assert.equal(RTP_PROFILES.game1080.width, 1920);
@@ -27,6 +27,13 @@ test('RTP profiles include 720p fallback, 1080p game baseline, quality 1080p and
   assert.equal(RTP_PROFILES.resilient1080.h264ConfigInterval, -1);
   assert.equal(RTP_PROFILES.resilient1080.udpBufferSize, 4194304);
   assert.equal(RTP_PROFILES.resilient1080.encoderRcMode, 'cbr-ld-hq');
+  assert.equal(RTP_PROFILES.tvbox1080.width, 1920);
+  assert.equal(RTP_PROFILES.tvbox1080.height, 1080);
+  assert.equal(RTP_PROFILES.tvbox1080.fps, 30);
+  assert.equal(RTP_PROFILES.tvbox1080.bitrateKbps, 12000);
+  assert.equal(RTP_PROFILES.tvbox1080.keyframeInterval, 30);
+  assert.equal(RTP_PROFILES.tvbox1080.h264ConfigInterval, -1);
+  assert.equal(RTP_PROFILES.tvbox1080.udpBufferSize, 4194304);
   assert.equal(RTP_PROFILES.game4k.width, 3840);
   assert.equal(RTP_PROFILES.game4k.height, 2160);
   assert.equal(RTP_PROFILES.game4k.codec, 'h265');
@@ -196,6 +203,27 @@ test('builds resilient 1080p profile to reduce visible artifact recovery time', 
   assert.match(pipeline, /strict-gop=true/);
   assert.match(pipeline, /h264parse config-interval=-1/);
   assert.match(pipeline, /rtph264pay pt=96 config-interval=-1 aggregate-mode=zero-latency/);
+  assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
+});
+
+test('builds TV box stable 1080p30 profile for weaker Android TV decoders', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    profile: 'tvbox1080'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.width, 1920);
+  assert.equal(config.height, 1080);
+  assert.equal(config.fps, 30);
+  assert.equal(config.bitrateKbps, 12000);
+  assert.equal(config.keyframeInterval, 30);
+  assert.equal(config.h264ConfigInterval, -1);
+  assert.equal(config.udpBufferSize, 4194304);
+  assert.match(pipeline, /framerate=30\/1/);
+  assert.match(pipeline, /bitrate=12000/);
+  assert.match(pipeline, /gop-size=30/);
+  assert.match(pipeline, /h264parse config-interval=-1/);
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
 });
 

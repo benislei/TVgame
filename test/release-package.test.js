@@ -64,6 +64,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     '检查环境.bat',
     '启动输入桥.bat',
     '启动默认发送.bat',
+    '启动电视盒子稳定发送.bat',
     '启动高画质发送.bat',
     '启动抗花屏发送.bat',
     '启动低延迟实验发送.bat',
@@ -104,12 +105,13 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const check = read('检查环境.bat');
   const bridge = read('启动输入桥.bat');
   const defaultSender = read('启动默认发送.bat');
+  const tvBoxSender = read('启动电视盒子稳定发送.bat');
   const qualitySender = read('启动高画质发送.bat');
   const resilientSender = read('启动抗花屏发送.bat');
   const experimentalSender = read('启动低延迟实验发送.bat');
   const fallbackSender = read('启动720回退发送.bat');
 
-  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, defaultSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
+  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, defaultSender, tvBoxSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -131,6 +133,7 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
   assert.match(defaultSender, /不要填接收端左上角的“输入目标”/);
+  assert.match(tvBoxSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile tvbox1080/);
   assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile quality1080/);
   assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
   assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game1080/);
@@ -207,11 +210,16 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(readme, /启动输入桥\.bat/);
   assert.match(readme, /启动默认发送\.bat/);
+  assert.match(readme, /启动电视盒子稳定发送\.bat/);
   assert.match(readme, /启动高画质发送\.bat/);
   assert.match(readme, /启动抗花屏发送\.bat/);
   assert.match(readme, /启动低延迟实验发送\.bat/);
   assert.match(readme, /短 GOP/);
   assert.match(readme, /紧凑状态面板/);
+  assert.match(readme, /设备/);
+  assert.match(readme, /解码器/);
+  assert.match(readme, /建议档/);
+  assert.match(readme, /视频重启/);
   assert.match(readme, /菜单键或 F1/);
   assert.match(readme, /USB 手柄会被接收端 App 消费/);
   assert.match(readme, /回传原始手柄状态/);

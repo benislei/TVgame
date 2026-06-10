@@ -327,6 +327,10 @@ public final class StatsModelCompactHarness {
         stats.videoRecoveryDrops = 4;
         stats.videoQueueDrops = 5;
         stats.videoDecoderDrops = 6;
+        stats.videoRestarts = 2;
+        stats.deviceLabel = "Xiaomi Box 5 Max";
+        stats.receiverAdvice = "电视盒子稳定档";
+        stats.videoDecoderName = "OMX.test.avc.decoder";
         stats.audioPackets = 700;
         stats.audioBytes = 1048576;
         stats.renderCompact(1000);
@@ -343,11 +347,15 @@ public final class StatsModelCompactHarness {
         assertContains(text, "恢复 4");
         assertContains(text, "队列 8");
         assertContains(text, "解码 7");
+        assertContains(text, "重启 2");
         assertContains(text, "音频 正常");
+        assertContains(text, "设备 Xiaomi Box 5 Max");
+        assertContains(text, "解码器 OMX.test.avc.decoder");
+        assertContains(text, "建议 电视盒子稳定档");
 
         int lines = text.split("\\\\n", -1).length;
-        if (lines > 5) {
-            throw new AssertionError("Compact stats should use at most 5 lines, got " + lines + ": " + text);
+        if (lines > 6) {
+            throw new AssertionError("Compact stats should use at most 6 lines, got " + lines + ": " + text);
         }
     }
 
@@ -428,6 +436,23 @@ test('MainActivity keeps the TV screen awake while the receiver is open', () => 
   assert.match(source, /getWindow\(\)\.addFlags\(WindowManager\.LayoutParams\.FLAG_KEEP_SCREEN_ON\)/);
 });
 
+test('MainActivity shows device diagnostics and restarts stalled video receiver', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /stats\.deviceLabel\s*=\s*buildDeviceLabel\(\)/);
+  assert.match(source, /stats\.receiverAdvice\s*=\s*buildReceiverAdvice\(\)/);
+  assert.match(source, /PackageManager\.FEATURE_LEANBACK/);
+  assert.match(source, /PackageManager\.FEATURE_TELEVISION/);
+  assert.match(source, /activeSurface/);
+  assert.match(source, /monitorVideoHealth\(\)/);
+  assert.match(source, /VIDEO_STALL_RESTART_MS\s*=\s*2500/);
+  assert.match(source, /VIDEO_STALL_MIN_PACKETS\s*=\s*120/);
+  assert.match(source, /restartVideoReceiverFromWatchdog/);
+  assert.match(source, /stats\.videoRestarts\+\+/);
+  assert.match(source, /startVideoReceiverLocked\(activeSurface\)/);
+  assert.match(source, /stopVideoReceiverLocked\(\)/);
+});
+
 test('RtpPacket parser handles RTP v2 headers, CSRC and copied payload', () => {
   const source = readProjectFile(`${javaRoot}/RtpPacket.java`);
 
@@ -478,6 +503,7 @@ test('video and audio receivers use required ports, codecs and stats', () => {
 
   assert.match(video, /VIDEO_PORT\s*=\s*5004/);
   assert.match(video, /MediaCodec\.createDecoderByType\("video\/avc"\)/);
+  assert.match(video, /stats\.videoDecoderName\s*=\s*decoder\.getName\(\)/);
   assert.match(video, /MediaFormat\.createVideoFormat\("video\/avc",\s*1920,\s*1080\)/);
   assert.match(video, /MediaFormat\.KEY_LOW_LATENCY/);
   assert.match(video, /MediaCodec\.PARAMETER_KEY_LOW_LATENCY/);
@@ -555,7 +581,8 @@ test('MainActivity starts receivers once and stops them on surface or activity t
   assert.match(source, /surfaceView\.getHolder\(\)\.removeCallback\(this\)/);
   assert.match(source, /void\s+surfaceCreated\(SurfaceHolder\s+holder\)/);
   assert.match(source, /void\s+surfaceDestroyed\(SurfaceHolder\s+holder\)/);
-  assert.match(source, /startReceivers\(holder\.getSurface\(\)\)/);
+  assert.match(source, /activeSurface\s*=\s*holder\.getSurface\(\)/);
+  assert.match(source, /startReceivers\(activeSurface\)/);
   assert.match(source, /lifecycleLock/);
   assert.match(source, /synchronized\s*\(\s*lifecycleLock\s*\)/);
   assert.match(source, /STOP_JOIN_MS/);

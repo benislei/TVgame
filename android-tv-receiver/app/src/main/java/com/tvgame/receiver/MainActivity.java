@@ -26,6 +26,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final String INPUT_RELAY_AUTO_TEXT = "自动识别中";
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
+    private static final long VIDEO_HEALTH_SAMPLE_MS = 500;
+    private static final long VIDEO_STALL_RESTART_MS = 2500;
+    private static final long VIDEO_FRESH_MS = 1500;
+    private static final long VIDEO_STALL_MIN_PACKETS = 120;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
     private static final int BUTTON_A = 1 << 0;
     private static final int BUTTON_B = 1 << 1;
@@ -49,8 +53,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private final Runnable updateOverlay = new Runnable() {
         @Override
         public void run() {
+            monitorVideoHealth();
             overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n" + stats.renderCompact());
-            handler.postDelayed(this, 500);
+            handler.postDelayed(this, VIDEO_HEALTH_SAMPLE_MS);
         }
     };
 
@@ -61,6 +66,11 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private InputClient inputClient;
     private Thread videoThread;
     private Thread audioThread;
+    private Surface activeSurface;
+    private long lastVideoHealthPackets = -1;
+    private long lastVideoHealthFrames = -1;
+    private long videoStallStartedAtMs = -1;
+    private boolean videoRestartInProgress;
     private FrameLayout rootView;
     private float gamepadLx;
     private float gamepadLy;
@@ -87,6 +97,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        stats.deviceLabel = buildDeviceLabel();
+        stats.receiverAdvice = buildReceiverAdvice();
         String configuredInputRelayHost = resolveInputRelayHost();
         if (configuredInputRelayHost.length() > 0) {
             setInputRelayHost(configuredInputRelayHost);
@@ -134,7 +146,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        startReceivers(holder.getSurface());
+        activeSurface = holder.getSurface();
+        startReceivers(activeSurface);
     }
 
     @Override
@@ -143,6 +156,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        activeSurface = null;
         stopReceivers();
     }
 
@@ -157,6 +171,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             inputClient.close();
             inputClient = null;
         }
+        activeSurface = null;
         stopReceivers();
         super.onDestroy();
     }
@@ -434,47 +449,167 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         inputClient = new InputClient(host, INPUT_RELAY_PORT, stats);
     }
 
+    private static String buildDeviceLabel() {
+        String manufacturer = cleanBuildText(Build.MANUFACTURER);
+        String model = cleanBuildText(Build.MODEL);
+        String hardware = cleanBuildText(Build.HARDWARE);
+        String label = (manufacturer + " " + model).trim();
+        if (label.length() == 0) {
+            label = "未知设备";
+        }
+        if (hardware.length() > 0) {
+            label += " / " + hardware;
+        }
+        return label;
+    }
+
+    private String buildReceiverAdvice() {
+        PackageManager packageManager = getPackageManager();
+        boolean tvDevice = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            || packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION);
+        if (tvDevice) {
+            return "电视盒子稳定档";
+        }
+        return "默认1080p60";
+    }
+
+    private static String cleanBuildText(String text) {
+        if (text == null) {
+            return "";
+        }
+        text = text.trim();
+        if (text.length() == 0 || "unknown".equalsIgnoreCase(text)) {
+            return "";
+        }
+        return text;
+    }
+
     private void startReceivers(Surface surface) {
         synchronized (lifecycleLock) {
             if (hasRunningReceiverThreads()) {
                 return;
             }
 
-            videoReceiver = new H264VideoReceiver(surface, stats, new H264VideoReceiver.SenderAddressListener() {
-                @Override
-                public void onSenderAddress(String host) {
-                    updateInputRelayHost(host);
-                }
-            });
-            audioReceiver = new L16AudioReceiver(stats);
-            videoThread = new Thread(videoReceiver, "RTP 视频接收");
-            audioThread = new Thread(audioReceiver, "RTP 音频接收");
-            videoThread.start();
-            audioThread.start();
+            activeSurface = surface;
+            resetVideoHealthWatch();
+            startVideoReceiverLocked(surface);
+            startAudioReceiverLocked();
         }
     }
 
     private void stopReceivers() {
         synchronized (lifecycleLock) {
-            if (videoReceiver != null) {
-                videoReceiver.stop();
-            }
-            if (audioReceiver != null) {
-                audioReceiver.stop();
-            }
-
-            boolean videoStopped = waitForReceiverThread(videoThread);
-            boolean audioStopped = waitForReceiverThread(audioThread);
-
-            videoReceiver = null;
-            audioReceiver = null;
-            if (videoStopped) {
-                videoThread = null;
-            }
-            if (audioStopped) {
-                audioThread = null;
-            }
+            stopVideoReceiverLocked();
+            stopAudioReceiverLocked();
+            resetVideoHealthWatch();
         }
+    }
+
+    private void startVideoReceiverLocked(Surface surface) {
+        if (surface == null || !surface.isValid()) {
+            return;
+        }
+        videoReceiver = new H264VideoReceiver(surface, stats, new H264VideoReceiver.SenderAddressListener() {
+            @Override
+            public void onSenderAddress(String host) {
+                updateInputRelayHost(host);
+            }
+        });
+        videoThread = new Thread(videoReceiver, "RTP 视频接收");
+        videoThread.start();
+    }
+
+    private void startAudioReceiverLocked() {
+        audioReceiver = new L16AudioReceiver(stats);
+        audioThread = new Thread(audioReceiver, "RTP 音频接收");
+        audioThread.start();
+    }
+
+    private boolean stopVideoReceiverLocked() {
+        if (videoReceiver != null) {
+            videoReceiver.stop();
+        }
+        boolean videoStopped = waitForReceiverThread(videoThread);
+        videoReceiver = null;
+        if (videoStopped) {
+            videoThread = null;
+        }
+        return videoStopped;
+    }
+
+    private boolean stopAudioReceiverLocked() {
+        if (audioReceiver != null) {
+            audioReceiver.stop();
+        }
+        boolean audioStopped = waitForReceiverThread(audioThread);
+        audioReceiver = null;
+        if (audioStopped) {
+            audioThread = null;
+        }
+        return audioStopped;
+    }
+
+    private void monitorVideoHealth() {
+        long nowMs = System.currentTimeMillis();
+        long packets = stats.videoPackets;
+        long frames = stats.videoFrames;
+
+        if (lastVideoHealthPackets < 0 || lastVideoHealthFrames < 0) {
+            rememberVideoHealth(packets, frames);
+            return;
+        }
+
+        boolean packetsMoving = packets > lastVideoHealthPackets;
+        boolean framesMoving = frames > lastVideoHealthFrames;
+        boolean videoFresh = stats.lastVideoAtMs > 0 && nowMs - stats.lastVideoAtMs <= VIDEO_FRESH_MS;
+        boolean enoughPackets = packets >= VIDEO_STALL_MIN_PACKETS;
+
+        if (!packetsMoving || framesMoving || !videoFresh || !enoughPackets) {
+            videoStallStartedAtMs = -1;
+        } else if (videoStallStartedAtMs < 0) {
+            videoStallStartedAtMs = nowMs;
+        } else if (nowMs - videoStallStartedAtMs >= VIDEO_STALL_RESTART_MS) {
+            restartVideoReceiverFromWatchdog();
+            videoStallStartedAtMs = -1;
+        }
+
+        rememberVideoHealth(packets, frames);
+    }
+
+    private void restartVideoReceiverFromWatchdog() {
+        if (videoRestartInProgress) {
+            return;
+        }
+        if (activeSurface == null || !activeSurface.isValid()) {
+            return;
+        }
+
+        videoRestartInProgress = true;
+        try {
+            synchronized (lifecycleLock) {
+                if (activeSurface == null || !activeSurface.isValid()) {
+                    return;
+                }
+                if (stopVideoReceiverLocked()) {
+                    stats.videoRestarts++;
+                    startVideoReceiverLocked(activeSurface);
+                }
+                resetVideoHealthWatch();
+            }
+        } finally {
+            videoRestartInProgress = false;
+        }
+    }
+
+    private void rememberVideoHealth(long packets, long frames) {
+        lastVideoHealthPackets = packets;
+        lastVideoHealthFrames = frames;
+    }
+
+    private void resetVideoHealthWatch() {
+        lastVideoHealthPackets = -1;
+        lastVideoHealthFrames = -1;
+        videoStallStartedAtMs = -1;
     }
 
     private boolean hasRunningReceiverThreads() {

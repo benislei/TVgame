@@ -11,6 +11,10 @@ public final class StatsModel {
     public volatile long videoReceiveBufferBytes;
     public volatile long videoQueueDrops;
     public volatile long videoDecoderDrops;
+    public volatile long videoRestarts;
+    public volatile String deviceLabel = "";
+    public volatile String receiverAdvice = "";
+    public volatile String videoDecoderName = "";
     public volatile long audioPackets;
     public volatile long audioBytes;
     public volatile long droppedFrames;
@@ -59,6 +63,10 @@ public final class StatsModel {
             + "\n接收缓冲: " + videoReceiveBufferBytes
             + "\n队列丢帧: " + videoQueueDrops
             + "\n解码丢帧: " + videoDecoderDrops
+            + "\n视频重启: " + videoRestarts
+            + "\n设备: " + safeText(deviceLabel)
+            + "\n解码器: " + safeText(videoDecoderName)
+            + "\n建议档: " + safeText(receiverAdvice)
             + "\n音频包: " + audioPackets
             + "\n音频字节: " + audioBytes
             + "\n输入目标: " + inputRelayHost
@@ -83,6 +91,7 @@ public final class StatsModel {
             + " | 恢复 " + videoRecoveryDrops
             + " | 队列 " + videoQueueDrops
             + " | 解码 " + videoDecoderDrops
+            + " | 重启 " + videoRestarts
             + "\n视频 " + statusText(lastVideoAtMs, nowMs)
             + " | 包" + videoPackets
             + " / 帧 " + videoFrames
@@ -90,6 +99,9 @@ public final class StatsModel {
             + "\n音频 " + statusText(lastAudioAtMs, nowMs)
             + " | 包 " + audioPackets
             + " | " + formatBytes(audioBytes)
+            + "\n设备 " + safeText(deviceLabel)
+            + " | 解码器 " + safeText(videoDecoderName)
+            + " | 建议 " + safeText(receiverAdvice)
             + "\n输入 " + inputRelayHost + " " + statusText(lastInputAtMs, nowMs)
             + " | 发" + inputPackets
             + " | 失败" + inputFailures
@@ -156,6 +168,13 @@ public final class StatsModel {
 
     private static String formatAxis(float value) {
         return String.format(Locale.US, "%.2f", value);
+    }
+
+    private static String safeText(String text) {
+        if (text == null || text.trim().length() == 0) {
+            return "未知";
+        }
+        return text.trim();
     }
 
     private static String statusText(long timestampMs, long nowMs) {

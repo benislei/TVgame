@@ -141,6 +141,7 @@ public final class H264VideoReceiver implements Runnable {
     private void runDecoderLoop() {
         try {
             decoder = MediaCodec.createDecoderByType("video/avc");
+            stats.videoDecoderName = decoder.getName();
             MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
             format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
             format.setInteger(MediaFormat.KEY_PRIORITY, 0);
