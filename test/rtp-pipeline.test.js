@@ -29,8 +29,8 @@ test('RTP profiles include 720p fallback, 1080p game baseline, TV box stable mod
   assert.equal(RTP_PROFILES.resilient1080.encoderRcMode, 'cbr-ld-hq');
   assert.equal(RTP_PROFILES.tvbox1080.width, 1920);
   assert.equal(RTP_PROFILES.tvbox1080.height, 1080);
-  assert.equal(RTP_PROFILES.tvbox1080.fps, 60);
-  assert.equal(RTP_PROFILES.tvbox1080.bitrateKbps, 16000);
+  assert.equal(RTP_PROFILES.tvbox1080.fps, 30);
+  assert.equal(RTP_PROFILES.tvbox1080.bitrateKbps, 12000);
   assert.equal(RTP_PROFILES.tvbox1080.keyframeInterval, 5);
   assert.equal(RTP_PROFILES.tvbox1080.encoderRcMode, 'cbr-ld-hq');
   assert.equal(RTP_PROFILES.tvbox1080.h264ConfigInterval, -1);
@@ -208,7 +208,7 @@ test('builds resilient 1080p profile to reduce visible artifact recovery time', 
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
 });
 
-test('builds TV box compatible 1080p60 profile with default recovery structure', () => {
+test('builds TV box compatible 1080p30 profile with reduced decoder pressure', () => {
   const config = buildRtpConfig({
     host: '192.168.1.50',
     profile: 'tvbox1080'
@@ -217,15 +217,15 @@ test('builds TV box compatible 1080p60 profile with default recovery structure',
 
   assert.equal(config.width, 1920);
   assert.equal(config.height, 1080);
-  assert.equal(config.fps, 60);
-  assert.equal(config.bitrateKbps, 16000);
+  assert.equal(config.fps, 30);
+  assert.equal(config.bitrateKbps, 12000);
   assert.equal(config.keyframeInterval, 5);
   assert.equal(config.encoderRcMode, 'cbr-ld-hq');
   assert.equal(config.h264ConfigInterval, -1);
   assert.equal(config.udpBufferSize, 4194304);
   assert.equal(config.strictGop, true);
-  assert.match(pipeline, /framerate=60\/1/);
-  assert.match(pipeline, /bitrate=16000/);
+  assert.match(pipeline, /framerate=30\/1/);
+  assert.match(pipeline, /bitrate=12000/);
   assert.match(pipeline, /gop-size=5/);
   assert.match(pipeline, /rc-mode=cbr-ld-hq/);
   assert.match(pipeline, /strict-gop=true/);

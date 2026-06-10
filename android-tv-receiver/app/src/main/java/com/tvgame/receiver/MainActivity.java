@@ -27,9 +27,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final int INPUT_RELAY_PORT = 8789;
     private static final long STOP_JOIN_MS = 400;
     private static final long VIDEO_HEALTH_SAMPLE_MS = 500;
-    private static final long VIDEO_STALL_RESTART_MS = 2500;
+    private static final long VIDEO_STALL_RESTART_MS = 1200;
     private static final long VIDEO_FRESH_MS = 1500;
-    private static final long VIDEO_STALL_MIN_PACKETS = 120;
+    private static final long VIDEO_STALL_MIN_PACKETS = 60;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
     private static final int BUTTON_A = 1 << 0;
     private static final int BUTTON_B = 1 << 1;
@@ -467,10 +467,27 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         PackageManager packageManager = getPackageManager();
         boolean tvDevice = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION);
+        if (isAmlogicOrXiaomiBox()) {
+            return "小米盒子稳定档";
+        }
         if (tvDevice) {
             return "电视盒子稳定档";
         }
         return "默认1080p60";
+    }
+
+    private static boolean isAmlogicOrXiaomiBox() {
+        return containsIgnoreCase(Build.MANUFACTURER, "xiaomi")
+            || containsIgnoreCase(Build.MODEL, "mitv")
+            || containsIgnoreCase(Build.MODEL, "xiaomi")
+            || containsIgnoreCase(Build.HARDWARE, "amlogic");
+    }
+
+    private static boolean containsIgnoreCase(String text, String value) {
+        if (text == null || value == null) {
+            return false;
+        }
+        return text.toLowerCase().contains(value.toLowerCase());
     }
 
     private static String cleanBuildText(String text) {

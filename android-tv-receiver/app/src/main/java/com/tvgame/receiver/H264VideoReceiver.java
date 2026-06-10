@@ -26,9 +26,9 @@ public final class H264VideoReceiver implements Runnable {
     private static final int VIDEO_RECEIVE_BUFFER_BYTES = 4 * 1024 * 1024;
     private static final int MAX_RTP_PACKET_SIZE = 1500;
     private static final int MAX_ACCESS_UNIT_SIZE = 4 * 1024 * 1024;
-    private static final int MAX_PENDING_ACCESS_UNITS = 1;
-    private static final long DECODER_POLL_TIMEOUT_MS = 2;
-    private static final long DECODER_INPUT_TIMEOUT_US = 2000;
+    private static final int MAX_PENDING_ACCESS_UNITS = 2;
+    private static final long DECODER_POLL_TIMEOUT_MS = 4;
+    private static final long DECODER_INPUT_TIMEOUT_US = 8000;
     private static final long DECODER_JOIN_MS = 400;
 
     private final Surface surface;
@@ -153,6 +153,7 @@ public final class H264VideoReceiver implements Runnable {
             decoder.setParameters(decoderParameters);
 
             while (running || !pendingAccessUnits.isEmpty()) {
+                drainOutput();
                 EncodedFrame frame = pendingAccessUnits.poll(DECODER_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 if (frame != null) {
                     queueEncodedFrame(frame);
@@ -254,6 +255,10 @@ public final class H264VideoReceiver implements Runnable {
         }
 
         int inputIndex = decoder.dequeueInputBuffer(DECODER_INPUT_TIMEOUT_US);
+        if (inputIndex < 0) {
+            drainOutput();
+            inputIndex = decoder.dequeueInputBuffer(DECODER_INPUT_TIMEOUT_US);
+        }
         if (inputIndex < 0) {
             stats.videoDecoderDrops++;
             stats.droppedFrames++;
