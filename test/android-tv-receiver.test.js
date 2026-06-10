@@ -487,10 +487,8 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /recordVideoSequence\(packet\.sequenceNumber\)/);
   assert.match(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets/);
   assert.match(video, /accessUnitDamaged\s*=\s*true/);
-  assert.match(video, /waitingForKeyframe\s*=\s*true/);
-  assert.match(video, /accessUnitContainsIdr\(accessUnit\)/);
-  assert.match(video, /stats\.videoRecoveryWaits\+\+/);
-  assert.match(video, /stats\.videoRecoveryDrops\+\+/);
+  assert.doesNotMatch(video, /waitingForKeyframe/);
+  assert.doesNotMatch(video, /accessUnitContainsIdr/);
   assert.match(video, /VIDEO_RECEIVE_BUFFER_BYTES\s*=\s*4\s*\*\s*1024\s*\*\s*1024/);
   assert.match(video, /socket\.setReceiveBufferSize\(VIDEO_RECEIVE_BUFFER_BYTES\)/);
   assert.match(video, /stats\.videoReceiveBufferBytes\s*=\s*socket\.getReceiveBufferSize\(\)/);
@@ -538,13 +536,15 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(audio, /socket\.close\(\)/);
 });
 
-test('H264 receiver only waits for IDR after RTP loss, not after local stale queue drops', () => {
+test('H264 receiver drops only the damaged access unit after RTP loss for smooth playback', () => {
   const video = readProjectFile(`${javaRoot}/H264VideoReceiver.java`);
 
-  assert.match(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets;[\s\S]*?waitingForKeyframe\s*=\s*true/);
-  assert.match(video, /if\s*\(\s*waitingForKeyframe\s*\)[\s\S]*?!accessUnitContainsIdr\(accessUnit\)/);
+  assert.match(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets;[\s\S]*?accessUnitDamaged\s*=\s*true/);
+  assert.match(video, /if\s*\(\s*accessUnitDamaged\s*\)[\s\S]*?accessUnitDamaged\s*=\s*false/);
+  assert.doesNotMatch(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets;[\s\S]{0,180}?waitingForKeyframe\s*=\s*true/);
   assert.doesNotMatch(video, /stats\.videoQueueDrops\+\+;[\s\S]{0,180}?waitingForKeyframe\s*=\s*true/);
-  assert.doesNotMatch(video, /droppedQueuedFrame\s*&&\s*waitingForKeyframe/);
+  assert.doesNotMatch(video, /stats\.videoRecoveryWaits\+\+/);
+  assert.doesNotMatch(video, /stats\.videoRecoveryDrops\+\+/);
 });
 
 test('MainActivity starts receivers once and stops them on surface or activity teardown', () => {
