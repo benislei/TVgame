@@ -341,7 +341,7 @@ test('runRtpSender can select 720p fallback profile explicitly', () => {
   assert.match(videoArgs, /gop-size=15/);
 });
 
-test('runRtpSender can select TV box stable 1080p30 profile explicitly', () => {
+test('runRtpSender can select TV box compatible 1080p60 profile explicitly', () => {
   const spawnedCommands = [];
 
   withPatchedSpawn((executable, args) => {
@@ -358,9 +358,11 @@ test('runRtpSender can select TV box stable 1080p30 profile explicitly', () => {
   });
 
   const videoArgs = spawnedCommands[0].args.join(' ');
-  assert.match(videoArgs, /width=1920,height=1080,framerate=30\/1/);
-  assert.match(videoArgs, /bitrate=12000/);
-  assert.match(videoArgs, /gop-size=30/);
+  assert.match(videoArgs, /width=1920,height=1080,framerate=60\/1/);
+  assert.match(videoArgs, /bitrate=16000/);
+  assert.match(videoArgs, /gop-size=5/);
+  assert.match(videoArgs, /rc-mode=cbr-ld-hq/);
+  assert.match(videoArgs, /strict-gop=true/);
   assert.match(videoArgs, /h264parse config-interval=-1/);
 });
 

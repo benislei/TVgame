@@ -41,11 +41,13 @@ const RTP_PROFILES = {
     codec: 'h264',
     width: 1920,
     height: 1080,
-    fps: 30,
-    bitrateKbps: 12000,
-    keyframeInterval: 30,
+    fps: 60,
+    bitrateKbps: 16000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
     h264ConfigInterval: -1,
-    udpBufferSize: 4194304
+    udpBufferSize: 4194304,
+    strictGop: true
   },
   game4k: {
     codec: 'h265',
