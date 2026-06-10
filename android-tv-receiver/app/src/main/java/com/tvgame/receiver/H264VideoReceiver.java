@@ -221,7 +221,6 @@ public final class H264VideoReceiver implements Runnable {
 
     private void enqueueEncodedFrame(byte[] accessUnit, long timestamp) {
         EncodedFrame frame = new EncodedFrame(accessUnit, timestamp);
-        boolean droppedQueuedFrame = false;
         while (pendingAccessUnits.remainingCapacity() == 0) {
             EncodedFrame dropped = pendingAccessUnits.poll();
             if (dropped == null) {
@@ -229,22 +228,10 @@ public final class H264VideoReceiver implements Runnable {
             }
             stats.videoQueueDrops++;
             stats.droppedFrames++;
-            waitingForKeyframe = true;
-            droppedQueuedFrame = true;
-        }
-        if (droppedQueuedFrame && waitingForKeyframe && !accessUnitContainsIdr(accessUnit)) {
-            stats.videoRecoveryWaits++;
-            stats.videoRecoveryDrops++;
-            stats.droppedFrames++;
-            return;
-        }
-        if (droppedQueuedFrame && waitingForKeyframe && accessUnitContainsIdr(accessUnit)) {
-            waitingForKeyframe = false;
         }
         if (!pendingAccessUnits.offer(frame)) {
             stats.videoQueueDrops++;
             stats.droppedFrames++;
-            waitingForKeyframe = true;
         }
     }
 

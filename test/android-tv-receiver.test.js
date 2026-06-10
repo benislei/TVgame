@@ -538,12 +538,13 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(audio, /socket\.close\(\)/);
 });
 
-test('H264 receiver waits for next IDR after dropping queued compressed frames', () => {
+test('H264 receiver only waits for IDR after RTP loss, not after local stale queue drops', () => {
   const video = readProjectFile(`${javaRoot}/H264VideoReceiver.java`);
 
-  assert.match(video, /stats\.videoQueueDrops\+\+;[\s\S]*?waitingForKeyframe\s*=\s*true/);
-  assert.match(video, /if\s*\(\s*droppedQueuedFrame\s*&&\s*waitingForKeyframe\s*&&\s*!accessUnitContainsIdr\(accessUnit\)\s*\)[\s\S]*?stats\.videoRecoveryWaits\+\+/);
-  assert.match(video, /if\s*\(\s*droppedQueuedFrame\s*&&\s*waitingForKeyframe\s*&&\s*accessUnitContainsIdr\(accessUnit\)\s*\)[\s\S]*?waitingForKeyframe\s*=\s*false/);
+  assert.match(video, /stats\.videoRtpLossPackets\s*\+=\s*lostPackets;[\s\S]*?waitingForKeyframe\s*=\s*true/);
+  assert.match(video, /if\s*\(\s*waitingForKeyframe\s*\)[\s\S]*?!accessUnitContainsIdr\(accessUnit\)/);
+  assert.doesNotMatch(video, /stats\.videoQueueDrops\+\+;[\s\S]{0,180}?waitingForKeyframe\s*=\s*true/);
+  assert.doesNotMatch(video, /droppedQueuedFrame\s*&&\s*waitingForKeyframe/);
 });
 
 test('MainActivity starts receivers once and stops them on surface or activity teardown', () => {
