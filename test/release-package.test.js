@@ -64,12 +64,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     '检查环境.bat',
     '启动输入桥.bat',
     '启动推荐发送.bat',
-    '启动默认发送.bat',
-    '启动电视盒子稳定发送.bat',
-    '启动高画质发送.bat',
-    '启动抗花屏发送.bat',
-    '启动低延迟实验发送.bat',
-    '启动720回退发送.bat',
+    '启动发送端-选择画质.bat',
     path.join('app', 'package.json'),
     path.join('app', 'package-lock.json'),
     path.join('app', 'src', 'native-streamer', 'cli.js'),
@@ -106,14 +101,9 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const check = read('检查环境.bat');
   const bridge = read('启动输入桥.bat');
   const recommendedSender = read('启动推荐发送.bat');
-  const defaultSender = read('启动默认发送.bat');
-  const tvBoxSender = read('启动电视盒子稳定发送.bat');
-  const qualitySender = read('启动高画质发送.bat');
-  const resilientSender = read('启动抗花屏发送.bat');
-  const experimentalSender = read('启动低延迟实验发送.bat');
-  const fallbackSender = read('启动720回退发送.bat');
+  const selectorSender = read('启动发送端-选择画质.bat');
 
-  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, recommendedSender, defaultSender, tvBoxSender, qualitySender, resilientSender, experimentalSender, fallbackSender]) {
+  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, recommendedSender, selectorSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -134,16 +124,11 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(bridge, /InputBridgeRuntime\\InputBridge\.exe/);
   assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(recommendedSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30/);
-  assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30/);
-  assert.match(defaultSender, /不要填接收端左上角的“输入目标”/);
-  assert.match(tvBoxSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile h264720p30/);
-  assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile quality1080/);
-  assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
-  assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game1080/);
-  assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game720/);
+  assert.match(recommendedSender, /不要填接收端左上角的“输入目标”/);
+  assert.match(selectorSender, /--profile %TV_PROFILE%/);
 });
 
-test('friend preview package exposes explicit quality ladder and HEVC experiment launchers', () => {
+test('friend preview package consolidates quality choices into one selector', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();
   const report = createFriendPreviewPackage({
@@ -153,27 +138,36 @@ test('friend preview package exposes explicit quality ladder and HEVC experiment
   });
 
   const read = name => fs.readFileSync(path.join(report.packageDir, name), 'utf8');
-  const p72030 = read('启动720P30稳定发送.bat');
-  const p72060 = read('启动720P60流畅发送.bat');
-  const p108030 = read('启动1080P30清晰发送.bat');
-  const p108060 = read('启动1080P60高性能发送.bat');
-  const hevc108030 = read('启动HEVC1080P30实验发送.bat');
-  const hevc108060 = read('启动HEVC1080P60高性能发送.bat');
   const selector = read('启动发送端-选择画质.bat');
   const readme = read('README-朋友试用.md');
 
-  assert.match(p72030, /--profile h264720p30/);
-  assert.match(p72060, /--profile h264720p60/);
-  assert.match(p108030, /--profile h2641080p30/);
-  assert.match(p108060, /--profile h2641080p60/);
-  assert.match(hevc108030, /--profile hevc1080p30/);
-  assert.match(hevc108060, /--profile hevc1080p60/);
+  const removedLaunchers = [
+    '启动默认发送.bat',
+    '启动电视盒子稳定发送.bat',
+    '启动高画质发送.bat',
+    '启动抗花屏发送.bat',
+    '启动低延迟实验发送.bat',
+    '启动720回退发送.bat',
+    '启动720P30稳定发送.bat',
+    '启动720P60流畅发送.bat',
+    '启动1080P30清晰发送.bat',
+    '启动1080P60高性能发送.bat',
+    '启动HEVC1080P30实验发送.bat',
+    '启动HEVC1080P60高性能发送.bat'
+  ];
+  for (const name of removedLaunchers) {
+    assert.equal(fs.existsSync(path.join(report.packageDir, name)), false, `${name} should be consolidated into selector`);
+  }
+
   assert.match(selector, /1\. 720P30/);
   assert.match(selector, /2\. 720P60/);
   assert.match(selector, /3\. 1080P30/);
   assert.match(selector, /4\. 1080P60/);
   assert.match(selector, /5\. HEVC 1080P30/);
   assert.match(selector, /6\. HEVC 1080P60/);
+  assert.match(selector, /if "%TV_PROFILE%"=="5" set "TV_PROFILE=hevc1080p30"/);
+  assert.match(selector, /if "%TV_PROFILE%"=="6" set "TV_PROFILE=hevc1080p60"/);
+  assert.match(selector, /^echo\(  5\. HEVC 1080P30/m);
   assert.match(readme, /720P30/);
   assert.match(readme, /HEVC 1080P30/);
   assert.match(readme, /HEVC 1080P60/);
@@ -249,12 +243,17 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /虚拟 Xbox 手柄/);
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(readme, /启动输入桥\.bat/);
-  assert.match(readme, /启动默认发送\.bat/);
-  assert.match(readme, /启动电视盒子稳定发送\.bat/);
-  assert.match(readme, /启动高画质发送\.bat/);
-  assert.match(readme, /启动抗花屏发送\.bat/);
-  assert.match(readme, /启动低延迟实验发送\.bat/);
-  assert.match(readme, /短 GOP/);
+  assert.match(readme, /启动推荐发送\.bat/);
+  assert.match(readme, /启动发送端-选择画质\.bat/);
+  assert.match(readme, /统一画质选择入口/);
+  assert.doesNotMatch(readme, /启动默认发送\.bat/);
+  assert.doesNotMatch(readme, /启动电视盒子稳定发送\.bat/);
+  assert.doesNotMatch(readme, /启动高画质发送\.bat/);
+  assert.doesNotMatch(readme, /启动抗花屏发送\.bat/);
+  assert.doesNotMatch(readme, /启动低延迟实验发送\.bat/);
+  assert.match(readme, /建议顺序是：HEVC 1080P30/);
+  assert.match(readme, /FPS 归零或卡顿/);
+  assert.match(readme, /HEVC 1080P60/);
   assert.match(readme, /紧凑状态面板/);
   assert.match(readme, /设备/);
   assert.match(readme, /解码器/);
@@ -288,7 +287,7 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
   });
   writeFile(path.join(report.packageDir, 'app', 'npm.cmd'), '@echo off\r\necho npm:%*\r\nexit /b 0\r\n');
 
-  const script = path.join(report.packageDir, '启动默认发送.bat');
+  const script = path.join(report.packageDir, '启动推荐发送.bat');
   const result = childProcess.spawnSync('cmd.exe', [
     '/d',
     '/c',
@@ -301,6 +300,34 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder auto --encoder-preset auto --profile hevc1080p30/);
+});
+
+test('friend preview quality selector prints HEVC choices safely and forwards selected profile', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+  writeFile(path.join(report.packageDir, 'app', 'npm.cmd'), '@echo off\r\necho npm:%*\r\nexit /b 0\r\n');
+
+  const script = path.join(report.packageDir, '启动发送端-选择画质.bat');
+  const result = childProcess.spawnSync('cmd.exe', [
+    '/d',
+    '/c',
+    script
+  ], {
+    encoding: 'utf8',
+    input: '\r\n\r\n',
+    timeout: 10000
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /5\. HEVC 1080P30/);
+  assert.match(result.stdout, /6\. HEVC 1080P60/);
+  assert.doesNotMatch(result.stdout, /is not recognized as an internal or external command/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "127\.0\.0\.1" --encoder auto --encoder-preset auto --profile hevc1080p30/);
 });
 
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {

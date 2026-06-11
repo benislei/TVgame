@@ -160,7 +160,7 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动默认发送.bat`、`启动HEVC1080P60高性能发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动推荐发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，再试 `启动HEVC1080P60高性能发送.bat`。想对比 H.264 抗花屏参数时再用 `启动抗花屏发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat` 和 `启动发送端-选择画质.bat`。朋友优先使用 `启动推荐发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，或需要排查设备性能，再用 `启动发送端-选择画质.bat` 在 HEVC 1080P60、1080P60、1080P30、720P60 和 720P30 之间切换。
 
 ## 验收记录
 
