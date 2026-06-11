@@ -383,7 +383,8 @@ test('runRtpSender can select explicit H264 ladder and HEVC experiment profiles'
     ['h264720p60', /width=1280,height=720,framerate=60\/1/, /bitrate=10000/, /rtph264pay/],
     ['h2641080p30', /width=1920,height=1080,framerate=30\/1/, /bitrate=10000/, /rtph264pay/],
     ['h2641080p60', /width=1920,height=1080,framerate=60\/1/, /bitrate=18000/, /rtph264pay/],
-    ['hevc1080p30', /width=1920,height=1080,framerate=30\/1/, /bitrate=7000/, /rtph265pay/]
+    ['hevc1080p30', /width=1920,height=1080,framerate=30\/1/, /bitrate=7000/, /rtph265pay/],
+    ['hevc1080p60', /width=1920,height=1080,framerate=60\/1/, /bitrate=12000/, /rtph265pay/]
   ];
 
   for (const [profile, geometry, bitrate, payloader] of cases) {

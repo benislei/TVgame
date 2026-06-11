@@ -185,20 +185,23 @@ echo   2. 720P60 流畅优先，适合网络稳定但解码一般的设备
 echo   3. 1080P30 清晰稳定，适合电视盒子优先尝试
 echo   4. 1080P60 高性能，适合手机、高性能电视或盒子
 echo   5. HEVC 1080P30 实验，码率更低但要求接收端支持 H.265
+echo   6. HEVC 1080P60 高性能实验，适合解码能力较强的 Android 11+ 设备
 echo.
 set "TV_PROFILE="
-set /p "TV_PROFILE=请输入 1-5（默认 1）："
-if "%TV_PROFILE%"=="" set "TV_PROFILE=1"
+set /p "TV_PROFILE=请输入 1-6（默认 5 推荐）："
+if "%TV_PROFILE%"=="" set "TV_PROFILE=5"
 if "%TV_PROFILE%"=="1" set "TV_PROFILE=h264720p30"
 if "%TV_PROFILE%"=="2" set "TV_PROFILE=h264720p60"
 if "%TV_PROFILE%"=="3" set "TV_PROFILE=h2641080p30"
 if "%TV_PROFILE%"=="4" set "TV_PROFILE=h2641080p60"
 if "%TV_PROFILE%"=="5" set "TV_PROFILE=hevc1080p30"
+if "%TV_PROFILE%"=="6" set "TV_PROFILE=hevc1080p60"
 if "%TV_PROFILE%"=="h264720p30" goto :profile_ok
 if "%TV_PROFILE%"=="h264720p60" goto :profile_ok
 if "%TV_PROFILE%"=="h2641080p30" goto :profile_ok
 if "%TV_PROFILE%"=="h2641080p60" goto :profile_ok
 if "%TV_PROFILE%"=="hevc1080p30" goto :profile_ok
+if "%TV_PROFILE%"=="hevc1080p60" goto :profile_ok
 echo 输入无效，已改用 720P30 稳定档。
 set "TV_PROFILE=h264720p30"
 :profile_ok
@@ -234,12 +237,14 @@ function createReadme() {
     '- `安装ViGEmBus手柄驱动.bat`：安装 PC 端虚拟 Xbox 手柄驱动，电视或盒子上的 USB 手柄需要它才能被 PC 游戏识别。',
     '- `检查环境.bat`：检查电脑端 GStreamer、编码器、音频捕获和 .NET 环境。',
     '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥，默认运行包内 `InputBridgeRuntime\\InputBridge.exe`。',
-    '- `启动默认发送.bat`：1080p60 默认抗花屏推荐档，包含短 GOP、参数集随 IDR 发送和更大的 UDP 发送缓冲，也就是当前测试里画面、花屏和操作延迟综合最佳的档位。',
+    '- `启动推荐发送.bat`：HEVC 1080P30 推荐档，当前测试里清晰度、流畅度和延迟综合最好，优先从这里开始。',
+    '- `启动默认发送.bat`：同样使用 HEVC 1080P30 推荐档，保留这个入口方便老版本使用习惯。',
     '- `启动电视盒子稳定发送.bat`：1080p30 电视盒子稳定档，沿用短 GOP、重复参数集和严格 GOP，同时降低帧率和码率，优先解决小米盒子/Amlogic 设备队列堆积、FPS 归零或画面卡死的问题。',
     '- `启动高画质发送.bat`：1080p60 高画质档，画质更高但对网络和解码更敏感。',
     '- `启动抗花屏发送.bat`：1080p60 抗花屏档，和默认发送使用同一套参数，保留这个入口方便明确选择。',
     '- `启动低延迟实验发送.bat`：1080p60 旧默认低延迟实验档，主要用于和默认抗花屏档做 A/B 对比。',
     '- `启动720回退发送.bat`：720p60 回退档，用于排查网络或设备压力。',
+    '- `启动HEVC1080P60高性能发送.bat`：HEVC 1080P60 高性能实验档，适合小米盒子 5 Max、手机和更强解码设备继续压榨流畅度。',
     '',
     '## 快速验证步骤',
     '',
@@ -250,10 +255,10 @@ function createReadme() {
     '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
-    '6. 运行 `启动默认发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
+    '6. 运行 `启动推荐发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
     '7. 电视上看到画面和声音后，优先用真实游戏验证移动、转向、开火、菜单等操作体感。游戏里请选择 Xbox 手柄或控制器输入。',
     '8. 如果接收端面板显示 FPS 长时间低于 50、队列或解码丢帧持续增长，或者视频重启次数增加，电视盒子优先改用 `启动电视盒子稳定发送.bat`。这个档位目标是稳定优先，FPS 大约 30。',
-    '9. 默认档已经是抗花屏推荐档。想追求更清晰时再试 `启动高画质发送.bat`；想和旧低延迟参数对比时试 `启动低延迟实验发送.bat`；如果仍然花屏或卡顿，试 `启动720回退发送.bat` 判断是不是接收端或网络压力。',
+    '9. 推荐档是 HEVC 1080P30。想追求更高帧率时试 `启动HEVC1080P60高性能发送.bat` 或 `启动1080P60高性能发送.bat`；想和 H.264 抗花屏参数对比时试 `启动抗花屏发送.bat`；如果仍然花屏或卡顿，试 `启动720回退发送.bat` 判断是不是接收端或网络压力。',
     '',
     '## 手柄输入',
     '',
@@ -283,7 +288,8 @@ function createReadme() {
     '- 720P60：流畅优先，适合网络稳定但不适合 1080P 的设备。',
     '- 1080P30：清晰稳定，适合电视盒子优先尝试。',
     '- 1080P60：高性能档，适合手机、高性能电视或盒子。',
-    '- HEVC 1080P30：实验档，码率更低，但要求接收端 H.265 硬解稳定。',
+    '- HEVC 1080P30：推荐档，码率更低，当前测试里清晰度、流畅度和延迟综合最好。',
+    '- HEVC 1080P60：高性能实验档，适合 H.265 硬解稳定且性能更强的 Android 11+ 设备。',
     '',
     '接收端会按 16:9 等比居中显示画面，不再硬拉伸铺满屏幕；比例不一致时会保留黑边以避免画面变形。',
     ''
@@ -316,7 +322,8 @@ if not exist "InputBridgeRuntime\\InputBridge.exe" (
 "InputBridgeRuntime\\InputBridge.exe"
 exit /b %ERRORLEVEL%
 `),
-    '启动默认发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
+    '启动推荐发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30'),
+    '启动默认发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30'),
     '启动电视盒子稳定发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h264720p30'),
     '启动高画质发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile quality1080'),
     '启动抗花屏发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
@@ -327,6 +334,7 @@ exit /b %ERRORLEVEL%
     '启动1080P30清晰发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h2641080p30'),
     '启动1080P60高性能发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h2641080p60'),
     '启动HEVC1080P30实验发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30'),
+    '启动HEVC1080P60高性能发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p60'),
     '启动发送端-选择画质.bat': createQualitySelectorBatch()
   };
 

@@ -19,6 +19,7 @@ test('RTP profiles include 720p fallback, 1080p game baseline, TV box stable mod
     'h2641080p30',
     'h2641080p60',
     'hevc1080p30',
+    'hevc1080p60',
     'game720',
     'game1080',
     'quality1080',
@@ -81,6 +82,13 @@ test('RTP profiles expose explicit H264 quality ladder and HEVC 1080p30 experime
   assert.equal(RTP_PROFILES.hevc1080p30.fps, 30);
   assert.equal(RTP_PROFILES.hevc1080p30.bitrateKbps, 7000);
   assert.equal(RTP_PROFILES.hevc1080p30.experimental, true);
+
+  assert.equal(RTP_PROFILES.hevc1080p60.codec, 'h265');
+  assert.equal(RTP_PROFILES.hevc1080p60.width, 1920);
+  assert.equal(RTP_PROFILES.hevc1080p60.height, 1080);
+  assert.equal(RTP_PROFILES.hevc1080p60.fps, 60);
+  assert.equal(RTP_PROFILES.hevc1080p60.bitrateKbps, 12000);
+  assert.equal(RTP_PROFILES.hevc1080p60.experimental, true);
 });
 
 test('default RTP profile uses resilient 1080p anti-artifact settings', () => {
@@ -162,6 +170,22 @@ test('builds HEVC 1080p30 RTP video pipeline for experimental receiver validatio
   assert.match(pipeline, /rtph265pay pt=98 config-interval=-1 aggregate-mode=zero-latency/);
   assert.doesNotMatch(pipeline, /h264parse/);
   assert.doesNotMatch(pipeline, /rtph264pay/);
+});
+
+test('builds HEVC 1080p60 RTP video pipeline for high performance receivers', () => {
+  const config = buildRtpConfig({ host: '192.168.1.50', profile: 'hevc1080p60' });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.codec, 'h265');
+  assert.equal(config.width, 1920);
+  assert.equal(config.height, 1080);
+  assert.equal(config.fps, 60);
+  assert.equal(config.bitrateKbps, 12000);
+  assert.match(pipeline, /width=1920,height=1080,framerate=60\/1/);
+  assert.match(pipeline, /nvh265enc/);
+  assert.match(pipeline, /bitrate=12000/);
+  assert.match(pipeline, /gop-size=5/);
+  assert.match(pipeline, /rtph265pay pt=98 config-interval=-1 aggregate-mode=zero-latency/);
 });
 
 test('builds AMD AMF H264 RTP video pipeline without NVIDIA encoder', () => {

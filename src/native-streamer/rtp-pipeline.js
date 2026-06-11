@@ -62,6 +62,19 @@ const RTP_PROFILES = {
     strictGop: true,
     experimental: true
   },
+  hevc1080p60: {
+    codec: 'h265',
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    bitrateKbps: 12000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true,
+    experimental: true
+  },
   game720: {
     codec: 'h264',
     width: 1280,

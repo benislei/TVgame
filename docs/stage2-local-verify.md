@@ -50,37 +50,40 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\install-vigembus
 
 ## 启动发送端
 
-默认发送档位已经按当前实测最佳体验调整为 `resilient1080`：1080p、22Mbps、60fps、GOP5、低延迟 CBR HQ、每个 IDR 携带参数集，并增大发送端 UDP 缓冲。优先用默认游戏档验证 1080p 底线画质、抗花屏和手感：
+当前实测推荐优先使用 `hevc1080p30`：1080p、7Mbps、30fps、GOP5、低延迟 CBR HQ。它在小米盒子 5 Max 和手机接收端测试里清晰度、流畅度和延迟综合最好。命令行手动验证时请显式带上档位：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP>
+npm.cmd run native:rtp -- --host <Android TV IP> --profile hevc1080p30
 ```
 
-如果快速运动仍然偶发花屏，先切到 720p 回退档确认是否由码流压力触发：
+如果接收端 H.265 硬解稳定，并且想继续尝试更高帧率，可以测试 `hevc1080p60`：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP> --profile game720
+npm.cmd run native:rtp -- --host <Android TV IP> --profile hevc1080p60
 ```
 
-如果默认档稳定，可以再测 `quality1080`：1080p、30Mbps、60fps、GOP10。这个档位保留短关键帧恢复，同时给画质更多码率：
+如果 HEVC 在某台电视或盒子上表现不稳定，按下面 H.264 梯度回退：
 
 ```powershell
-npm.cmd run native:rtp -- --host <Android TV IP> --profile quality1080
+npm.cmd run native:rtp -- --host <Android TV IP> --profile h2641080p60
+npm.cmd run native:rtp -- --host <Android TV IP> --profile h2641080p30
+npm.cmd run native:rtp -- --host <Android TV IP> --profile h264720p60
+npm.cmd run native:rtp -- --host <Android TV IP> --profile h264720p30
 ```
 
-`resilient1080` 仍然可以显式指定，方便确认当前使用的是抗花屏档：
+`resilient1080` 仍然可以显式指定，方便和前一版抗花屏 H.264 推荐档做 A/B 对比：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP> --profile resilient1080
 ```
 
-如果想和旧默认低延迟参数做 A/B 对比，可以测试 `game1080` 实验档：1080p、24Mbps、60fps、GOP10。这个档位可能更激进，但在你和朋友的当前测试里，综合体验不如默认抗花屏档：
+如果想和旧默认低延迟参数做 A/B 对比，可以测试 `game1080` 实验档：1080p、24Mbps、60fps、GOP10。这个档位可能更激进，但在你和朋友的当前测试里，综合体验不如 HEVC 推荐档：
 
 ```powershell
 npm.cmd run native:rtp -- --host <Android TV IP> --profile game1080
 ```
 
-`game4k` 是后续 4K60/HEVC 路线的能力档位，当前 H.264 接收端不会直接启用它；如果运行 `--profile game4k`，发送端会提示需要 HEVC 接收端支持。
+`game4k` 仍然是后续 4K60 路线的能力档位，当前先保留为能力检测和路线预留，不作为朋友包默认入口。
 
 发送端默认使用 `--encoder auto --encoder-preset auto`。编码器会按 `nvh264enc`、`amfh264enc`、`mfh264enc` 自动选择；N 卡的 preset 会按游戏体验优先顺序自动尝试 `low-latency-hq`、`low-latency-hp`、`low-latency`、`hp`、`default`、`hq`。如果前面的低延迟 preset 不被当前显卡、驱动或 GStreamer 支持，会自动回退到后面的兼容档。
 
@@ -157,7 +160,7 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动默认发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动默认发送.bat` 验证 1080p60 基础手感；默认档已经等同抗花屏推荐档。想对比旧低延迟参数时再用 `启动低延迟实验发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动默认发送.bat`、`启动HEVC1080P60高性能发送.bat`、`启动高画质发送.bat`、`启动抗花屏发送.bat`、`启动低延迟实验发送.bat` 和 `启动720回退发送.bat`。朋友优先使用 `启动推荐发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，再试 `启动HEVC1080P60高性能发送.bat`。想对比 H.264 抗花屏参数时再用 `启动抗花屏发送.bat`；如果出现花屏或明显卡顿，用 720 回退档判断是否是接收端或网络压力。
 
 ## 验收记录
 
