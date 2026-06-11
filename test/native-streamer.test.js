@@ -40,12 +40,23 @@ function createReadyStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/g
       gstInspect: 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-inspect-1.0.exe'
     },
     dotnet: { ready: true, path: 'C:/Program Files/dotnet/dotnet.exe' },
-    plugins: { nvh264enc: true, amfh264enc: false, mfh264enc: false },
+    plugins: {
+      nvh264enc: true,
+      amfh264enc: false,
+      mfh264enc: false,
+      nvh265enc: true,
+      h265parse: true,
+      rtph265pay: true
+    },
     codecs: {
       h264: {
         ready: true,
         encoder: 'nvh264enc',
         availableEncoders: ['nvh264enc'],
+        missing: []
+      },
+      hevc: {
+        ready: true,
         missing: []
       }
     },
@@ -364,6 +375,37 @@ test('runRtpSender can select TV box compatible 1080p30 profile explicitly', () 
   assert.match(videoArgs, /rc-mode=cbr-ld-hq/);
   assert.match(videoArgs, /strict-gop=true/);
   assert.match(videoArgs, /h264parse config-interval=-1/);
+});
+
+test('runRtpSender can select explicit H264 ladder and HEVC experiment profiles', () => {
+  const cases = [
+    ['h264720p30', /width=1280,height=720,framerate=30\/1/, /bitrate=6000/, /rtph264pay/],
+    ['h264720p60', /width=1280,height=720,framerate=60\/1/, /bitrate=10000/, /rtph264pay/],
+    ['h2641080p30', /width=1920,height=1080,framerate=30\/1/, /bitrate=10000/, /rtph264pay/],
+    ['h2641080p60', /width=1920,height=1080,framerate=60\/1/, /bitrate=18000/, /rtph264pay/],
+    ['hevc1080p30', /width=1920,height=1080,framerate=30\/1/, /bitrate=7000/, /rtph265pay/]
+  ];
+
+  for (const [profile, geometry, bitrate, payloader] of cases) {
+    const spawnedCommands = [];
+    withPatchedSpawn((executable, args) => {
+      spawnedCommands.push({ executable, args });
+      return new EventEmitter();
+    }, () => {
+      runRtpSender(
+        parseArgs(['rtp', '--host', '192.168.1.50', '--profile', profile]),
+        {
+          createReport: () => createReadyStage2Report(),
+          spawnSync: createSuccessfulPresetProbe()
+        }
+      );
+    });
+
+    const videoArgs = spawnedCommands[0].args.join(' ');
+    assert.match(videoArgs, geometry);
+    assert.match(videoArgs, bitrate);
+    assert.match(videoArgs, payloader);
+  }
 });
 
 test('runRtpSender rejects unknown RTP profiles before spawning', () => {

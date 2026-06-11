@@ -13,7 +13,19 @@ const {
 } = require('../src/native-streamer/rtp-pipeline');
 
 test('RTP profiles include 720p fallback, 1080p game baseline, TV box stable mode and 4K roadmap', () => {
-  assert.deepEqual(Object.keys(RTP_PROFILES), ['game720', 'game1080', 'quality1080', 'resilient1080', 'tvbox1080', 'game4k']);
+  assert.deepEqual(Object.keys(RTP_PROFILES), [
+    'h264720p30',
+    'h264720p60',
+    'h2641080p30',
+    'h2641080p60',
+    'hevc1080p30',
+    'game720',
+    'game1080',
+    'quality1080',
+    'resilient1080',
+    'tvbox1080',
+    'game4k'
+  ]);
   assert.equal(RTP_PROFILES.game720.width, 1280);
   assert.equal(RTP_PROFILES.game720.height, 720);
   assert.equal(RTP_PROFILES.game1080.width, 1920);
@@ -39,6 +51,36 @@ test('RTP profiles include 720p fallback, 1080p game baseline, TV box stable mod
   assert.equal(RTP_PROFILES.game4k.width, 3840);
   assert.equal(RTP_PROFILES.game4k.height, 2160);
   assert.equal(RTP_PROFILES.game4k.codec, 'h265');
+});
+
+test('RTP profiles expose explicit H264 quality ladder and HEVC 1080p30 experiment', () => {
+  assert.equal(RTP_PROFILES.h264720p30.width, 1280);
+  assert.equal(RTP_PROFILES.h264720p30.height, 720);
+  assert.equal(RTP_PROFILES.h264720p30.fps, 30);
+  assert.equal(RTP_PROFILES.h264720p30.bitrateKbps, 6000);
+  assert.equal(RTP_PROFILES.h264720p30.codec, 'h264');
+
+  assert.equal(RTP_PROFILES.h264720p60.width, 1280);
+  assert.equal(RTP_PROFILES.h264720p60.height, 720);
+  assert.equal(RTP_PROFILES.h264720p60.fps, 60);
+  assert.equal(RTP_PROFILES.h264720p60.bitrateKbps, 10000);
+
+  assert.equal(RTP_PROFILES.h2641080p30.width, 1920);
+  assert.equal(RTP_PROFILES.h2641080p30.height, 1080);
+  assert.equal(RTP_PROFILES.h2641080p30.fps, 30);
+  assert.equal(RTP_PROFILES.h2641080p30.bitrateKbps, 10000);
+
+  assert.equal(RTP_PROFILES.h2641080p60.width, 1920);
+  assert.equal(RTP_PROFILES.h2641080p60.height, 1080);
+  assert.equal(RTP_PROFILES.h2641080p60.fps, 60);
+  assert.equal(RTP_PROFILES.h2641080p60.bitrateKbps, 18000);
+
+  assert.equal(RTP_PROFILES.hevc1080p30.codec, 'h265');
+  assert.equal(RTP_PROFILES.hevc1080p30.width, 1920);
+  assert.equal(RTP_PROFILES.hevc1080p30.height, 1080);
+  assert.equal(RTP_PROFILES.hevc1080p30.fps, 30);
+  assert.equal(RTP_PROFILES.hevc1080p30.bitrateKbps, 7000);
+  assert.equal(RTP_PROFILES.hevc1080p30.experimental, true);
 });
 
 test('default RTP profile uses resilient 1080p anti-artifact settings', () => {
@@ -96,6 +138,32 @@ test('builds default resilient 1080p H264 RTP video pipeline for Android TV', ()
   assert.match(pipeline, /udpsink host=192\.168\.1\.50 port=5004 sync=false async=false buffer-size=4194304/);
 });
 
+test('video RTP pipeline preserves source aspect ratio while scaling to target frame', () => {
+  const config = buildRtpConfig({ host: '192.168.1.50', profile: 'h264720p30' });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.match(pipeline, /videoscale add-borders=true/);
+  assert.match(pipeline, /video\/x-raw,format=NV12,width=1280,height=720,framerate=30\/1/);
+});
+
+test('builds HEVC 1080p30 RTP video pipeline for experimental receiver validation', () => {
+  const config = buildRtpConfig({ host: '192.168.1.50', profile: 'hevc1080p30' });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.codec, 'h265');
+  assert.equal(config.width, 1920);
+  assert.equal(config.height, 1080);
+  assert.equal(config.fps, 30);
+  assert.equal(config.bitrateKbps, 7000);
+  assert.match(pipeline, /nvh265enc/);
+  assert.match(pipeline, /bitrate=7000/);
+  assert.match(pipeline, /gop-size=5/);
+  assert.match(pipeline, /h265parse config-interval=-1/);
+  assert.match(pipeline, /rtph265pay pt=98 config-interval=-1 aggregate-mode=zero-latency/);
+  assert.doesNotMatch(pipeline, /h264parse/);
+  assert.doesNotMatch(pipeline, /rtph264pay/);
+});
+
 test('builds AMD AMF H264 RTP video pipeline without NVIDIA encoder', () => {
   const config = buildRtpConfig({
     host: '192.168.1.50',
@@ -110,9 +178,10 @@ test('builds AMD AMF H264 RTP video pipeline without NVIDIA encoder', () => {
   assert.match(pipeline, /b-frames=0/);
   assert.match(pipeline, /bitrate=22000/);
   assert.match(pipeline, /gop-size=5/);
-  assert.match(pipeline, /video\/x-raw\(memory:D3D11Memory\),format=NV12,width=1920,height=1080,framerate=60\/1/);
+  assert.match(pipeline, /videoscale add-borders=true/);
+  assert.match(pipeline, /video\/x-raw,format=NV12,width=1920,height=1080,framerate=60\/1/);
   assert.doesNotMatch(pipeline, /nvh264enc/);
-  assert.doesNotMatch(pipeline, /d3d11download/);
+  assert.match(pipeline, /d3d11download/);
 });
 
 test('builds Media Foundation H264 RTP video pipeline as generic Windows fallback', () => {
@@ -129,7 +198,8 @@ test('builds Media Foundation H264 RTP video pipeline as generic Windows fallbac
   assert.match(pipeline, /bitrate=22000/);
   assert.match(pipeline, /gop-size=5/);
   assert.doesNotMatch(pipeline, /nvh264enc/);
-  assert.doesNotMatch(pipeline, /d3d11download/);
+  assert.match(pipeline, /videoscale add-borders=true/);
+  assert.match(pipeline, /d3d11download/);
 });
 
 test('builds explicit NVENC encoder preset when configured', () => {

@@ -501,14 +501,33 @@ test('H264 RTP depacketizer supports single NAL, STAP-A and FU-A safely', () => 
   assert.match(source, /out\.clear\(\)/);
 });
 
+test('HEVC RTP depacketizer supports single NAL, aggregation packets and fragmented units', () => {
+  const source = readProjectFile(`${javaRoot}/H265RtpDepacketizer.java`);
+
+  assert.match(source, /START_CODE\s*=\s*new\s+byte\[\]\s*\{\s*0,\s*0,\s*0,\s*1\s*\}/);
+  assert.match(source, /MAX_REASSEMBLED_NAL_SIZE\s*=\s*2\s*\*\s*1024\s*\*\s*1024/);
+  assert.match(source, /nalType\s*=\s*\(payload\[0\]\s*&\s*0x7E\)\s*>>\s*1/);
+  assert.match(source, /nalType\s*>=\s*0\s*&&\s*nalType\s*<=\s*47/);
+  assert.match(source, /nalType\s*==\s*48/);
+  assert.match(source, /nalType\s*==\s*49/);
+  assert.match(source, /fuHeader/);
+  assert.match(source, /startBit/);
+  assert.match(source, /endBit/);
+  assert.match(source, /reconstructedNalHeader/);
+});
+
 test('video and audio receivers use required ports, codecs and stats', () => {
   const video = readProjectFile(`${javaRoot}/H264VideoReceiver.java`);
   const audio = readProjectFile(`${javaRoot}/L16AudioReceiver.java`);
 
   assert.match(video, /VIDEO_PORT\s*=\s*5004/);
-  assert.match(video, /MediaCodec\.createDecoderByType\("video\/avc"\)/);
+  assert.match(video, /MediaCodec\.createDecoderByType\(mimeType\)/);
+  assert.match(video, /"video\/hevc"/);
+  assert.match(video, /H265RtpDepacketizer/);
+  assert.match(video, /detectCodecKind\(packet\)/);
+  assert.match(video, /selectedCodecKind\.mimeType/);
   assert.match(video, /stats\.videoDecoderName\s*=\s*decoder\.getName\(\)/);
-  assert.match(video, /MediaFormat\.createVideoFormat\("video\/avc",\s*1920,\s*1080\)/);
+  assert.match(video, /MediaFormat\.createVideoFormat\(mimeType,\s*1920,\s*1080\)/);
   assert.match(video, /MediaFormat\.KEY_LOW_LATENCY/);
   assert.match(video, /MediaCodec\.PARAMETER_KEY_LOW_LATENCY/);
   assert.match(video, /setInteger\(MediaFormat\.KEY_PRIORITY,\s*0\)/);
@@ -530,7 +549,7 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(video, /DECODER_INPUT_TIMEOUT_US\s*=\s*8000/);
   assert.match(video, /dequeueInputBuffer\(DECODER_INPUT_TIMEOUT_US\)/);
   assert.match(video, /drainOutput\(\);\s*[\s\S]*?pendingAccessUnits\.poll/);
-  assert.match(video, /new\s+Thread\([\s\S]*,\s*"H264 解码"\)/);
+  assert.match(video, /new\s+Thread\([\s\S]*,\s*selectedCodecKind\.threadName\)/);
   assert.match(video, /stats\.lastVideoAtMs\s*=\s*System\.currentTimeMillis\(\)/);
   assert.match(video, /interface\s+SenderAddressListener/);
   assert.match(video, /datagram\.getAddress\(\)\.getHostAddress\(\)/);
@@ -565,6 +584,17 @@ test('video and audio receivers use required ports, codecs and stats', () => {
   assert.match(audio, /setSoTimeout\(/);
   assert.match(audio, /public\s+void\s+stop\(\)/);
   assert.match(audio, /socket\.close\(\)/);
+});
+
+test('MainActivity keeps decoded video at 16:9 without stretching to fill the TV surface', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /VIDEO_ASPECT_RATIO\s*=\s*16\.0f\s*\/\s*9\.0f/);
+  assert.match(source, /root\.setBackgroundColor\(0xFF000000\)/);
+  assert.match(source, /updateSurfaceLayout\(\)/);
+  assert.match(source, /root\.addOnLayoutChangeListener/);
+  assert.match(source, /FrameLayout\.LayoutParams\s+params\s*=\s*new\s+FrameLayout\.LayoutParams\(targetWidth,\s*targetHeight,\s*Gravity\.CENTER\)/);
+  assert.doesNotMatch(source, /root\.addView\(surfaceView,\s*new\s+FrameLayout\.LayoutParams\(\s*FrameLayout\.LayoutParams\.MATCH_PARENT,\s*FrameLayout\.LayoutParams\.MATCH_PARENT\s*\)\)/);
 });
 
 test('H264 receiver drops only the damaged access unit after RTP loss for smooth playback', () => {

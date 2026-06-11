@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
+public final class H265RtpDepacketizer implements VideoRtpDepacketizer {
     private static final byte[] START_CODE = new byte[] { 0, 0, 0, 1 };
     private static final int MAX_REASSEMBLED_NAL_SIZE = 2 * 1024 * 1024;
 
@@ -14,14 +14,15 @@ public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
     private int expectedSequenceNumber = -1;
     private long fragmentTimestamp = -1;
 
+    @Override
     public List<byte[]> depacketize(RtpPacket packet) {
-        if (packet == null || packet.payloadLength <= 0) {
+        if (packet == null || packet.payloadLength <= 1) {
             return Collections.emptyList();
         }
 
         byte[] payload = packet.payload;
-        int nalType = payload[0] & 0x1F;
-        if (nalType >= 1 && nalType <= 23) {
+        int nalType = (payload[0] & 0x7E) >> 1;
+        if (nalType >= 0 && nalType <= 47) {
             resetFragment();
             if (packet.payloadLength > MAX_REASSEMBLED_NAL_SIZE) {
                 return Collections.emptyList();
@@ -29,22 +30,22 @@ public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
             return Collections.singletonList(withStartCode(payload, 0, packet.payloadLength));
         }
 
-        if (nalType == 24) {
+        if (nalType == 48) {
             resetFragment();
-            return unpackStapA(payload, packet.payloadLength);
+            return unpackAggregationPacket(payload, packet.payloadLength);
         }
 
-        if (nalType == 28) {
-            return unpackFuA(packet, payload, packet.payloadLength);
+        if (nalType == 49) {
+            return unpackFragmentationUnit(packet, payload, packet.payloadLength);
         }
 
         resetFragment();
         return Collections.emptyList();
     }
 
-    private List<byte[]> unpackStapA(byte[] payload, int payloadLength) {
+    private List<byte[]> unpackAggregationPacket(byte[] payload, int payloadLength) {
         List<byte[]> out = new ArrayList<>();
-        int offset = 1;
+        int offset = 2;
         while (offset + 2 <= payloadLength) {
             int nalLength = ((payload[offset] & 0xFF) << 8) | (payload[offset + 1] & 0xFF);
             offset += 2;
@@ -65,17 +66,20 @@ public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
         return out;
     }
 
-    private List<byte[]> unpackFuA(RtpPacket packet, byte[] payload, int payloadLength) {
-        if (payloadLength < 2) {
+    private List<byte[]> unpackFragmentationUnit(RtpPacket packet, byte[] payload, int payloadLength) {
+        if (payloadLength < 3) {
             resetFragment();
             return Collections.emptyList();
         }
 
-        int fuIndicator = payload[0] & 0xFF;
-        int fuHeader = payload[1] & 0xFF;
+        int fuHeader = payload[2] & 0xFF;
         boolean startBit = (fuHeader & 0x80) != 0;
         boolean endBit = (fuHeader & 0x40) != 0;
-        int reconstructedHeader = (fuIndicator & 0xE0) | (fuHeader & 0x1F);
+        int fuType = fuHeader & 0x3F;
+        byte[] reconstructedNalHeader = new byte[] {
+            (byte) ((payload[0] & 0x81) | (fuType << 1)),
+            payload[1]
+        };
 
         if (startBit) {
             resetFragment();
@@ -83,7 +87,7 @@ public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
             fragmentTimestamp = packet.timestamp;
             expectedSequenceNumber = nextSequenceNumber(packet.sequenceNumber);
             fragmentBuffer.write(START_CODE, 0, START_CODE.length);
-            fragmentBuffer.write(reconstructedHeader);
+            fragmentBuffer.write(reconstructedNalHeader, 0, reconstructedNalHeader.length);
         } else {
             if (!fragmentStarted) {
                 return Collections.emptyList();
@@ -96,12 +100,12 @@ public final class H264RtpDepacketizer implements VideoRtpDepacketizer {
             expectedSequenceNumber = nextSequenceNumber(packet.sequenceNumber);
         }
 
-        if (fragmentBuffer.size() + payloadLength - 2 > MAX_REASSEMBLED_NAL_SIZE) {
+        if (fragmentBuffer.size() + payloadLength - 3 > MAX_REASSEMBLED_NAL_SIZE) {
             resetFragment();
             return Collections.emptyList();
         }
 
-        fragmentBuffer.write(payload, 2, payloadLength - 2);
+        fragmentBuffer.write(payload, 3, payloadLength - 3);
 
         if (endBit) {
             byte[] nal = fragmentBuffer.toByteArray();

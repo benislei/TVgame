@@ -133,11 +133,43 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(defaultSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
   assert.match(defaultSender, /不要填接收端左上角的“输入目标”/);
-  assert.match(tvBoxSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile tvbox1080/);
+  assert.match(tvBoxSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile h264720p30/);
   assert.match(qualitySender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile quality1080/);
   assert.match(resilientSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile resilient1080/);
   assert.match(experimentalSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game1080/);
   assert.match(fallbackSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile game720/);
+});
+
+test('friend preview package exposes explicit quality ladder and HEVC experiment launchers', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+
+  const read = name => fs.readFileSync(path.join(report.packageDir, name), 'utf8');
+  const p72030 = read('启动720P30稳定发送.bat');
+  const p72060 = read('启动720P60流畅发送.bat');
+  const p108030 = read('启动1080P30清晰发送.bat');
+  const p108060 = read('启动1080P60高性能发送.bat');
+  const hevc108030 = read('启动HEVC1080P30实验发送.bat');
+  const selector = read('启动发送端-选择画质.bat');
+  const readme = read('README-朋友试用.md');
+
+  assert.match(p72030, /--profile h264720p30/);
+  assert.match(p72060, /--profile h264720p60/);
+  assert.match(p108030, /--profile h2641080p30/);
+  assert.match(p108060, /--profile h2641080p60/);
+  assert.match(hevc108030, /--profile hevc1080p30/);
+  assert.match(selector, /1\. 720P30/);
+  assert.match(selector, /2\. 720P60/);
+  assert.match(selector, /3\. 1080P30/);
+  assert.match(selector, /4\. 1080P60/);
+  assert.match(selector, /5\. HEVC 1080P30/);
+  assert.match(readme, /720P30/);
+  assert.match(readme, /HEVC 1080P30/);
 });
 
 test('friend preview package can publish InputBridge runtime so friends do not need the .NET SDK', () => {

@@ -34,7 +34,6 @@ public final class H264VideoReceiver implements Runnable {
     private final Surface surface;
     private final StatsModel stats;
     private final SenderAddressListener senderAddressListener;
-    private final H264RtpDepacketizer depacketizer = new H264RtpDepacketizer();
     private final ByteArrayOutputStream accessUnitBuffer = new ByteArrayOutputStream(512 * 1024);
     private final ArrayBlockingQueue<EncodedFrame> pendingAccessUnits =
         new ArrayBlockingQueue<>(MAX_PENDING_ACCESS_UNITS);
@@ -42,6 +41,8 @@ public final class H264VideoReceiver implements Runnable {
     private DatagramSocket socket;
     private MediaCodec decoder;
     private Thread decoderThread;
+    private CodecKind codecKind = CodecKind.UNKNOWN;
+    private VideoRtpDepacketizer depacketizer;
     private long accessUnitTimestamp = -1;
     private long firstVideoTimestamp = -1;
     private int expectedVideoSequenceNumber = -1;
@@ -60,7 +61,6 @@ public final class H264VideoReceiver implements Runnable {
 
     @Override
     public void run() {
-        startDecoderThread();
         try {
             socket = new DatagramSocket(null);
             socket.setReuseAddress(true);
@@ -78,8 +78,16 @@ public final class H264VideoReceiver implements Runnable {
                     recordSenderAddress(datagram);
                     RtpPacket packet = RtpPacket.parse(datagram.getData(), datagram.getLength());
                     stats.videoPackets++;
-                    recordVideoSequence(packet.sequenceNumber);
                     stats.lastVideoAtMs = System.currentTimeMillis();
+                    if (codecKind == CodecKind.UNKNOWN) {
+                        codecKind = detectCodecKind(packet);
+                        if (codecKind == CodecKind.UNKNOWN) {
+                            continue;
+                        }
+                        depacketizer = codecKind.createDepacketizer();
+                        startDecoderThread(codecKind);
+                    }
+                    recordVideoSequence(packet.sequenceNumber);
                     List<byte[]> nalUnits = depacketizer.depacketize(packet);
                     if (!nalUnits.isEmpty()) {
                         appendNalUnits(packet.timestamp, nalUnits);
@@ -128,21 +136,21 @@ public final class H264VideoReceiver implements Runnable {
         senderAddressListener.onSenderAddress(host);
     }
 
-    private void startDecoderThread() {
+    private void startDecoderThread(final CodecKind selectedCodecKind) {
         decoderThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                runDecoderLoop();
+                runDecoderLoop(selectedCodecKind.mimeType);
             }
-        }, "H264 解码");
+        }, selectedCodecKind.threadName);
         decoderThread.start();
     }
 
-    private void runDecoderLoop() {
+    private void runDecoderLoop(String mimeType) {
         try {
-            decoder = MediaCodec.createDecoderByType("video/avc");
+            decoder = MediaCodec.createDecoderByType(mimeType);
             stats.videoDecoderName = decoder.getName();
-            MediaFormat format = MediaFormat.createVideoFormat("video/avc", 1920, 1080);
+            MediaFormat format = MediaFormat.createVideoFormat(mimeType, 1920, 1080);
             format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
             format.setInteger(MediaFormat.KEY_PRIORITY, 0);
             format.setInteger(MediaFormat.KEY_OPERATING_RATE, 60);
@@ -245,6 +253,40 @@ public final class H264VideoReceiver implements Runnable {
 
     private static int nextSequenceNumber(int sequenceNumber) {
         return (sequenceNumber + 1) & 0xFFFF;
+    }
+
+    private static CodecKind detectCodecKind(RtpPacket packet) {
+        if (packet == null || packet.payloadLength <= 0) {
+            return CodecKind.UNKNOWN;
+        }
+        if (packet.payloadType == 96) {
+            return CodecKind.H264;
+        }
+        if (packet.payloadType == 98) {
+            return CodecKind.HEVC;
+        }
+
+        byte[] payload = packet.payload;
+        if (packet.payloadLength >= 2) {
+            int h265NalType = (payload[0] & 0x7E) >> 1;
+            if ((h265NalType >= 16 && h265NalType <= 21)
+                || h265NalType == 32
+                || h265NalType == 33
+                || h265NalType == 34
+                || h265NalType == 48
+                || h265NalType == 49) {
+                return CodecKind.HEVC;
+            }
+        }
+
+        int h264NalType = payload[0] & 0x1F;
+        if ((h264NalType >= 1 && h264NalType <= 23)
+            || h264NalType == 24
+            || h264NalType == 28) {
+            return CodecKind.H264;
+        }
+
+        return CodecKind.UNKNOWN;
     }
 
     private void queueEncodedFrame(EncodedFrame frame) {
@@ -354,5 +396,36 @@ public final class H264VideoReceiver implements Runnable {
             this.accessUnit = accessUnit;
             this.timestamp = timestamp;
         }
+    }
+
+    private enum CodecKind {
+        UNKNOWN("", "") {
+            @Override
+            VideoRtpDepacketizer createDepacketizer() {
+                return null;
+            }
+        },
+        H264("video/avc", "H264 decode") {
+            @Override
+            VideoRtpDepacketizer createDepacketizer() {
+                return new H264RtpDepacketizer();
+            }
+        },
+        HEVC("video/hevc", "HEVC decode") {
+            @Override
+            VideoRtpDepacketizer createDepacketizer() {
+                return new H265RtpDepacketizer();
+            }
+        };
+
+        private final String mimeType;
+        private final String threadName;
+
+        CodecKind(String mimeType, String threadName) {
+            this.mimeType = mimeType;
+            this.threadName = threadName;
+        }
+
+        abstract VideoRtpDepacketizer createDepacketizer();
     }
 }

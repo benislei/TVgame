@@ -123,11 +123,11 @@ function printRtpHelp() {
   console.log('  --host <IP>           Android TV IP，默认 127.0.0.1');
   console.log('  --video-port <端口>   视频 RTP UDP 端口，默认 5004');
   console.log('  --audio-port <端口>   音频 RTP UDP 端口，默认 5006');
-  console.log('  --profile <档位>      默认 resilient1080，可选 game720, game1080, quality1080, resilient1080, tvbox1080, game4k');
+  console.log('  --profile <档位>      默认 resilient1080，可选 h264720p30, h264720p60, h2641080p30, h2641080p60, hevc1080p30, game720, game1080, quality1080, resilient1080, tvbox1080, game4k');
   console.log('  --width <宽度>        视频宽度，默认 1920');
   console.log('  --height <高度>       视频高度，默认 1080');
   console.log('  --fps <帧率>          视频帧率，默认 60');
-  console.log('  --bitrate <kbps>      H.264 码率，默认 22000');
+  console.log('  --bitrate <kbps>      H.264/HEVC 码率，默认 22000');
   console.log('  --gop <帧数>          关键帧间隔，默认 5');
   console.log('  --encoder <编码器>    H.264 编码器，默认 auto；可选 nvenc, amf, mf');
   console.log('  --encoder-preset <值> NVENC preset，默认 auto；按体验优先自动探测，可手动指定 low-latency-hq 或 default');
@@ -167,7 +167,7 @@ function validateRtpArgs(args) {
     errors.push(`profile 必须是以下之一：${Object.keys(RTP_PROFILES).join(', ')}`);
   }
   const fallbackProfile = profileConfig || RTP_PROFILES.resilient1080;
-  if (fallbackProfile.codec !== 'h264') {
+  if (profile === 'game4k') {
     errors.push(`${profile} 需要 HEVC 接收端支持，当前先用于 4K60 路线能力检测。`);
   }
 
@@ -307,6 +307,25 @@ function selectH264Encoder(config, report, gstLaunch, spawnSync) {
   return false;
 }
 
+function selectHevcEncoder(config, report, gstLaunch, spawnSync) {
+  if (!report.codecs || !report.codecs.hevc || !report.codecs.hevc.ready) {
+    const missing = report.codecs && report.codecs.hevc && report.codecs.hevc.missing
+      ? report.codecs.hevc.missing.join(', ')
+      : 'nvh265enc, h265parse, rtph265pay';
+    console.error(`HEVC 实验档不可用：缺少 ${missing}`);
+    return false;
+  }
+
+  config.encoder = 'nvh265enc';
+  if (config.encoderPreset === 'auto') {
+    const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
+    if (!selectedPreset) return false;
+    config.encoderPreset = selectedPreset;
+  }
+  console.log('HEVC 编码器自动选择：nvh265enc');
+  return true;
+}
+
 function runRtpSender(args, options = {}) {
   if (args.help) {
     printRtpHelp();
@@ -332,7 +351,10 @@ function runRtpSender(args, options = {}) {
 
   const config = buildRtpConfig(validation.config);
   const gstLaunch = report.gstreamer.gstLaunch || 'gst-launch-1.0';
-  if (!selectH264Encoder(config, report, gstLaunch, spawnSync)) {
+  const encoderReady = config.codec === 'h265'
+    ? selectHevcEncoder(config, report, gstLaunch, spawnSync)
+    : selectH264Encoder(config, report, gstLaunch, spawnSync);
+  if (!encoderReady) {
     process.exitCode = 1;
     return;
   }

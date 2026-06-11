@@ -1,6 +1,67 @@
 'use strict';
 
 const RTP_PROFILES = {
+  h264720p30: {
+    codec: 'h264',
+    width: 1280,
+    height: 720,
+    fps: 30,
+    bitrateKbps: 6000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true
+  },
+  h264720p60: {
+    codec: 'h264',
+    width: 1280,
+    height: 720,
+    fps: 60,
+    bitrateKbps: 10000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true
+  },
+  h2641080p30: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    bitrateKbps: 10000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true
+  },
+  h2641080p60: {
+    codec: 'h264',
+    width: 1920,
+    height: 1080,
+    fps: 60,
+    bitrateKbps: 18000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true
+  },
+  hevc1080p30: {
+    codec: 'h265',
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    bitrateKbps: 7000,
+    keyframeInterval: 5,
+    encoderRcMode: 'cbr-ld-hq',
+    h264ConfigInterval: -1,
+    udpBufferSize: 4194304,
+    strictGop: true,
+    experimental: true
+  },
   game720: {
     codec: 'h264',
     width: 1280,
@@ -114,6 +175,13 @@ function splitPipeline(pipeline) {
 }
 
 function buildVideoRtpPipeline(config) {
+  if (config.codec === 'h265') {
+    return buildHevcVideoRtpPipeline(config);
+  }
+  return buildH264VideoRtpPipeline(config);
+}
+
+function buildH264VideoRtpPipeline(config) {
   const fps = `${config.fps}/1`;
   const udpOptions = [
     `host=${config.host}`,
@@ -125,15 +193,6 @@ function buildVideoRtpPipeline(config) {
     udpOptions.push(`buffer-size=${config.udpBufferSize}`);
   }
   const encoder = buildH264EncoderElement(config);
-  const needsSystemMemory = config.encoder === 'nvh264enc';
-  const d3d11Steps = needsSystemMemory
-    ? [
-        'd3d11download',
-        '!',
-        `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
-        '!'
-      ]
-    : [];
 
   return [
     `d3d11screencapturesrc show-cursor=true monitor-index=${config.displayIndex}`,
@@ -142,9 +201,16 @@ function buildVideoRtpPipeline(config) {
     '!',
     'd3d11convert',
     '!',
-    `video/x-raw(memory:D3D11Memory),format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    `video/x-raw(memory:D3D11Memory),format=NV12,framerate=${fps}`,
     '!',
-    ...d3d11Steps,
+    'd3d11download',
+    '!',
+    `video/x-raw,format=NV12,framerate=${fps}`,
+    '!',
+    'videoscale add-borders=true',
+    '!',
+    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
     'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
     '!',
     encoder,
@@ -152,6 +218,47 @@ function buildVideoRtpPipeline(config) {
     `h264parse config-interval=${config.h264ConfigInterval}`,
     '!',
     `rtph264pay pt=96 config-interval=${config.h264ConfigInterval} aggregate-mode=zero-latency`,
+    '!',
+    `udpsink ${udpOptions.join(' ')}`
+  ].join(' ');
+}
+
+function buildHevcVideoRtpPipeline(config) {
+  const fps = `${config.fps}/1`;
+  const udpOptions = [
+    `host=${config.host}`,
+    `port=${config.videoPort}`,
+    'sync=false',
+    'async=false'
+  ];
+  if (config.udpBufferSize > 0) {
+    udpOptions.push(`buffer-size=${config.udpBufferSize}`);
+  }
+
+  return [
+    `d3d11screencapturesrc show-cursor=true monitor-index=${config.displayIndex}`,
+    '!',
+    `video/x-raw(memory:D3D11Memory),framerate=${fps}`,
+    '!',
+    'd3d11convert',
+    '!',
+    `video/x-raw(memory:D3D11Memory),format=NV12,framerate=${fps}`,
+    '!',
+    'd3d11download',
+    '!',
+    `video/x-raw,format=NV12,framerate=${fps}`,
+    '!',
+    'videoscale add-borders=true',
+    '!',
+    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    'queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream',
+    '!',
+    buildH265EncoderElement(config),
+    '!',
+    `h265parse config-interval=${config.h264ConfigInterval}`,
+    '!',
+    `rtph265pay pt=98 config-interval=${config.h264ConfigInterval} aggregate-mode=zero-latency`,
     '!',
     `udpsink ${udpOptions.join(' ')}`
   ].join(' ');
@@ -194,6 +301,22 @@ function buildH264EncoderElement(config) {
   return `nvh264enc ${encoderOptions.join(' ')}`;
 }
 
+function buildH265EncoderElement(config) {
+  const preset = config.encoderPreset === 'auto' ? 'default' : config.encoderPreset;
+  const encoderOptions = [
+    `preset=${preset}`,
+    `rc-mode=${config.encoderRcMode}`,
+    `bitrate=${config.bitrateKbps}`,
+    `gop-size=${config.keyframeInterval}`,
+    'bframes=0',
+    'zerolatency=true'
+  ];
+  if (config.strictGop) {
+    encoderOptions.push('strict-gop=true');
+  }
+  return `nvh265enc ${encoderOptions.join(' ')}`;
+}
+
 function buildAudioRtpPipeline(config) {
   return [
     'wasapi2src loopback=true low-latency=true buffer-time=10000',
@@ -212,12 +335,13 @@ function buildAudioRtpPipeline(config) {
 
 function buildNvencPresetProbePipeline(config, preset) {
   const fps = `${config.fps}/1`;
+  const encoder = config.codec === 'h265' ? 'nvh265enc' : 'nvh264enc';
   return [
     'videotestsrc num-buffers=1',
     '!',
     `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
     '!',
-    `nvh264enc preset=${preset} rc-mode=${config.encoderRcMode} bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
+    `${encoder} preset=${preset} rc-mode=${config.encoderRcMode} bitrate=${config.bitrateKbps} gop-size=${config.keyframeInterval} bframes=0 zerolatency=true`,
     '!',
     'fakesink sync=false'
   ].join(' ');
@@ -268,6 +392,7 @@ module.exports = {
   buildRtpConfig,
   buildVideoRtpPipeline,
   buildH264EncoderElement,
+  buildH265EncoderElement,
   buildH264EncoderProbePipeline,
   buildH264EncoderProbeArgs,
   buildAudioRtpPipeline,

@@ -30,6 +30,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final long VIDEO_STALL_RESTART_MS = 1200;
     private static final long VIDEO_FRESH_MS = 1500;
     private static final long VIDEO_STALL_MIN_PACKETS = 60;
+    private static final float VIDEO_ASPECT_RATIO = 16.0f / 9.0f;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
     private static final int BUTTON_A = 1 << 0;
     private static final int BUTTON_B = 1 << 1;
@@ -122,14 +123,28 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
         FrameLayout root = new FrameLayout(this);
         rootView = root;
+        root.setBackgroundColor(0xFF000000);
         root.setFocusable(true);
         root.setFocusableInTouchMode(true);
         root.setOnKeyListener(gamepadKeyListener);
         root.setOnGenericMotionListener(gamepadMotionListener);
-        root.addView(surfaceView, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
-        ));
+        root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(
+                View view,
+                int left,
+                int top,
+                int right,
+                int bottom,
+                int oldLeft,
+                int oldTop,
+                int oldRight,
+                int oldBottom
+            ) {
+                updateSurfaceLayout();
+            }
+        });
+        root.addView(surfaceView);
 
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -139,6 +154,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(overlay, overlayParams);
 
         setContentView(root);
+        updateSurfaceLayout();
         applyImmersiveFlags();
         requestInputFocus();
         handler.postDelayed(updateOverlay, 500);
@@ -152,6 +168,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        updateSurfaceLayout();
     }
 
     @Override
@@ -402,6 +419,28 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         );
+    }
+
+    private void updateSurfaceLayout() {
+        if (rootView == null || surfaceView == null) {
+            return;
+        }
+
+        int rootWidth = rootView.getWidth();
+        int rootHeight = rootView.getHeight();
+        if (rootWidth <= 0 || rootHeight <= 0) {
+            return;
+        }
+
+        int targetWidth = rootWidth;
+        int targetHeight = Math.round(targetWidth / VIDEO_ASPECT_RATIO);
+        if (targetHeight > rootHeight) {
+            targetHeight = rootHeight;
+            targetWidth = Math.round(targetHeight * VIDEO_ASPECT_RATIO);
+        }
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(targetWidth, targetHeight, Gravity.CENTER);
+        surfaceView.setLayoutParams(params);
     }
 
     private void releaseMappedKeys() {

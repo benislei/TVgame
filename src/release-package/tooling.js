@@ -177,6 +177,42 @@ call npm.cmd run native:rtp -- --host "%TV_IP%"${profileArgs ? ` ${profileArgs}`
 `));
 }
 
+function createQualitySelectorBatch() {
+  return createBatchScript(createNpmGuardBody(`
+echo 请选择发送画质档位：
+echo   1. 720P30 稳定优先，适合电视盒子和弱解码设备
+echo   2. 720P60 流畅优先，适合网络稳定但解码一般的设备
+echo   3. 1080P30 清晰稳定，适合电视盒子优先尝试
+echo   4. 1080P60 高性能，适合手机、高性能电视或盒子
+echo   5. HEVC 1080P30 实验，码率更低但要求接收端支持 H.265
+echo.
+set "TV_PROFILE="
+set /p "TV_PROFILE=请输入 1-5（默认 1）："
+if "%TV_PROFILE%"=="" set "TV_PROFILE=1"
+if "%TV_PROFILE%"=="1" set "TV_PROFILE=h264720p30"
+if "%TV_PROFILE%"=="2" set "TV_PROFILE=h264720p60"
+if "%TV_PROFILE%"=="3" set "TV_PROFILE=h2641080p30"
+if "%TV_PROFILE%"=="4" set "TV_PROFILE=h2641080p60"
+if "%TV_PROFILE%"=="5" set "TV_PROFILE=hevc1080p30"
+if "%TV_PROFILE%"=="h264720p30" goto :profile_ok
+if "%TV_PROFILE%"=="h264720p60" goto :profile_ok
+if "%TV_PROFILE%"=="h2641080p30" goto :profile_ok
+if "%TV_PROFILE%"=="h2641080p60" goto :profile_ok
+if "%TV_PROFILE%"=="hevc1080p30" goto :profile_ok
+echo 输入无效，已改用 720P30 稳定档。
+set "TV_PROFILE=h264720p30"
+:profile_ok
+echo.
+echo 请选择电视或盒子的局域网 IP。
+set "TV_IP="
+set /p "TV_IP=电视/盒子 IP（留空为 127.0.0.1）："
+if "%TV_IP%"=="" set "TV_IP=127.0.0.1"
+echo.
+echo 正在启动发送端，目标：%TV_IP%，档位：%TV_PROFILE%
+call npm.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile %TV_PROFILE%
+`));
+}
+
 function createReadme() {
   return [
     '# TVGame 朋友试用包',
@@ -240,6 +276,16 @@ function createReadme() {
     '- 输入回传：TCP 8789',
     '',
     '如果电视收不到画面，先确认 Windows 防火墙没有拦截 Node.js、GStreamer 或 InputBridge。',
+    '',
+    '## 画质档位',
+    '',
+    '- 720P30：稳定优先，适合电视盒子或解码能力偏弱的设备。',
+    '- 720P60：流畅优先，适合网络稳定但不适合 1080P 的设备。',
+    '- 1080P30：清晰稳定，适合电视盒子优先尝试。',
+    '- 1080P60：高性能档，适合手机、高性能电视或盒子。',
+    '- HEVC 1080P30：实验档，码率更低，但要求接收端 H.265 硬解稳定。',
+    '',
+    '接收端会按 16:9 等比居中显示画面，不再硬拉伸铺满屏幕；比例不一致时会保留黑边以避免画面变形。',
     ''
   ].join('\n');
 }
@@ -271,11 +317,17 @@ if not exist "InputBridgeRuntime\\InputBridge.exe" (
 exit /b %ERRORLEVEL%
 `),
     '启动默认发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
-    '启动电视盒子稳定发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile tvbox1080'),
+    '启动电视盒子稳定发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h264720p30'),
     '启动高画质发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile quality1080'),
     '启动抗花屏发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile resilient1080'),
     '启动低延迟实验发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile game1080'),
-    '启动720回退发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile game720')
+    '启动720回退发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile game720'),
+    '启动720P30稳定发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h264720p30'),
+    '启动720P60流畅发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h264720p60'),
+    '启动1080P30清晰发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h2641080p30'),
+    '启动1080P60高性能发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile h2641080p60'),
+    '启动HEVC1080P30实验发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30'),
+    '启动发送端-选择画质.bat': createQualitySelectorBatch()
   };
 
   for (const [name, text] of Object.entries(launchers)) {
