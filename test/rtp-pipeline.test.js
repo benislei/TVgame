@@ -188,6 +188,27 @@ test('builds HEVC 1080p60 RTP video pipeline for high performance receivers', ()
   assert.match(pipeline, /rtph265pay pt=98 config-interval=-1 aggregate-mode=zero-latency/);
 });
 
+test('builds AMD AMF HEVC RTP video pipeline without NVIDIA encoder', () => {
+  const config = buildRtpConfig({
+    host: '192.168.1.50',
+    profile: 'hevc1080p60',
+    encoder: 'amfh265enc'
+  });
+  const pipeline = buildVideoRtpPipeline(config);
+
+  assert.equal(config.codec, 'h265');
+  assert.equal(config.encoder, 'amfh265enc');
+  assert.match(pipeline, /amfh265enc/);
+  assert.match(pipeline, /usage=ultra-low-latency/);
+  assert.match(pipeline, /rate-control=cbr/);
+  assert.match(pipeline, /preset=speed/);
+  assert.match(pipeline, /b-frames=0/);
+  assert.match(pipeline, /bitrate=12000/);
+  assert.match(pipeline, /gop-size=5/);
+  assert.match(pipeline, /rtph265pay/);
+  assert.doesNotMatch(pipeline, /nvh265enc/);
+});
+
 test('builds AMD AMF H264 RTP video pipeline without NVIDIA encoder', () => {
   const config = buildRtpConfig({
     host: '192.168.1.50',

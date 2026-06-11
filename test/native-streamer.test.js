@@ -66,9 +66,20 @@ function createReadyStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/g
 
 function createAmdStage2Report(gstLaunch = 'D:/gstreamer/1.0/msvc_x86_64/bin/gst-launch-1.0.exe') {
   const report = createReadyStage2Report(gstLaunch);
-  report.plugins = { nvh264enc: false, amfh264enc: true, mfh264enc: false };
+  report.plugins = {
+    nvh264enc: false,
+    amfh264enc: true,
+    mfh264enc: false,
+    nvh265enc: false,
+    amfh265enc: true,
+    mfh265enc: false,
+    h265parse: true,
+    rtph265pay: true
+  };
   report.codecs.h264.encoder = 'amfh264enc';
   report.codecs.h264.availableEncoders = ['amfh264enc'];
+  report.codecs.hevc.encoder = 'amfh265enc';
+  report.codecs.hevc.availableEncoders = ['amfh265enc'];
   return report;
 }
 
@@ -303,6 +314,28 @@ test('runRtpSender auto selects AMD AMF encoder when NVENC is unavailable', () =
   assert.match(videoArgs, /amfh264enc/);
   assert.doesNotMatch(videoArgs, /nvh264enc/);
   assert.match(videoArgs, /usage=ultra-low-latency/);
+});
+
+test('runRtpSender auto selects AMD AMF HEVC encoder when NVENC HEVC is unavailable', () => {
+  const spawnedCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    spawnedCommands.push({ executable, args });
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'hevc1080p60']),
+      {
+        createReport: () => createAmdStage2Report(),
+        spawnSync: createSuccessfulPresetProbe()
+      }
+    );
+  });
+
+  const videoArgs = spawnedCommands[0].args.join(' ');
+  assert.match(videoArgs, /amfh265enc/);
+  assert.match(videoArgs, /rtph265pay/);
+  assert.doesNotMatch(videoArgs, /nvh265enc/);
 });
 
 test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', () => {

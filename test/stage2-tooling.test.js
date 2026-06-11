@@ -38,13 +38,13 @@ test('stage2 report keeps H264 ready when optional HEVC plugins are missing', ()
       if (name === 'dotnet') return 'C:/Program Files/dotnet/dotnet.exe';
       return null;
     },
-    inspectPlugin: plugin => !['nvh265enc', 'h265parse', 'rtph265pay'].includes(plugin)
+    inspectPlugin: plugin => !['nvh265enc', 'amfh265enc', 'mfh265enc', 'h265parse', 'rtph265pay'].includes(plugin)
   });
 
   assert.equal(report.ready, true);
   assert.equal(report.codecs.h264.ready, true);
   assert.equal(report.codecs.hevc.ready, false);
-  assert.deepEqual(report.codecs.hevc.missing, ['nvh265enc', 'h265parse', 'rtph265pay']);
+  assert.deepEqual(report.codecs.hevc.missing, ['nvh265enc|amfh265enc|mfh265enc', 'h265parse', 'rtph265pay']);
   assert.doesNotMatch(report.missing.plugins.join(','), /nvh265enc/);
 });
 
@@ -68,6 +68,27 @@ test('stage2 report is ready on AMD when AMF H264 encoder exists without NVENC',
   assert.equal(report.codecs.h264.encoder, 'amfh264enc');
   assert.deepEqual(report.codecs.h264.missing, []);
   assert.doesNotMatch(report.missing.plugins.join(','), /nvh264enc/);
+});
+
+test('stage2 report is HEVC ready on AMD when AMF H265 encoder exists without NVENC', () => {
+  const report = createStage2Report({
+    findExecutable: name => {
+      if (name === 'gst-launch-1.0' || name === 'gst-inspect-1.0') {
+        return `D:/gstreamer/1.0/msvc_x86_64/bin/${name}.exe`;
+      }
+      if (name === 'dotnet') return 'C:/Program Files/dotnet/dotnet.exe';
+      return null;
+    },
+    inspectPlugin: plugin => !['nvh264enc', 'nvh265enc', 'mfh265enc'].includes(plugin)
+  });
+
+  assert.equal(report.ready, true);
+  assert.equal(report.optionalPlugins.nvh265enc, false);
+  assert.equal(report.optionalPlugins.amfh265enc, true);
+  assert.equal(report.codecs.hevc.ready, true);
+  assert.equal(report.codecs.hevc.encoder, 'amfh265enc');
+  assert.deepEqual(report.codecs.hevc.availableEncoders, ['amfh265enc']);
+  assert.deepEqual(report.codecs.hevc.missing, []);
 });
 
 test('stage2 report accepts generic Media Foundation H264 encoder as fallback', () => {
@@ -139,7 +160,7 @@ test('stage2 report default inspector uses the resolved gst-inspect path', () =>
     });
 
     assert.equal(report.ready, true);
-    assert.equal(seen.length, 15);
+    assert.equal(seen.length, 17);
     assert.deepEqual(seen[0], ['d3d11screencapturesrc', 'D:/gstreamer/bin/gst-inspect-1.0.exe']);
   } finally {
     environment.inspectPlugin = originalInspectPlugin;

@@ -20,8 +20,14 @@ const H264_ENCODER_PLUGINS = [
   'mfh264enc'
 ];
 
-const OPTIONAL_HEVC_PLUGINS = [
+const HEVC_ENCODER_PLUGINS = [
   'nvh265enc',
+  'amfh265enc',
+  'mfh265enc'
+];
+
+const OPTIONAL_HEVC_PLUGINS = [
+  ...HEVC_ENCODER_PLUGINS,
   'h265parse',
   'rtph265pay'
 ];
@@ -35,10 +41,15 @@ function createStage2Report(options = {}) {
   const plugins = Object.fromEntries(REQUIRED_PLUGINS.concat(H264_ENCODER_PLUGINS).map(name => [name, inspect(name)]));
   const optionalPlugins = Object.fromEntries(OPTIONAL_HEVC_PLUGINS.map(name => [name, inspect(name)]));
   const availableH264Encoders = H264_ENCODER_PLUGINS.filter(name => plugins[name]);
+  const availableHevcEncoders = HEVC_ENCODER_PLUGINS.filter(name => optionalPlugins[name]);
   const missingPlugins = REQUIRED_PLUGINS
     .filter(name => !plugins[name])
     .concat(availableH264Encoders.length === 0 ? ['H.264 hardware encoder (nvh264enc/amfh264enc/mfh264enc)'] : []);
-  const missingHevcPlugins = OPTIONAL_HEVC_PLUGINS.filter(name => !optionalPlugins[name]);
+  const missingHevcPlugins = [
+    availableHevcEncoders.length === 0 && 'nvh265enc|amfh265enc|mfh265enc',
+    !optionalPlugins.h265parse && 'h265parse',
+    !optionalPlugins.rtph265pay && 'rtph265pay'
+  ].filter(Boolean);
 
   return {
     ready: Boolean(gstLaunch && gstInspect && dotnet && missingPlugins.length === 0),
@@ -62,7 +73,9 @@ function createStage2Report(options = {}) {
         ].filter(Boolean)
       },
       hevc: {
-        ready: missingHevcPlugins.length === 0,
+        ready: Boolean(availableHevcEncoders.length > 0 && optionalPlugins.h265parse && optionalPlugins.rtph265pay),
+        encoder: availableHevcEncoders[0] || null,
+        availableEncoders: availableHevcEncoders,
         missing: missingHevcPlugins
       }
     },
@@ -78,4 +91,10 @@ function createStage2Report(options = {}) {
   };
 }
 
-module.exports = { REQUIRED_PLUGINS, H264_ENCODER_PLUGINS, OPTIONAL_HEVC_PLUGINS, createStage2Report };
+module.exports = {
+  REQUIRED_PLUGINS,
+  H264_ENCODER_PLUGINS,
+  HEVC_ENCODER_PLUGINS,
+  OPTIONAL_HEVC_PLUGINS,
+  createStage2Report
+};

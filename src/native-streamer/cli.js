@@ -17,10 +17,12 @@ const { createStage2Report } = require('../stage2/tooling');
 const {
   RTP_PROFILES,
   H264_ENCODER_AUTO_ORDER,
+  H265_ENCODER_AUTO_ORDER,
   NVENC_ENCODER_PRESETS,
   NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
   buildH264EncoderProbeArgs,
+  buildH265EncoderProbeArgs,
   buildNvencPresetProbeArgs,
   buildRtpLaunchCommands
 } = require('./rtp-pipeline');
@@ -103,7 +105,7 @@ function printStage2Report(report) {
   console.log('');
   console.log('编码能力：');
   console.log(`  H.264：${report.codecs.h264.ready ? `通过（${report.codecs.h264.encoder}）` : `缺失 ${report.codecs.h264.missing.join(', ')}`}`);
-  console.log(`  HEVC/4K60 预备：${report.codecs.hevc.ready ? '通过' : `缺失 ${report.codecs.hevc.missing.join(', ')}`}`);
+  console.log(`  HEVC/4K60 预备：${report.codecs.hevc.ready ? `通过（${report.codecs.hevc.encoder}）` : `缺失 ${report.codecs.hevc.missing.join(', ')}`}`);
   console.log('');
   console.log(report.ready ? '结果：阶段 2 RTP 发送端环境已就绪。' : '结果：阶段 2 RTP 发送端环境未就绪。');
   if (!report.ready) {
@@ -129,7 +131,7 @@ function printRtpHelp() {
   console.log('  --fps <帧率>          视频帧率，默认 60');
   console.log('  --bitrate <kbps>      H.264/HEVC 码率，默认 22000');
   console.log('  --gop <帧数>          关键帧间隔，默认 5');
-  console.log('  --encoder <编码器>    H.264 编码器，默认 auto；可选 nvenc, amf, mf');
+  console.log('  --encoder <编码器>    硬件编码器偏好，默认 auto；可选 nvenc, amf, mf');
   console.log('  --encoder-preset <值> NVENC preset，默认 auto；按体验优先自动探测，可手动指定 low-latency-hq 或 default');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
@@ -152,6 +154,14 @@ function parseIntegerOption(value, label, min, max, errors) {
 function normalizeH264Encoder(value) {
   if (typeof value !== 'string') return null;
   return H264_ENCODER_ALIASES[value.toLowerCase()] || null;
+}
+
+function normalizeHevcEncoderPreference(encoder) {
+  if (encoder === 'auto') return 'auto';
+  if (encoder === 'nvh264enc') return 'nvh265enc';
+  if (encoder === 'amfh264enc') return 'amfh265enc';
+  if (encoder === 'mfh264enc') return 'mfh265enc';
+  return encoder;
 }
 
 function validateRtpArgs(args) {
@@ -261,6 +271,16 @@ function probeH264Encoder(config, encoder, gstLaunch, spawnSync) {
   return Boolean(result && result.status === 0);
 }
 
+function probeH265Encoder(config, encoder, gstLaunch, spawnSync) {
+  const args = buildH265EncoderProbeArgs(config, encoder);
+  const result = spawnSync(gstLaunch, args, {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    windowsHide: true
+  });
+  return Boolean(result && result.status === 0);
+}
+
 function selectH264Encoder(config, report, gstLaunch, spawnSync) {
   const availableEncoders = new Set(
     report.codecs && report.codecs.h264 && Array.isArray(report.codecs.h264.availableEncoders)
@@ -311,19 +331,58 @@ function selectHevcEncoder(config, report, gstLaunch, spawnSync) {
   if (!report.codecs || !report.codecs.hevc || !report.codecs.hevc.ready) {
     const missing = report.codecs && report.codecs.hevc && report.codecs.hevc.missing
       ? report.codecs.hevc.missing.join(', ')
-      : 'nvh265enc, h265parse, rtph265pay';
+      : 'nvh265enc|amfh265enc|mfh265enc, h265parse, rtph265pay';
     console.error(`HEVC 实验档不可用：缺少 ${missing}`);
     return false;
   }
 
-  config.encoder = 'nvh265enc';
-  if (config.encoderPreset === 'auto') {
-    const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
-    if (!selectedPreset) return false;
-    config.encoderPreset = selectedPreset;
+  const availableEncoders = new Set(
+    report.codecs && report.codecs.hevc && Array.isArray(report.codecs.hevc.availableEncoders)
+      ? report.codecs.hevc.availableEncoders
+      : H265_ENCODER_AUTO_ORDER.filter(name => (
+        report.optionalPlugins && report.optionalPlugins[name]
+      ) || (
+        report.plugins && report.plugins[name]
+      ))
+  );
+  const requested = normalizeHevcEncoderPreference(config.encoder || 'auto');
+  const candidates = requested === 'auto'
+    ? H265_ENCODER_AUTO_ORDER.filter(name => availableEncoders.has(name))
+    : [requested];
+
+  if (candidates.length === 0) {
+    console.error('未检测到可用的 HEVC 硬件编码器：需要 nvh265enc、amfh265enc 或 mfh265enc 之一。');
+    return false;
   }
-  console.log('HEVC 编码器自动选择：nvh265enc');
-  return true;
+
+  for (const encoder of candidates) {
+    if (!availableEncoders.has(encoder)) {
+      console.error(`指定的 HEVC 编码器不可用：${encoder}`);
+      continue;
+    }
+
+    if (encoder === 'nvh265enc') {
+      config.encoder = encoder;
+      if (config.encoderPreset === 'auto') {
+        const selectedPreset = selectAutoEncoderPreset(config, gstLaunch, spawnSync);
+        if (!selectedPreset) continue;
+        config.encoderPreset = selectedPreset;
+      }
+      console.log(`HEVC 编码器自动选择：${encoder}`);
+      return true;
+    }
+
+    console.log(`正在探测 HEVC 编码器：${encoder}`);
+    if (probeH265Encoder(config, encoder, gstLaunch, spawnSync)) {
+      config.encoder = encoder;
+      console.log(`HEVC 编码器自动选择：${encoder}`);
+      return true;
+    }
+    console.log(`HEVC 编码器不可用，继续回退：${encoder}`);
+  }
+
+  console.error('自动探测 HEVC 编码器失败：当前显卡、驱动或 GStreamer 无法启动硬件 HEVC 编码。');
+  return false;
 }
 
 function runRtpSender(args, options = {}) {

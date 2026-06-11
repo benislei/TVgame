@@ -159,6 +159,12 @@ const H264_ENCODER_AUTO_ORDER = [
   'mfh264enc'
 ];
 
+const H265_ENCODER_AUTO_ORDER = [
+  'nvh265enc',
+  'amfh265enc',
+  'mfh265enc'
+];
+
 function buildRtpConfig(overrides = {}) {
   const profileName = overrides.profile || 'resilient1080';
   const profile = RTP_PROFILES[profileName] || RTP_PROFILES.resilient1080;
@@ -315,6 +321,28 @@ function buildH264EncoderElement(config) {
 }
 
 function buildH265EncoderElement(config) {
+  if (config.encoder === 'amfh265enc') {
+    return [
+      'amfh265enc',
+      'usage=ultra-low-latency',
+      'rate-control=cbr',
+      'preset=speed',
+      `bitrate=${config.bitrateKbps}`,
+      `gop-size=${config.keyframeInterval}`,
+      'b-frames=0'
+    ].join(' ');
+  }
+
+  if (config.encoder === 'mfh265enc') {
+    return [
+      'mfh265enc',
+      'low-latency=true',
+      'rc-mode=cbr',
+      `bitrate=${config.bitrateKbps}`,
+      `gop-size=${config.keyframeInterval}`
+    ].join(' ');
+  }
+
   const preset = config.encoderPreset === 'auto' ? 'default' : config.encoderPreset;
   const encoderOptions = [
     `preset=${preset}`,
@@ -374,8 +402,26 @@ function buildH264EncoderProbePipeline(config, encoder) {
   ].join(' ');
 }
 
+function buildH265EncoderProbePipeline(config, encoder) {
+  const fps = `${config.fps}/1`;
+  const probeConfig = { ...config, encoder };
+  return [
+    'videotestsrc num-buffers=1',
+    '!',
+    `video/x-raw,format=NV12,width=${config.width},height=${config.height},framerate=${fps}`,
+    '!',
+    buildH265EncoderElement(probeConfig),
+    '!',
+    'fakesink sync=false'
+  ].join(' ');
+}
+
 function buildH264EncoderProbeArgs(config, encoder) {
   return ['-q'].concat(splitPipeline(buildH264EncoderProbePipeline(config, encoder)));
+}
+
+function buildH265EncoderProbeArgs(config, encoder) {
+  return ['-q'].concat(splitPipeline(buildH265EncoderProbePipeline(config, encoder)));
 }
 
 function buildNvencPresetProbeArgs(config, preset) {
@@ -400,6 +446,7 @@ function buildRtpLaunchCommands(config) {
 module.exports = {
   RTP_PROFILES,
   H264_ENCODER_AUTO_ORDER,
+  H265_ENCODER_AUTO_ORDER,
   NVENC_ENCODER_PRESETS,
   NVENC_AUTO_PRESET_ORDER,
   buildRtpConfig,
@@ -407,7 +454,9 @@ module.exports = {
   buildH264EncoderElement,
   buildH265EncoderElement,
   buildH264EncoderProbePipeline,
+  buildH265EncoderProbePipeline,
   buildH264EncoderProbeArgs,
+  buildH265EncoderProbeArgs,
   buildAudioRtpPipeline,
   buildNvencPresetProbePipeline,
   buildNvencPresetProbeArgs,
