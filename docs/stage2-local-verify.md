@@ -62,7 +62,7 @@ npm.cmd run native:rtp -- --host <Android TV IP> --profile hevc1080p30
 npm.cmd run native:rtp -- --host <Android TV IP> --profile hevc1080p30 --process-priority high
 ```
 
-如果接收端 FPS 明显低于电脑端游戏 FPS，先在游戏内设置 FPS 上限，建议从 60 FPS 开始；仍然卡顿时再试 45 或 30 FPS。串流场景里要给发送端留下 10% 到 20% 的 GPU/显存余量，稳定帧时间通常比电脑端单机 FPS 更重要。
+如果接收端 FPS 明显低于电脑端游戏 FPS，先在游戏内设置 FPS 上限，建议从 60 FPS 开始；仍然卡顿时再试 45 或 30 FPS。串流场景里要给发送端留下 10% 到 20% 的 GPU/显存余量，稳定帧时间通常比电脑端单机 FPS 更重要。朋友包里的 `启动发送端-选择画质.bat` 会给每个画质档位显示建议的游戏 FPS 上限，并且所有档位都会带上发送进程 High 优先级；脚本只提示建议值，不会自动修改游戏设置。
 
 如果接收端 H.265 硬解稳定，并且想继续尝试更高帧率，可以测试 `hevc1080p60`：
 
@@ -168,7 +168,7 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动性能保护发送.bat` 和 `启动发送端-选择画质.bat`。朋友优先使用 `启动推荐发送.bat` 或 `启动性能保护发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，或需要排查设备性能，再用 `启动发送端-选择画质.bat` 在性能保护推荐、HEVC 1080P60、1080P60、1080P30、720P60 和 720P30 之间切换。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动性能保护发送.bat` 和 `启动发送端-选择画质.bat`。朋友优先使用 `启动推荐发送.bat` 或 `启动性能保护发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，或需要排查设备性能，再用 `启动发送端-选择画质.bat` 在性能保护推荐、HEVC 1080P60、1080P60、1080P30、720P60 和 720P30 之间切换。选择器里的每个档位都会开启发送端 High 优先级，并在启动前提示对应的游戏 FPS 上限建议。
 
 ## 验收记录
 

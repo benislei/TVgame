@@ -181,6 +181,29 @@ test('friend preview package consolidates quality choices into one selector', ()
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
 });
 
+test('friend preview quality selector gives every profile a game FPS protection hint', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+
+  const selector = fs.readFileSync(path.join(report.packageDir, '启动发送端-选择画质.bat'), 'utf8');
+
+  assert.match(selector, /set "TV_GAME_FPS_LIMIT=30"/);
+  assert.match(selector, /set "TV_GAME_FPS_LIMIT=45"/);
+  assert.match(selector, /set "TV_GAME_FPS_LIMIT=60"/);
+  for (const profile of ['h264720p30', 'h264720p60', 'h2641080p30', 'h2641080p60', 'hevc1080p30', 'hevc1080p60']) {
+    assert.match(selector, new RegExp(`if "%TV_PROFILE%"=="${profile}"`));
+  }
+  assert.match(selector, /TV_PROFILE_CHOICE/);
+  assert.match(selector, /TV_GAME_FPS_NOTE/);
+  assert.match(selector, /%TV_GAME_FPS_LIMIT%/);
+  assert.match(selector, /--process-priority high/);
+});
+
 test('friend preview package can publish InputBridge runtime so friends do not need the .NET SDK', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();

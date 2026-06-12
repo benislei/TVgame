@@ -191,6 +191,7 @@ echo(
 set "TV_PROFILE="
 set /p "TV_PROFILE=请输入 1-7（默认 7 性能保护推荐）："
 if "%TV_PROFILE%"=="" set "TV_PROFILE=7"
+set "TV_PROFILE_CHOICE=%TV_PROFILE%"
 if "%TV_PROFILE%"=="1" set "TV_PROFILE=h264720p30"
 if "%TV_PROFILE%"=="2" set "TV_PROFILE=h264720p60"
 if "%TV_PROFILE%"=="3" set "TV_PROFILE=h2641080p30"
@@ -207,13 +208,54 @@ if "%TV_PROFILE%"=="hevc1080p60" goto :profile_ok
 echo(输入无效，已改用 720P30 稳定档。
 set "TV_PROFILE=h264720p30"
 :profile_ok
+set "TV_PROFILE_LABEL=%TV_PROFILE%"
+set "TV_GAME_FPS_LIMIT=60"
+set "TV_GAME_FPS_NOTE=建议先把游戏内 FPS 上限锁到 60；如果仍卡，再降到 45 或 30。"
+if "%TV_PROFILE%"=="h264720p30" (
+  set "TV_PROFILE_LABEL=720P30"
+  set "TV_GAME_FPS_LIMIT=30"
+  set "TV_GAME_FPS_NOTE=低性能设备优先锁 30 FPS，保证捕获和编码有余量。"
+)
+if "%TV_PROFILE%"=="h264720p60" (
+  set "TV_PROFILE_LABEL=720P60"
+  set "TV_GAME_FPS_LIMIT=60"
+  set "TV_GAME_FPS_NOTE=建议锁 60 FPS；如果电脑负载很高，再降到 45 或 30。"
+)
+if "%TV_PROFILE%"=="h2641080p30" (
+  set "TV_PROFILE_LABEL=1080P30"
+  set "TV_GAME_FPS_LIMIT=45"
+  set "TV_GAME_FPS_NOTE=建议先锁 45 FPS，想要更低输入延迟可试 60，卡顿时降到 30。"
+)
+if "%TV_PROFILE%"=="h2641080p60" (
+  set "TV_PROFILE_LABEL=1080P60"
+  set "TV_GAME_FPS_LIMIT=60"
+  set "TV_GAME_FPS_NOTE=建议锁 60 FPS，给捕获、编码和发送留下稳定余量。"
+)
+if "%TV_PROFILE%"=="hevc1080p30" (
+  set "TV_PROFILE_LABEL=HEVC 1080P30"
+  set "TV_GAME_FPS_LIMIT=60"
+  set "TV_GAME_FPS_NOTE=推荐先锁 60 FPS；大型游戏仍卡时降到 45 或 30。"
+)
+if "%TV_PROFILE%"=="hevc1080p60" (
+  set "TV_PROFILE_LABEL=HEVC 1080P60"
+  set "TV_GAME_FPS_LIMIT=60"
+  set "TV_GAME_FPS_NOTE=高性能档建议锁 60 FPS，避免游戏把编码资源吃满。"
+)
+if "%TV_PROFILE_CHOICE%"=="7" (
+  set "TV_PROFILE_LABEL=性能保护推荐 HEVC 1080P30"
+  set "TV_GAME_FPS_LIMIT=60"
+  set "TV_GAME_FPS_NOTE=大型游戏优先锁 60 FPS；显卡、显存或内存吃满时降到 45 或 30。"
+)
+echo(
+echo(性能保护已开启：发送端进程将使用 High 优先级。
+echo(建议游戏 FPS 上限：%TV_GAME_FPS_LIMIT%。%TV_GAME_FPS_NOTE%
 echo(
 echo(请选择电视或盒子的局域网 IP。
 set "TV_IP="
 set /p "TV_IP=电视/盒子 IP（留空为 127.0.0.1）："
 if "%TV_IP%"=="" set "TV_IP=127.0.0.1"
 echo(
-echo(正在启动发送端，目标：%TV_IP%，档位：%TV_PROFILE%
+echo(正在启动发送端，目标：%TV_IP%，档位：%TV_PROFILE_LABEL%
 call npm.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile %TV_PROFILE% --process-priority high
 `));
 }
@@ -241,7 +283,7 @@ function createReadme() {
     '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥，默认运行包内 `InputBridgeRuntime\\InputBridge.exe`。',
     '- `启动推荐发送.bat`：HEVC 1080P30 推荐档，并自动提高发送进程优先级。当前测试里清晰度、流畅度和延迟综合最好，优先从这里开始。',
     '- `启动性能保护发送.bat`：大型游戏优先使用。它会使用 HEVC 1080P30，同时把发送端 GStreamer 进程提高到 High 优先级，尽量给画面捕获、编码和传输保留响应时间。',
-    '- `启动发送端-选择画质.bat`：统一画质选择入口，包含 720P30、720P60、1080P30、1080P60、HEVC 1080P30、HEVC 1080P60 和性能保护推荐。默认选项是性能保护推荐档。',
+    '- `启动发送端-选择画质.bat`：统一画质选择入口，包含 720P30、720P60、1080P30、1080P60、HEVC 1080P30、HEVC 1080P60 和性能保护推荐。每个档位都会提高发送进程优先级，并显示对应的游戏 FPS 上限建议。默认选项是性能保护推荐档。',
     '',
     '## 快速验证步骤',
     '',
@@ -254,14 +296,14 @@ function createReadme() {
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
     '6. 运行 `启动推荐发送.bat` 或 `启动性能保护发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
     '7. 电视上看到画面和声音后，优先用真实游戏验证移动、转向、开火、菜单等操作体感。游戏里请选择 Xbox 手柄或控制器输入。',
-    '8. 如果想切换画质或排查设备性能，运行 `启动发送端-选择画质.bat`。建议顺序是：HEVC 1080P30、HEVC 1080P60、1080P60、1080P30、720P60、720P30。',
-    '9. 如果出现花屏、FPS 归零或卡顿，先降到 1080P30；仍不稳定再降到 720P60 或 720P30。手机和高性能盒子可以优先尝试 HEVC 1080P60。大型游戏如果电脑端显卡或内存被吃满，先把游戏内 FPS 上限设置到 60 或 90，关闭不必要的后台录屏/直播/叠加层，并使用 `启动性能保护发送.bat`。',
+    '8. 如果想切换画质或排查设备性能，运行 `启动发送端-选择画质.bat`。建议顺序是：HEVC 1080P30、HEVC 1080P60、1080P60、1080P30、720P60、720P30。选择器里的每个档位都会启用发送端 High 优先级，并在启动前提示该档建议的游戏 FPS 上限。',
+    '9. 如果出现花屏、FPS 归零或卡顿，先降到 1080P30；仍不稳定再降到 720P60 或 720P30。手机和高性能盒子可以优先尝试 HEVC 1080P60。大型游戏如果电脑端显卡或内存被吃满，按脚本提示把游戏内 FPS 上限设置到 60、45 或 30，关闭不必要的后台录屏/直播/叠加层，并使用 `启动性能保护发送.bat`。',
     '',
     '## 大型游戏性能保护',
     '',
-    '性能保护模式不会降低游戏本身画质，它主要做两件事：使用当前最稳的 HEVC 1080P30 推荐档，并把发送端 GStreamer 进程提升到 High 优先级。这样在游戏把 GPU、显存或内存吃满时，捕获、编码和 UDP 发送更不容易被系统调度挤掉。',
+    '性能保护模式不会降低游戏本身画质，它主要做两件事：把发送端 GStreamer 进程提升到 High 优先级，并给当前画质档位显示建议的游戏 FPS 上限。这样在游戏把 GPU、显存或内存吃满时，捕获、编码和 UDP 发送更不容易被系统调度挤掉。',
     '',
-    '如果接收端 FPS 明显低于电脑端游戏 FPS，优先在游戏内开启帧率上限，建议先锁 60 FPS；如果仍卡，再锁 45 或 30 FPS。目标是给发送端留下 10% 到 20% 的 GPU/显存余量。这个余量比单纯追求电脑端游戏 FPS 更重要，因为串流链路需要稳定的帧时间。',
+    '如果接收端 FPS 明显低于电脑端游戏 FPS，优先在游戏内开启帧率上限。脚本只会给出每个档位的建议值，不会自动修改游戏设置；真正的限帧需要在游戏内、显卡驱动或 RTSS 这类工具里手动设置。目标是给发送端留下 10% 到 20% 的 GPU/显存余量。这个余量比单纯追求电脑端游戏 FPS 更重要，因为串流链路需要稳定的帧时间。',
     '',
     '## 手柄输入',
     '',
