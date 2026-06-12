@@ -14,6 +14,7 @@
     "native:profiles": "node src/native-streamer/cli.js profiles",
     "native:run": "node src/native-streamer/cli.js run",
     "stage2:check": "node src/native-streamer/cli.js stage2-check",
+    "stage2:doctor": "node src/native-streamer/cli.js stage2-doctor",
     "native:rtp": "node src/native-streamer/cli.js rtp",
     "android:check": "node src/android-build/cli.js check",
     "android:install": "node src/android-build/cli.js install",

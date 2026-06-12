@@ -18,6 +18,7 @@ function createFakeProject() {
     name: 'lan-game-streaming-prototype',
     scripts: {
       'stage2:check': 'node src/native-streamer/cli.js stage2-check',
+      'stage2:doctor': 'node src/native-streamer/cli.js stage2-doctor',
       'native:rtp': 'node src/native-streamer/cli.js rtp'
     }
   }, null, 2));
@@ -122,7 +123,14 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(installVigemBus, /powershell\.exe[\s\S]+scripts\\install-vigembus\.ps1/);
   assert.match(check, /where npm\.cmd/);
   assert.match(check, /未检测到 Node\.js\/npm/);
-  assert.match(check, /npm\.cmd run stage2:check/);
+  assert.match(check, /是否现在安装 Node\.js LTS/);
+  assert.match(check, /scripts\\install-nodejs\.ps1/);
+  assert.match(check, /未检测到 npm 依赖目录 node_modules/);
+  assert.match(check, /是否现在安装\/更新 npm 依赖/);
+  assert.match(check, /choice \/C YN \/N \/M/);
+  assert.doesNotMatch(check, /set \/p "TV_FIX_/);
+  assert.match(check, /npm\.cmd install/);
+  assert.match(check, /npm\.cmd run stage2:doctor/);
   assert.match(bridge, /InputBridgeRuntime\\InputBridge\.exe/);
   assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
   assert.match(recommendedSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high/);
@@ -262,8 +270,9 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /Android 11\+/);
   assert.match(readme, /TVGameReceiver\.apk/);
   assert.match(readme, /安装Node\.js运行环境\.bat/);
-  assert.match(readme, /Node\.js\/npm 是发送端基础运行时依赖/);
-  assert.match(readme, /重新打开一个新的命令窗口/);
+  assert.match(readme, /检查环境\.bat/);
+  assert.match(readme, /先说明处理方案，确认后再一键处理/);
+  assert.match(readme, /输入 Y 后自动安装\/更新对应依赖/);
   assert.match(readme, /N 卡优先使用 `nvh264enc`/);
   assert.match(readme, /A 卡优先使用 `amfh264enc`/);
   assert.match(readme, /`mfh264enc` 兜底/);

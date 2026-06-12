@@ -790,7 +790,7 @@ test('stage 2 verification guide documents input return and acceptance checklist
   assert.match(doc, /## 验收记录/);
   for (const item of [
     'App 启动中文状态面板',
-    '`stage2:check` 通过',
+    '`检查环境.bat` 或 `npm.cmd run stage2:doctor` 通过',
     '`native:rtp` 启动视频音频发送',
     '电视视频包计数增长',
     '音频包计数增长',

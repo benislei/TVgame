@@ -17,10 +17,40 @@ function Install-Msi($Path, $Name) {
   }
 }
 
+function Ensure-Aria2 {
+  if (Test-Command "aria2c") {
+    return $true
+  }
+
+  if (-not (Test-Command "winget.exe")) {
+    Write-Host "未检测到 aria2c，也没有 winget，稍后回退到 curl 断点续传。"
+    return $false
+  }
+
+  Write-Host "未检测到 aria2c，正在尝试安装 aria2 下载加速器..."
+  & winget.exe install --id aria2.aria2 --exact --silent --accept-package-agreements --accept-source-agreements
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "aria2 安装失败，稍后回退到 curl 断点续传。退出码：$LASTEXITCODE"
+    return $false
+  }
+
+  $aria2Candidate = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links\aria2c.exe"
+  if (Test-Path $aria2Candidate) {
+    $linkDir = Split-Path $aria2Candidate
+    if (-not (($env:PATH -split ";") | Where-Object { $_ -eq $linkDir })) {
+      $env:PATH = "$linkDir;$env:PATH"
+    }
+  }
+
+  return (Test-Command "aria2c")
+}
+
 function Download-File($Url, $Path) {
   if ((Test-Path $Path) -and ((Get-Item $Path).Length -gt 0)) {
     Write-Host "检测到已有下载文件，尝试断点续传：$Path"
   }
+
+  Ensure-Aria2 | Out-Null
 
   if (Test-Command "aria2c") {
     Write-Host "使用 aria2c 下载/续传..."

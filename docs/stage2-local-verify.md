@@ -12,12 +12,12 @@
 
 ## PC 端准备
 
-Node.js/npm 是发送端基础运行时依赖。朋友试用包用户先运行 `安装npm依赖.bat`；如果当前电脑没有 Node.js/npm，这个脚本会先尝试安装 Node.js LTS。安装完成后如果仍提示找不到 `npm.cmd`，请关闭当前窗口，重新打开一个新的命令窗口后再运行一次 `安装npm依赖.bat`。
+Node.js/npm 是发送端基础运行时依赖。朋友试用包用户优先运行 `检查环境.bat`：它会先检查 Node.js/npm、npm 依赖、GStreamer、编码器插件、音频捕获和输入桥运行时；如果发现缺失，会先说明原因和处理方案，再询问是否一键处理。用户确认后脚本会自动安装/更新对应依赖，不需要一个个手动运行安装脚本。
 
-在项目根目录运行依赖检查：
+源码开发环境可在项目根目录运行同样的环境医生：
 
 ```powershell
-npm.cmd run stage2:check
+npm.cmd run stage2:doctor
 ```
 
 确认 GStreamer、RTP 视频插件、RTP 音频插件和编码能力通过后，启动 InputBridge。朋友试用包直接运行 `启动输入桥.bat`，它会使用包内 `InputBridgeRuntime\InputBridge.exe`，朋友电脑不需要安装 .NET SDK。源码开发环境可使用：
@@ -168,13 +168,13 @@ dist\TVGame-Friend-Preview\
 dist\TVGame-Friend-Preview.zip
 ```
 
-试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动性能保护发送.bat` 和 `启动发送端-选择画质.bat`。朋友优先使用 `启动推荐发送.bat` 或 `启动性能保护发送.bat` 验证 HEVC 1080P30 基础手感；如果接收设备足够强，或需要排查设备性能，再用 `启动发送端-选择画质.bat` 在性能保护推荐、HEVC 1080P60、1080P60、1080P30、720P60 和 720P30 之间切换。选择器里的每个档位都会开启发送端 High 优先级，并在启动前提示对应的游戏 FPS 上限建议。
+试用包内包含 `TVGameReceiver.apk`、`README-朋友试用.md`、`InputBridgeRuntime`、`安装npm依赖.bat`、`安装GStreamer依赖.bat`、`安装ViGEmBus手柄驱动.bat`、`检查环境.bat`、`启动输入桥.bat`、`启动推荐发送.bat`、`启动性能保护发送.bat` 和 `启动发送端-选择画质.bat`。朋友优先运行 `检查环境.bat`，按提示确认一键处理缺失依赖；确认环境通过后，再使用 `启动推荐发送.bat` 或 `启动性能保护发送.bat` 验证 HEVC 1080P30 基础手感。如果接收设备足够强，或需要排查设备性能，再用 `启动发送端-选择画质.bat` 在性能保护推荐、HEVC 1080P60、1080P60、1080P30、720P60 和 720P30 之间切换。选择器里的每个档位都会开启发送端 High 优先级，并在启动前提示对应的游戏 FPS 上限建议。
 
 ## 验收记录
 
 - [ ] App 启动中文状态面板。
 - [ ] 状态面板显示 Android 11+ 极致模式。
-- [ ] `stage2:check` 通过。
+- [ ] `检查环境.bat` 或 `npm.cmd run stage2:doctor` 通过。
 - [ ] InputBridge 启动并监听 TCP 8789。
 - [ ] `native:rtp` 启动视频音频发送。
 - [ ] 电视视频包计数增长。
@@ -193,7 +193,7 @@ dist\TVGame-Friend-Preview.zip
 - [ ] 紧凑状态面板包含 FPS、实时丢包、实时丢帧、等待关键、恢复、队列、解码、视频状态和音频状态，并且不会遮挡大面积游戏画面。
 - [ ] 菜单键或 F1 可以隐藏或显示状态面板。
 - [ ] 未收到数据时，视频状态和音频状态显示“未收到”。
-- [ ] 运行 `npm.cmd run stage2:check` 可以看到 PC 端阶段 2 依赖检查结果。
+- [ ] 运行 `npm.cmd run stage2:doctor` 可以看到 PC 端阶段 2 依赖检查结果和确认式一键处理方案。
 - [ ] 运行 `npm.cmd run native:rtp -- --host <Android TV IP>` 后，PC 端启动视频和音频 RTP 发送进程。
 - [ ] Android TV 接收端视频 UDP 5004 和音频 UDP 5006 指标会随数据包增长。
 - [ ] 在真实 Android 11+ TV 上确认 MediaCodec 显示 H.264 画面，AudioTrack 播放 L16 音频。

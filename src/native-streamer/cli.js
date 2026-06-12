@@ -1,6 +1,7 @@
 'use strict';
 
 const childProcess = require('child_process');
+const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const {
@@ -14,6 +15,12 @@ const {
   listProfiles
 } = require('./pipeline');
 const { createStage2Report } = require('../stage2/tooling');
+const {
+  createStage2RepairPlan,
+  formatStage2RepairPlan,
+  hasInputBridgeRuntime,
+  runStage2RepairActions
+} = require('../stage2/repair');
 const {
   RTP_PROFILES,
   H264_ENCODER_AUTO_ORDER,
@@ -119,6 +126,114 @@ function printStage2Report(report) {
     console.log('缺失项：');
     for (const item of report.missing.executables) console.log(`  - ${item}`);
     for (const item of report.missing.plugins) console.log(`  - ${item}`);
+  }
+}
+
+function createStage2DoctorTestReport(name) {
+  if (name !== 'missing-gstreamer') return null;
+  return {
+    ready: false,
+    gstreamer: {
+      ready: false,
+      gstLaunch: null,
+      gstInspect: null
+    },
+    dotnet: {
+      ready: false,
+      path: null
+    },
+    plugins: {
+      d3d11screencapturesrc: true,
+      d3d11download: false,
+      wasapi2src: false,
+      nvh264enc: false,
+      amfh264enc: false,
+      mfh264enc: false
+    },
+    optionalPlugins: {
+      nvh265enc: false,
+      amfh265enc: false,
+      mfh265enc: false,
+      h265parse: false,
+      rtph265pay: false
+    },
+    codecs: {
+      h264: {
+        ready: false,
+        encoder: null,
+        availableEncoders: [],
+        missing: ['nvh264enc|amfh264enc|mfh264enc']
+      },
+      hevc: {
+        ready: false,
+        encoder: null,
+        availableEncoders: [],
+        missing: ['nvh265enc|amfh265enc|mfh265enc', 'h265parse', 'rtph265pay']
+      }
+    },
+    missing: {
+      executables: ['gst-launch-1.0', 'gst-inspect-1.0', 'dotnet'],
+      plugins: ['d3d11download', 'wasapi2src', 'H.264 hardware encoder (nvh264enc/amfh264enc/mfh264enc)'],
+      pythonModules: []
+    }
+  };
+}
+
+function printReadableStage2Report(report) {
+  console.log('阶段 2 发送端环境检测');
+  console.log('====================');
+  console.log(`GStreamer：${report.gstreamer.ready ? '通过' : '未就绪'}`);
+  console.log(`gst-launch-1.0：${report.gstreamer.gstLaunch || '未找到'}`);
+  console.log(`gst-inspect-1.0：${report.gstreamer.gstInspect || '未找到'}`);
+  console.log(`dotnet：${report.dotnet.ready ? report.dotnet.path : '未找到'}`);
+  console.log('');
+  console.log(`H.264：${report.codecs.h264.ready ? `通过（${report.codecs.h264.encoder}）` : `缺失 ${report.codecs.h264.missing.join(', ')}`}`);
+  console.log(`HEVC：${report.codecs.hevc.ready ? `通过（${report.codecs.hevc.encoder}）` : `缺失 ${report.codecs.hevc.missing.join(', ')}`}`);
+}
+
+function readYesNoFromStdin() {
+  const buffer = Buffer.alloc(1024);
+  try {
+    const bytes = fs.readSync(0, buffer, 0, buffer.length);
+    return buffer.toString('utf8', 0, bytes).trim();
+  } catch {
+    return '';
+  }
+}
+
+function runStage2Doctor(options = {}) {
+  const projectRoot = options.projectRoot || process.cwd();
+  const createReport = options.createReport || (() => (
+    createStage2DoctorTestReport(process.env.TVGAME_STAGE2_TEST_REPORT) || createStage2Report()
+  ));
+  const report = createReport();
+  const plan = createStage2RepairPlan(report, {
+    hasInputBridgeRuntime: hasInputBridgeRuntime(projectRoot)
+  });
+
+  printReadableStage2Report(report);
+  console.log(formatStage2RepairPlan(plan));
+
+  if (plan.automaticActions.length === 0) return;
+
+  console.log('');
+  process.stdout.write('是否现在执行一键处理？输入 Y 后开始，其它输入取消：');
+  const answer = options.answer === undefined ? readYesNoFromStdin() : options.answer;
+  if (!/^y(es)?$/i.test(answer)) {
+    console.log('已取消自动处理。');
+    return;
+  }
+
+  try {
+    runStage2RepairActions(plan, {
+      projectRoot,
+      spawnSync: options.spawnSync
+    });
+    console.log('');
+    console.log('自动处理已执行完成。请关闭当前窗口，重新打开后再次运行 检查环境.bat。');
+  } catch (error) {
+    console.error(`自动处理失败：${error.message}`);
+    process.exitCode = 1;
   }
 }
 
@@ -592,6 +707,11 @@ function main(argv = process.argv.slice(2)) {
     return;
   }
 
+  if (command === 'stage2-doctor') {
+    runStage2Doctor();
+    return;
+  }
+
   if (command === 'rtp') {
     runRtpSender(args);
     return;
@@ -623,7 +743,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   console.error(`未知命令：${command}`);
-  console.error('可用命令：check, stage2-check, install, pipeline, profiles, urls, run, rtp');
+  console.error('可用命令：check, stage2-check, stage2-doctor, install, pipeline, profiles, urls, run, rtp');
   process.exitCode = 1;
 }
 
@@ -631,4 +751,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, main, printReport, printStage2Report, printRtpHelp, validateRtpArgs, runRtpSender };
+module.exports = { parseArgs, main, printReport, printStage2Report, printRtpHelp, validateRtpArgs, runRtpSender, runStage2Doctor };

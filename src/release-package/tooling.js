@@ -269,7 +269,7 @@ function createReadme() {
     '## 适用设备',
     '',
     '- 接收端：Android 11+ 电视或电视盒子，推荐小米盒子 5 Max、同级或更高性能设备。',
-    '- 发送端：Windows 电脑，推荐 NVIDIA 显卡，并已安装 Node.js、GStreamer MSVC x86_64 运行环境；输入桥已随包发布到 `InputBridgeRuntime`，朋友电脑不需要额外安装 .NET SDK。如果要让电视端 USB 手柄控制 PC 游戏，还需要 ViGEmBus 虚拟手柄驱动。',
+    '- 发送端：Windows 电脑，推荐 NVIDIA 或 AMD 独立显卡，并通过 `检查环境.bat` 自动检查和处理 Node.js、npm 依赖、GStreamer MSVC x86_64、硬件编码插件等运行环境；输入桥已随包发布到 `InputBridgeRuntime`，朋友电脑不需要额外安装 .NET SDK。如果要让电视端 USB 手柄控制 PC 游戏，还需要 ViGEmBus 虚拟手柄驱动。',
     '- 网络：电视/盒子和电脑在同一个局域网，优先使用有线或高质量 5GHz/6GHz Wi-Fi。',
     '',
     '## 文件说明',
@@ -279,7 +279,7 @@ function createReadme() {
     '- `安装npm依赖.bat`：在电脑端安装项目 npm 依赖；如果没有 Node.js/npm，会先自动尝试安装 Node.js LTS。',
     '- `安装GStreamer依赖.bat`：尝试安装 GStreamer 依赖。',
     '- `安装ViGEmBus手柄驱动.bat`：安装 PC 端虚拟 Xbox 手柄驱动，电视或盒子上的 USB 手柄需要它才能被 PC 游戏识别。',
-    '- `检查环境.bat`：检查电脑端 GStreamer、编码器、音频捕获和 .NET 环境。',
+    '- `检查环境.bat`：推荐第一个运行。它会检查电脑端 Node.js/npm、npm 依赖、GStreamer、编码器、音频捕获和输入桥运行时；发现缺失后会先说明处理方案，确认后再一键处理。',
     '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥，默认运行包内 `InputBridgeRuntime\\InputBridge.exe`。',
     '- `启动推荐发送.bat`：HEVC 1080P30 推荐档，并自动提高发送进程优先级。当前测试里清晰度、流畅度和延迟综合最好，优先从这里开始。',
     '- `启动性能保护发送.bat`：大型游戏优先使用。它会使用 HEVC 1080P30，同时把发送端 GStreamer 进程提高到 High 优先级，尽量给画面捕获、编码和传输保留响应时间。',
@@ -288,9 +288,9 @@ function createReadme() {
     '## 快速验证步骤',
     '',
     '1. 把 `TVGameReceiver.apk` 安装到 Android 11+ 电视或电视盒子上，然后打开“电视游戏接收端”。接收端 App 打开期间会保持屏幕常亮，避免电视自动休眠后黑屏。',
-    '2. 在电脑上运行 `安装npm依赖.bat`。如果提示刚安装 Node.js，请关闭当前窗口，重新打开一个新的命令窗口后再运行一次 `安装npm依赖.bat`。',
-    '3. 如果 `检查环境.bat` 提示 GStreamer 缺失，先运行 `安装GStreamer依赖.bat`。安装完成后关闭当前窗口，重新打开一个新的命令窗口，再运行 `检查环境.bat`。',
-    '   如果环境检查缺 `nvh264enc` 但电脑是 AMD 显卡，这是正常的；新版发送端会自动尝试 `amfh264enc`。如果 `amfh264enc` 也缺，优先重新运行 `安装GStreamer依赖.bat` 安装 devel 包，并更新 AMD 显卡驱动。',
+    '2. 在电脑上运行 `检查环境.bat`。如果发现缺 Node.js/npm、npm 依赖、GStreamer 或编码器插件，脚本会先列出缺失项和处理方案，再询问是否一键处理；输入 Y 后自动安装/更新对应依赖。',
+    '3. 一键处理完成后，关闭当前窗口，重新运行 `检查环境.bat`。如果仍缺硬件编码器，请优先更新 NVIDIA/AMD 显卡驱动，并确认 GStreamer runtime + devel 都已安装。',
+    '   如果环境检查缺 `nvh264enc` 但电脑是 AMD 显卡，这是正常的；新版发送端会自动尝试 `amfh264enc`。如果 `amfh264enc` 也缺，优先通过 `检查环境.bat` 的一键处理安装 devel 包，并更新 AMD 显卡驱动。',
     '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
@@ -341,6 +341,42 @@ function createReadme() {
   ].join('\n');
 }
 
+function createEnvironmentCheckBatch() {
+  return createBatchScript(`
+echo 正在检查发送端环境...
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+  echo 未检测到 Node.js/npm。
+  echo 处理方案：安装 Node.js LTS，安装完成后脚本会尝试把 npm 加入当前 PATH。
+  choice /C YN /N /M "是否现在安装 Node.js LTS？按 Y 开始，按 N 取消："
+  if errorlevel 2 (
+    echo 已取消 Node.js 自动安装。
+  ) else (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-nodejs.ps1"
+    if exist "%ProgramFiles%\\nodejs\\npm.cmd" set "PATH=%ProgramFiles%\\nodejs;%PATH%"
+  )
+)
+where npm.cmd >nul 2>nul
+if errorlevel 1 (
+  echo 仍未检测到 Node.js/npm。请关闭当前窗口，重新打开后再运行 检查环境.bat。
+  exit /b 1
+)
+if not exist "node_modules" (
+  echo.
+  echo 未检测到 npm 依赖目录 node_modules。
+  echo 处理方案：运行 npm install，一次性安装发送端所需 Node 依赖。
+  choice /C YN /N /M "是否现在安装/更新 npm 依赖？按 Y 开始，按 N 跳过："
+  if errorlevel 2 (
+    echo 已跳过 npm 依赖安装。
+  ) else (
+    call npm.cmd install
+    if errorlevel 1 exit /b 1
+  )
+)
+call npm.cmd run stage2:doctor
+`);
+}
+
 function writeLaunchers(packageDir) {
   const launchers = {
     '安装Node.js运行环境.bat': createBatchScript('echo 正在安装 Node.js 运行环境...\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\\install-nodejs.ps1"\r\necho.\r\necho 如果刚安装 Node.js，请关闭当前窗口，重新打开后再运行 安装npm依赖.bat。'),
@@ -371,6 +407,8 @@ exit /b %ERRORLEVEL%
     '启动性能保护发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high'),
     '启动发送端-选择画质.bat': createQualitySelectorBatch()
   };
+
+  launchers['检查环境.bat'] = createEnvironmentCheckBatch();
 
   for (const [name, text] of Object.entries(launchers)) {
     writeText(path.join(packageDir, name), text);
