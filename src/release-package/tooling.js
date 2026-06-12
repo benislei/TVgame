@@ -186,16 +186,18 @@ echo(  3. 1080P30 清晰稳定，适合电视盒子优先尝试
 echo(  4. 1080P60 高性能，适合手机、高性能电视或盒子
 echo(  5. HEVC 1080P30 推荐，低码率高清，优先使用
 echo(  6. HEVC 1080P60 高性能，适合解码能力较强的 Android 11+ 设备
+echo(  7. 性能保护推荐，HEVC 1080P30，并提高发送进程优先级
 echo(
 set "TV_PROFILE="
-set /p "TV_PROFILE=请输入 1-6（默认 5 推荐）："
-if "%TV_PROFILE%"=="" set "TV_PROFILE=5"
+set /p "TV_PROFILE=请输入 1-7（默认 7 性能保护推荐）："
+if "%TV_PROFILE%"=="" set "TV_PROFILE=7"
 if "%TV_PROFILE%"=="1" set "TV_PROFILE=h264720p30"
 if "%TV_PROFILE%"=="2" set "TV_PROFILE=h264720p60"
 if "%TV_PROFILE%"=="3" set "TV_PROFILE=h2641080p30"
 if "%TV_PROFILE%"=="4" set "TV_PROFILE=h2641080p60"
 if "%TV_PROFILE%"=="5" set "TV_PROFILE=hevc1080p30"
 if "%TV_PROFILE%"=="6" set "TV_PROFILE=hevc1080p60"
+if "%TV_PROFILE%"=="7" set "TV_PROFILE=hevc1080p30"
 if "%TV_PROFILE%"=="h264720p30" goto :profile_ok
 if "%TV_PROFILE%"=="h264720p60" goto :profile_ok
 if "%TV_PROFILE%"=="h2641080p30" goto :profile_ok
@@ -212,7 +214,7 @@ set /p "TV_IP=电视/盒子 IP（留空为 127.0.0.1）："
 if "%TV_IP%"=="" set "TV_IP=127.0.0.1"
 echo(
 echo(正在启动发送端，目标：%TV_IP%，档位：%TV_PROFILE%
-call npm.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile %TV_PROFILE%
+call npm.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile %TV_PROFILE% --process-priority high
 `));
 }
 
@@ -237,8 +239,9 @@ function createReadme() {
     '- `安装ViGEmBus手柄驱动.bat`：安装 PC 端虚拟 Xbox 手柄驱动，电视或盒子上的 USB 手柄需要它才能被 PC 游戏识别。',
     '- `检查环境.bat`：检查电脑端 GStreamer、编码器、音频捕获和 .NET 环境。',
     '- `启动输入桥.bat`：启动键鼠输入和虚拟 Xbox 手柄输入回传桥，默认运行包内 `InputBridgeRuntime\\InputBridge.exe`。',
-    '- `启动推荐发送.bat`：HEVC 1080P30 推荐档，当前测试里清晰度、流畅度和延迟综合最好，优先从这里开始。',
-    '- `启动发送端-选择画质.bat`：统一画质选择入口，包含 720P30、720P60、1080P30、1080P60、HEVC 1080P30 和 HEVC 1080P60。默认选项是 HEVC 1080P30 推荐档。',
+    '- `启动推荐发送.bat`：HEVC 1080P30 推荐档，并自动提高发送进程优先级。当前测试里清晰度、流畅度和延迟综合最好，优先从这里开始。',
+    '- `启动性能保护发送.bat`：大型游戏优先使用。它会使用 HEVC 1080P30，同时把发送端 GStreamer 进程提高到 High 优先级，尽量给画面捕获、编码和传输保留响应时间。',
+    '- `启动发送端-选择画质.bat`：统一画质选择入口，包含 720P30、720P60、1080P30、1080P60、HEVC 1080P30、HEVC 1080P60 和性能保护推荐。默认选项是性能保护推荐档。',
     '',
     '## 快速验证步骤',
     '',
@@ -249,10 +252,16 @@ function createReadme() {
     '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
     '4. 如果要测试电视端 USB 手柄，先以管理员权限运行 `安装ViGEmBus手柄驱动.bat`。安装完成后重新启动 `启动输入桥.bat`，窗口里应看到“虚拟 Xbox 手柄已连接”。',
     '5. 运行 `启动输入桥.bat`，保持这个窗口打开。如果游戏以管理员权限运行，输入桥也建议用管理员权限启动。',
-    '6. 运行 `启动推荐发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
+    '6. 运行 `启动推荐发送.bat` 或 `启动性能保护发送.bat`，输入电视或盒子的局域网 IP。注意这里填的是电视/盒子自身 IP，不是接收端左上角显示的“输入目标”。接收端会从视频包来源自动识别电脑输入桥 IP。',
     '7. 电视上看到画面和声音后，优先用真实游戏验证移动、转向、开火、菜单等操作体感。游戏里请选择 Xbox 手柄或控制器输入。',
     '8. 如果想切换画质或排查设备性能，运行 `启动发送端-选择画质.bat`。建议顺序是：HEVC 1080P30、HEVC 1080P60、1080P60、1080P30、720P60、720P30。',
-    '9. 如果出现花屏、FPS 归零或卡顿，先降到 1080P30；仍不稳定再降到 720P60 或 720P30。手机和高性能盒子可以优先尝试 HEVC 1080P60。',
+    '9. 如果出现花屏、FPS 归零或卡顿，先降到 1080P30；仍不稳定再降到 720P60 或 720P30。手机和高性能盒子可以优先尝试 HEVC 1080P60。大型游戏如果电脑端显卡或内存被吃满，先把游戏内 FPS 上限设置到 60 或 90，关闭不必要的后台录屏/直播/叠加层，并使用 `启动性能保护发送.bat`。',
+    '',
+    '## 大型游戏性能保护',
+    '',
+    '性能保护模式不会降低游戏本身画质，它主要做两件事：使用当前最稳的 HEVC 1080P30 推荐档，并把发送端 GStreamer 进程提升到 High 优先级。这样在游戏把 GPU、显存或内存吃满时，捕获、编码和 UDP 发送更不容易被系统调度挤掉。',
+    '',
+    '如果接收端 FPS 明显低于电脑端游戏 FPS，优先在游戏内开启帧率上限，建议先锁 60 FPS；如果仍卡，再锁 45 或 30 FPS。目标是给发送端留下 10% 到 20% 的 GPU/显存余量。这个余量比单纯追求电脑端游戏 FPS 更重要，因为串流链路需要稳定的帧时间。',
     '',
     '## 手柄输入',
     '',
@@ -316,7 +325,8 @@ if not exist "InputBridgeRuntime\\InputBridge.exe" (
 "InputBridgeRuntime\\InputBridge.exe"
 exit /b %ERRORLEVEL%
 `),
-    '启动推荐发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30'),
+    '启动推荐发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high'),
+    '启动性能保护发送.bat': createSenderBatch('--encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high'),
     '启动发送端-选择画质.bat': createQualitySelectorBatch()
   };
 

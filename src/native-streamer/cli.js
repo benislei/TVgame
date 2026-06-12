@@ -40,6 +40,12 @@ const H264_ENCODER_ALIASES = {
   mfh264enc: 'mfh264enc'
 };
 
+const PROCESS_PRIORITY_CLASSES = {
+  normal: null,
+  'above-normal': 'AboveNormal',
+  high: 'High'
+};
+
 function parseArgs(argv) {
   const args = { _: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -133,6 +139,7 @@ function printRtpHelp() {
   console.log('  --gop <帧数>          关键帧间隔，默认 5');
   console.log('  --encoder <编码器>    硬件编码器偏好，默认 auto；可选 nvenc, amf, mf');
   console.log('  --encoder-preset <值> NVENC preset，默认 auto；按体验优先自动探测，可手动指定 low-latency-hq 或 default');
+  console.log('  --process-priority <值> 发送进程优先级，默认 normal；可选 normal, above-normal, high');
   console.log('  --display <索引>      Windows 显示器索引，默认 0');
 }
 
@@ -198,6 +205,10 @@ function validateRtpArgs(args) {
   if (!encoder) {
     errors.push('encoder 必须是以下之一：auto, nvenc, amf, mf, nvh264enc, amfh264enc, mfh264enc');
   }
+  const processPriority = args['process-priority'] === undefined ? 'normal' : args['process-priority'];
+  if (typeof processPriority !== 'string' || !Object.prototype.hasOwnProperty.call(PROCESS_PRIORITY_CLASSES, processPriority)) {
+    errors.push('process-priority 必须是以下之一：normal, above-normal, high');
+  }
 
   return {
     ok: errors.length === 0,
@@ -215,6 +226,7 @@ function validateRtpArgs(args) {
       keyframeInterval,
       encoder,
       encoderPreset,
+      processPriority,
       displayIndex
     }
   };
@@ -235,6 +247,36 @@ function stopRtpChildren(children, failedChild) {
     if (!child || child.killed || typeof child.kill !== 'function') continue;
     child.kill();
   }
+}
+
+function setChildProcessPriority(child, priority, spawnSync, platform) {
+  const priorityClass = PROCESS_PRIORITY_CLASSES[priority];
+  if (!priorityClass || platform !== 'win32' || !child || !child.pid) return true;
+
+  const command = [
+    '$ErrorActionPreference = "Stop";',
+    `$process = Get-Process -Id ${child.pid};`,
+    `$process.PriorityClass = '${priorityClass}';`
+  ].join(' ');
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-Command',
+    command
+  ], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    windowsHide: true
+  });
+
+  if (result && result.status === 0) {
+    console.log(`发送进程优先级：${priorityClass}（PID ${child.pid}）`);
+    return true;
+  }
+
+  console.error(`设置发送进程优先级失败：PID ${child.pid}，优先级 ${priorityClass}`);
+  return false;
 }
 
 function selectAutoEncoderPreset(config, gstLaunch, spawnSync) {
@@ -401,6 +443,7 @@ function runRtpSender(args, options = {}) {
   const createReport = options.createReport || createStage2Report;
   const spawn = options.spawn || childProcess.spawn;
   const spawnSync = options.spawnSync || childProcess.spawnSync;
+  const platform = options.platform || process.platform;
   const report = createReport();
   if (!report.ready) {
     printStage2Report(report);
@@ -409,6 +452,7 @@ function runRtpSender(args, options = {}) {
   }
 
   const config = buildRtpConfig(validation.config);
+  config.processPriority = validation.config.processPriority;
   const gstLaunch = report.gstreamer.gstLaunch || 'gst-launch-1.0';
   const encoderReady = config.codec === 'h265'
     ? selectHevcEncoder(config, report, gstLaunch, spawnSync)
@@ -436,6 +480,7 @@ function runRtpSender(args, options = {}) {
     }
 
     children.push(child);
+    setChildProcessPriority(child, config.processPriority, spawnSync, platform);
     if (options.onChild) options.onChild(child, command);
     child.on('error', error => {
       console.error(`启动失败：${command.title}：${error.message}`);

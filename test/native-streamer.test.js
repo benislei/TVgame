@@ -363,6 +363,40 @@ test('runRtpSender accepts explicit NVENC encoder preset for advanced tuning', (
   assert.match(videoArgs, /preset=low-latency-hq/);
 });
 
+test('runRtpSender can raise GStreamer sender process priority for game protection mode', () => {
+  const spawnedCommands = [];
+  const priorityCommands = [];
+
+  withPatchedSpawn((executable, args) => {
+    const child = new EventEmitter();
+    child.pid = 43210 + spawnedCommands.length;
+    spawnedCommands.push({ executable, args, child });
+    return child;
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50', '--profile', 'hevc1080p30', '--process-priority', 'high']),
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync(executable, args) {
+          const joined = args.join(' ');
+          if (executable === 'powershell.exe') {
+            priorityCommands.push(joined);
+          }
+          return { status: 0, stdout: '', stderr: '' };
+        },
+        platform: 'win32'
+      }
+    );
+  });
+
+  assert.equal(spawnedCommands.length, 2);
+  assert.equal(priorityCommands.length, 2);
+  assert.match(priorityCommands[0], /Get-Process -Id 43210/);
+  assert.match(priorityCommands[0], /PriorityClass = 'High'/);
+  assert.match(priorityCommands[1], /Get-Process -Id 43211/);
+  assert.match(priorityCommands[1], /PriorityClass = 'High'/);
+});
+
 test('runRtpSender can select 720p fallback profile explicitly', () => {
   const spawnedCommands = [];
 

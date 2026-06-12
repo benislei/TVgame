@@ -64,6 +64,7 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
     '检查环境.bat',
     '启动输入桥.bat',
     '启动推荐发送.bat',
+    '启动性能保护发送.bat',
     '启动发送端-选择画质.bat',
     path.join('app', 'package.json'),
     path.join('app', 'package-lock.json'),
@@ -101,9 +102,10 @@ test('friend preview launchers run the expected low-latency commands', () => {
   const check = read('检查环境.bat');
   const bridge = read('启动输入桥.bat');
   const recommendedSender = read('启动推荐发送.bat');
+  const protectedSender = read('启动性能保护发送.bat');
   const selectorSender = read('启动发送端-选择画质.bat');
 
-  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, recommendedSender, selectorSender]) {
+  for (const text of [installNode, installNpm, installGstreamer, installVigemBus, check, bridge, recommendedSender, protectedSender, selectorSender]) {
     assert.match(text, /chcp 65001 >nul/);
     assert.doesNotMatch(text, /(?<!\r)\n/);
     assert.match(text, /if not exist "%~dp0app\\package\.json"/);
@@ -123,9 +125,11 @@ test('friend preview launchers run the expected low-latency commands', () => {
   assert.match(check, /npm\.cmd run stage2:check/);
   assert.match(bridge, /InputBridgeRuntime\\InputBridge\.exe/);
   assert.doesNotMatch(bridge, /dotnet run --project InputBridge\\InputBridge\.csproj/);
-  assert.match(recommendedSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30/);
+  assert.match(recommendedSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high/);
+  assert.match(protectedSender, /npm\.cmd run native:rtp -- --host "%TV_IP%" --encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high/);
   assert.match(recommendedSender, /不要填接收端左上角的“输入目标”/);
   assert.match(selectorSender, /--profile %TV_PROFILE%/);
+  assert.match(selectorSender, /--process-priority high/);
 });
 
 test('friend preview package consolidates quality choices into one selector', () => {
@@ -165,9 +169,12 @@ test('friend preview package consolidates quality choices into one selector', ()
   assert.match(selector, /4\. 1080P60/);
   assert.match(selector, /5\. HEVC 1080P30/);
   assert.match(selector, /6\. HEVC 1080P60/);
+  assert.match(selector, /7\. 性能保护推荐/);
   assert.match(selector, /if "%TV_PROFILE%"=="5" set "TV_PROFILE=hevc1080p30"/);
   assert.match(selector, /if "%TV_PROFILE%"=="6" set "TV_PROFILE=hevc1080p60"/);
+  assert.match(selector, /if "%TV_PROFILE%"=="7" set "TV_PROFILE=hevc1080p30"/);
   assert.match(selector, /^echo\(  5\. HEVC 1080P30/m);
+  assert.match(selector, /^echo\(  7\. 性能保护推荐/m);
   assert.match(readme, /720P30/);
   assert.match(readme, /HEVC 1080P30/);
   assert.match(readme, /HEVC 1080P60/);
@@ -244,6 +251,7 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   assert.match(readme, /安装ViGEmBus手柄驱动\.bat/);
   assert.match(readme, /启动输入桥\.bat/);
   assert.match(readme, /启动推荐发送\.bat/);
+  assert.match(readme, /启动性能保护发送\.bat/);
   assert.match(readme, /启动发送端-选择画质\.bat/);
   assert.match(readme, /统一画质选择入口/);
   assert.doesNotMatch(readme, /启动默认发送\.bat/);
@@ -299,7 +307,7 @@ test('friend preview sender launcher waits for TV IP input and forwards it to na
   });
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder auto --encoder-preset auto --profile hevc1080p30/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "192\.168\.50\.140" --encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high/);
 });
 
 test('friend preview quality selector prints HEVC choices safely and forwards selected profile', () => {
@@ -327,7 +335,8 @@ test('friend preview quality selector prints HEVC choices safely and forwards se
   assert.match(result.stdout, /5\. HEVC 1080P30/);
   assert.match(result.stdout, /6\. HEVC 1080P60/);
   assert.doesNotMatch(result.stdout, /is not recognized as an internal or external command/);
-  assert.match(result.stdout, /npm:run native:rtp -- --host "127\.0\.0\.1" --encoder auto --encoder-preset auto --profile hevc1080p30/);
+  assert.match(result.stdout, /7\. 性能保护推荐/);
+  assert.match(result.stdout, /npm:run native:rtp -- --host "127\.0\.0\.1" --encoder auto --encoder-preset auto --profile hevc1080p30 --process-priority high/);
 });
 
 test('friend preview package can request a zip archive through PowerShell Compress-Archive', () => {
