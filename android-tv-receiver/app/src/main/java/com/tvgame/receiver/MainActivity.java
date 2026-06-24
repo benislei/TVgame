@@ -65,6 +65,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private H264VideoReceiver videoReceiver;
     private L16AudioReceiver audioReceiver;
     private InputClient inputClient;
+    private DiscoveryBroadcaster discoveryBroadcaster;
     private Thread videoThread;
     private Thread audioThread;
     private Surface activeSurface;
@@ -100,6 +101,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         stats.deviceLabel = buildDeviceLabel();
         stats.receiverAdvice = buildReceiverAdvice();
+        discoveryBroadcaster = new DiscoveryBroadcaster(stats);
+        discoveryBroadcaster.start();
         String configuredInputRelayHost = resolveInputRelayHost();
         if (configuredInputRelayHost.length() > 0) {
             setInputRelayHost(configuredInputRelayHost);
@@ -190,6 +193,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         activeSurface = null;
         stopReceivers();
+        if (discoveryBroadcaster != null) {
+            discoveryBroadcaster.stop();
+            discoveryBroadcaster = null;
+        }
         super.onDestroy();
     }
 

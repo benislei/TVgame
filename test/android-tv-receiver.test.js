@@ -38,12 +38,56 @@ test('Android TV receiver skeleton and RTP receiver files exist', () => {
     `${javaRoot}/H264VideoReceiver.java`,
     `${javaRoot}/L16AudioReceiver.java`,
     `${javaRoot}/InputClient.java`,
+    `${javaRoot}/DiscoveryBroadcaster.java`,
     'docs/stage2-local-verify.md'
   ];
 
   for (const file of files) {
     assertFileExists(file);
   }
+});
+
+test('DiscoveryBroadcaster advertises the Android receiver on the LAN', () => {
+  assertFileExists(`${javaRoot}/DiscoveryBroadcaster.java`);
+  const source = readProjectFile(`${javaRoot}/DiscoveryBroadcaster.java`);
+
+  assert.match(source, /package\s+com\.tvgame\.receiver/);
+  assert.match(source, /DISCOVERY_PORT\s*=\s*8790/);
+  assert.match(source, /DatagramSocket/);
+  assert.match(source, /\.setBroadcast\(true\)/);
+  assert.match(source, /255\.255\.255\.255/);
+  assert.match(source, /StandardCharsets\.UTF_8/);
+  assert.match(source, /Build\.MANUFACTURER/);
+  assert.match(source, /Build\.MODEL/);
+  assert.match(source, /Build\.VERSION\.SDK_INT/);
+  assert.match(source, /\\"app\\":\\"TVGameReceiver\\"/);
+  assert.match(source, /\\"version\\":1/);
+  assert.match(source, /\\"deviceName\\":\\"/);
+  assert.match(source, /\\"androidApi\\":/);
+  assert.match(source, /\\"decoder\\":\\"/);
+  assert.match(source, /\\"recommendedProfile\\":\\"/);
+  assert.match(source, /stats\.videoDecoderName/);
+  assert.match(source, /stats\.receiverAdvice/);
+  assert.match(source, /profileFromAdvice/);
+  assert.match(source, /Thread\s*\(/);
+  assert.match(source, /\.setDaemon\(true\)/);
+  assert.match(source, /Thread\.sleep\(2000\)/);
+  assert.match(source, /replace\("\\\\",\s*"\\\\\\\\?"\)/);
+  assert.match(source, /replace\("\\"",\s*"\\\\\\""\)/);
+  assert.match(source, /hevc1080p60/);
+  assert.match(source, /hevc1080p30/);
+  assert.match(source, /h264720p60/);
+  assert.match(source, /h264720p30/);
+  assert.match(source, /h2641080p60/);
+  assert.match(source, /h2641080p30/);
+});
+
+test('MainActivity starts and stops LAN discovery with the Android receiver lifecycle', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /private\s+DiscoveryBroadcaster\s+discoveryBroadcaster/);
+  assert.match(source, /stats\.receiverAdvice\s*=\s*buildReceiverAdvice\(\);\s*discoveryBroadcaster\s*=\s*new\s+DiscoveryBroadcaster\(stats\);\s*discoveryBroadcaster\.start\(\);/s);
+  assert.match(source, /if\s*\(\s*discoveryBroadcaster\s*!=\s*null\s*\)\s*\{\s*discoveryBroadcaster\.stop\(\);\s*discoveryBroadcaster\s*=\s*null;\s*\}\s*super\.onDestroy\(\);/s);
 });
 
 test('Android TV receiver Gradle files use the required app identity and SDKs', () => {
