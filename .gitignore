@@ -3,6 +3,7 @@ node_modules/
 
 # Build outputs
 dist/
+dist-desktop/
 build/
 target/
 bin/
@@ -16,6 +17,7 @@ QuickVerify.exe
 QuickVerify.pdb
 InputBridge.exe
 InputBridge.pdb
+InputBridgeRuntime/
 QuickVerify/bin/
 QuickVerify/obj/
 InputBridge/bin/
@@ -27,6 +29,7 @@ native/**/target/
 
 # Archives and local deliverables
 *.zip
+.build-cache/
 
 # Logs and local environment
 *.log

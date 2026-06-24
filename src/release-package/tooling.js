@@ -101,6 +101,16 @@ function copyDesktopSenderIfExists(projectRoot, packageDir) {
   return desktopTarget;
 }
 
+function injectInputBridgeRuntimeIntoDesktop(desktopPackagePath, inputBridgeRuntimePath) {
+  if (!desktopPackagePath || !inputBridgeRuntimePath || !fs.existsSync(inputBridgeRuntimePath)) {
+    return null;
+  }
+
+  const desktopRuntimePath = path.join(desktopPackagePath, 'resources', 'app', 'InputBridgeRuntime');
+  copyDirectoryContents(inputBridgeRuntimePath, desktopRuntimePath);
+  return desktopRuntimePath;
+}
+
 function publishInputBridgeRuntime(projectRoot, packageDir, spawnSync = childProcess.spawnSync) {
   const projectFile = path.join(projectRoot, 'InputBridge', 'InputBridge.csproj');
   if (!fs.existsSync(projectFile)) {
@@ -543,6 +553,7 @@ function createFriendPreviewPackage(options = {}) {
   if (publishInputBridge) {
     inputBridgeRuntimePath = publishInputBridgeRuntime(projectRoot, packageDir, options.spawnSync);
   }
+  const desktopInputBridgeRuntimePath = injectInputBridgeRuntimeIntoDesktop(desktopPackagePath, inputBridgeRuntimePath);
 
   const readmePath = path.join(packageDir, 'README-朋友试用.md');
   writeText(readmePath, createReadme());
@@ -570,6 +581,7 @@ function createFriendPreviewPackage(options = {}) {
     readmePath,
     launcherPaths,
     inputBridgeRuntimePath,
+    desktopInputBridgeRuntimePath,
     desktopPackagePath,
     appFiles
   };

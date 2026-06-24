@@ -8,6 +8,11 @@
   "extraMetadata": {
     "main": "src/desktop/main.js"
   },
+  "electronDownload": {
+    "mirrorOptions": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    }
+  },
   "files": [
     "package.json",
     "src/**",

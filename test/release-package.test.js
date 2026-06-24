@@ -119,6 +119,35 @@ test('friend preview package includes packaged Electron desktop sender when avai
   assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /start "" "TVGame Sender\.exe"/);
 });
 
+test('friend preview package injects InputBridge runtime into packaged Electron app resources', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'TVGame Sender.exe'), 'desktop exe');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'resources', 'app', 'src', 'desktop', 'main.js'), 'main');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'resources', 'app', 'src', 'native-streamer', 'cli.js'), 'cli');
+
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false,
+    publishInputBridge: true,
+    spawnSync(command, args) {
+      assert.equal(command, 'dotnet');
+      const outputIndex = args.indexOf('-o');
+      assert.notEqual(outputIndex, -1);
+      writeFile(path.join(args[outputIndex + 1], 'InputBridge.exe'), 'published exe');
+      return { status: 0 };
+    }
+  });
+
+  const appRuntime = path.join(report.packageDir, 'app', 'InputBridgeRuntime', 'InputBridge.exe');
+  const desktopRuntime = path.join(report.packageDir, 'desktop', 'resources', 'app', 'InputBridgeRuntime', 'InputBridge.exe');
+  assert.equal(fs.existsSync(appRuntime), true);
+  assert.equal(fs.existsSync(desktopRuntime), true);
+  assert.equal(fs.readFileSync(desktopRuntime, 'utf8'), 'published exe');
+  assert.equal(report.desktopInputBridgeRuntimePath, path.dirname(desktopRuntime));
+});
+
 test('friend preview package skips desktop sender files and launcher when desktop package is missing', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();

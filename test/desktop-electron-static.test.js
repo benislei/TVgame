@@ -142,8 +142,12 @@ test('package exposes Electron desktop scripts', () => {
 
   assert.equal(packageJson.scripts.desktop, 'electron src/desktop/main.js');
   assert.equal(
+    packageJson.scripts['desktop:runtime'],
+    'dotnet publish InputBridge/InputBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o InputBridgeRuntime'
+  );
+  assert.equal(
     packageJson.scripts['desktop:package'],
-    'electron-builder --config src/desktop/electron-builder.json'
+    'npm run desktop:runtime && electron-builder --config src/desktop/electron-builder.json'
   );
 });
 
@@ -155,6 +159,7 @@ test('Electron builder config creates a small portable Windows sender package', 
   assert.equal(builderConfig.directories.output, 'dist-desktop');
   assert.equal(builderConfig.asar, false);
   assert.deepEqual(builderConfig.win.target, ['portable']);
+  assert.equal(builderConfig.electronDownload.mirrorOptions.mirror, 'https://npmmirror.com/mirrors/electron/');
 
   for (const required of ['package.json', 'src/**', 'scripts/**', 'InputBridgeRuntime/**', 'InputBridge/**', 'docs/**']) {
     assert.ok(builderConfig.files.includes(required), `missing builder file include ${required}`);
