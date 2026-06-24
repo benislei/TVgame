@@ -29,6 +29,28 @@ function createFakeIpcMain() {
   };
 }
 
+function assertRendererNoMojibake(source, label) {
+  const commonFragments = [
+    '\uFFFD',
+    '\u951F',
+    '\u95BF',
+    '\u95AB',
+    '\u93C9',
+    '\u95B8',
+    '\u7F01',
+    '\u6FE1',
+    '\u7F02',
+    '\u95BA',
+    '鍙',
+    '佺',
+    ''
+  ];
+
+  for (const fragment of commonFragments) {
+    assert.doesNotMatch(source, new RegExp(fragment), `${label} contains mojibake fragment ${fragment}`);
+  }
+}
+
 function createFakeServices(overrides = {}) {
   const calls = [];
   const process = {
@@ -168,6 +190,94 @@ test('IPC handlers register the desktop channels and delegate to services', () =
   assert.match(source, /services\.process\.status\(\)/);
   assert.match(source, /module\.exports\s*=\s*\{\s*registerIpcHandlers\s*\}/);
   assertNoMojibake(source, 'ipc-handlers.js');
+});
+
+test('renderer files exist and expose the Chinese sender UI shell', () => {
+  const files = ['index.html', 'styles.css', 'app.js'];
+
+  for (const file of files) {
+    assert.ok(
+      fs.existsSync(path.join(projectRoot, 'src', 'desktop', 'renderer', file)),
+      `missing renderer ${file}`
+    );
+  }
+
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const requiredChineseText = [
+    'TVGame 发送端',
+    '日常主屏',
+    '首次配置',
+    '电视设备',
+    '画质档位',
+    '环境诊断',
+    '日志',
+    '自动搜索电视',
+    '手动输入 IP',
+    '开始串流',
+    '停止串流',
+    '检查并修复环境'
+  ];
+
+  for (const text of requiredChineseText) {
+    assert.match(html, new RegExp(text), `missing Chinese UI text: ${text}`);
+  }
+
+  const senderCodepoints = Array.from('发送端').map(char => char.codePointAt(0).toString(16));
+  assert.deepEqual(senderCodepoints, ['53d1', '9001', '7aef']);
+});
+
+test('renderer script defines only the supported quality presets and uses the TVGame bridge API', () => {
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+  const presetIds = [
+    'h264720p30',
+    'h264720p60',
+    'h2641080p30',
+    'h2641080p60',
+    'hevc1080p30',
+    'hevc1080p60'
+  ];
+  const apiNames = [
+    'loadConfig',
+    'saveConfig',
+    'checkEnvironment',
+    'repairEnvironment',
+    'listDevices',
+    'startStream',
+    'stopStream',
+    'getStatus'
+  ];
+
+  for (const presetId of presetIds) {
+    assert.match(appJs, new RegExp(`['"]${presetId}['"]`), `missing preset ${presetId}`);
+  }
+
+  for (const apiName of apiNames) {
+    assert.match(appJs, new RegExp(`window\\.tvgame\\.${apiName}\\(`), `missing window.tvgame.${apiName}`);
+  }
+
+  assert.match(appJs, /selectedQuality/);
+  assert.match(appJs, /performanceProtection/);
+  assert.match(appJs, /firstRunComplete/);
+});
+
+test('renderer avoids advanced custom streaming controls and mojibake', () => {
+  const rendererSources = {
+    'index.html': readProjectFile('src', 'desktop', 'renderer', 'index.html'),
+    'styles.css': readProjectFile('src', 'desktop', 'renderer', 'styles.css'),
+    'app.js': readProjectFile('src', 'desktop', 'renderer', 'app.js')
+  };
+  const combined = Object.values(rendererSources).join('\n');
+
+  assert.doesNotMatch(combined, /GOP/i);
+  assert.doesNotMatch(combined, /码率/);
+  assert.doesNotMatch(combined, /自定义帧率/);
+  assert.doesNotMatch(combined, /bitrate/i);
+  assert.doesNotMatch(combined, /custom\s*frame\s*rate/i);
+
+  for (const [label, source] of Object.entries(rendererSources)) {
+    assertRendererNoMojibake(source, label);
+    assert.match(source, /[\u4E00-\u9FFF]/, `${label} should contain real Chinese text or comments`);
+  }
 });
 
 test('stream:start rejects malformed payload before starting input bridge', () => {

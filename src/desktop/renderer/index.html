@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVGame 发送端</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <span class="brand-mark">TV</span>
+          <div>
+            <h1>TVGame 发送端</h1>
+            <p>局域网游戏串流控制台</p>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <button class="nav-item is-active" type="button" data-page="home">日常主屏</button>
+          <button class="nav-item" type="button" data-page="setup">首次配置</button>
+          <button class="nav-item" type="button" data-page="devices">电视设备</button>
+          <button class="nav-item" type="button" data-page="quality">画质档位</button>
+          <button class="nav-item" type="button" data-page="diagnostics">环境诊断</button>
+          <button class="nav-item" type="button" data-page="logs">日志</button>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="section-label">发送端状态</p>
+            <h2 id="pageTitle">日常主屏</h2>
+          </div>
+          <div class="status-pill" id="streamStatusText">未启动</div>
+        </header>
+
+        <section class="page is-active" id="page-home" aria-labelledby="homeTitle">
+          <div class="summary-grid">
+            <article class="panel">
+              <h3 id="homeTitle">当前环境状态摘要</h3>
+              <div class="status-list" id="environmentSummary">
+                <span>正在检查环境...</span>
+              </div>
+            </article>
+            <article class="panel">
+              <h3>串流控制</h3>
+              <div class="control-grid">
+                <fieldset class="radio-row">
+                  <legend>连接方式</legend>
+                  <label>
+                    <input type="radio" name="deviceMode" value="auto" id="modeAuto" checked>
+                    自动搜索电视
+                  </label>
+                  <label>
+                    <input type="radio" name="deviceMode" value="manual" id="modeManual">
+                    手动输入 IP
+                  </label>
+                </fieldset>
+
+                <label class="field">
+                  <span>自动发现的电视/盒子</span>
+                  <select id="deviceSelect">
+                    <option value="">正在搜索...</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>手动输入 IP</span>
+                  <input id="manualIpInput" type="text" inputmode="numeric" autocomplete="off" placeholder="例如 192.168.1.23">
+                </label>
+
+                <label class="field">
+                  <span>画质档位</span>
+                  <select id="qualitySelect"></select>
+                </label>
+
+                <label class="checkbox-row">
+                  <input id="performanceProtectionInput" type="checkbox">
+                  <span>启用性能保护</span>
+                </label>
+
+                <div class="button-row">
+                  <button class="primary-button" type="button" id="startButton">开始串流</button>
+                  <button class="secondary-button" type="button" id="stopButton">停止串流</button>
+                </div>
+                <p class="inline-status" id="actionStatus">未启动</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="page" id="page-setup" aria-labelledby="setupTitle">
+          <article class="panel">
+            <h3 id="setupTitle">首次配置</h3>
+            <ol class="step-list">
+              <li>安装接收端到电视或盒子。</li>
+              <li>检查环境，确认 GStreamer、编码器、输入桥和手柄驱动可用。</li>
+              <li>需要时使用一键修复。</li>
+              <li>自动搜索电视，或改用手动输入 IP。</li>
+              <li>选择画质档位，推荐 HEVC 1080P30。</li>
+              <li>开始串流。</li>
+            </ol>
+          </article>
+        </section>
+
+        <section class="page" id="page-devices" aria-labelledby="devicesTitle">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3 id="devicesTitle">电视设备</h3>
+                <p>刷新局域网内可用的接收端。</p>
+              </div>
+              <button class="secondary-button" type="button" id="refreshDevicesButton">刷新/自动搜索</button>
+            </div>
+            <div class="device-list" id="deviceList">还没有发现电视或盒子</div>
+          </article>
+        </section>
+
+        <section class="page" id="page-quality" aria-labelledby="qualityTitle">
+          <article class="panel">
+            <h3 id="qualityTitle">画质档位</h3>
+            <div class="preset-list" id="presetList"></div>
+          </article>
+        </section>
+
+        <section class="page" id="page-diagnostics" aria-labelledby="diagnosticsTitle">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3 id="diagnosticsTitle">环境诊断</h3>
+                <p>检查发送端依赖，并在可行时自动修复。</p>
+              </div>
+              <div class="button-row compact">
+                <button class="secondary-button" type="button" id="checkEnvironmentButton">检查环境</button>
+                <button class="primary-button" type="button" id="repairEnvironmentButton">检查并修复环境</button>
+              </div>
+            </div>
+            <div class="diagnostic-grid" id="diagnosticGrid"></div>
+          </article>
+        </section>
+
+        <section class="page" id="page-logs" aria-labelledby="logsTitle">
+          <article class="panel">
+            <h3 id="logsTitle">日志</h3>
+            <pre class="log-view" id="logView">暂无日志</pre>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
