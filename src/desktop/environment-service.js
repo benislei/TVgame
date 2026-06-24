@@ -73,7 +73,11 @@ function createEnvironmentService(options = {}) {
   function repair(projectRoot) {
     const report = createReport();
     const runtime = getRuntime();
-    const plan = createRepairPlan(report, runtime);
+    const repairOptions = {
+      ...runtime,
+      hasInputBridgeRuntime: runtime.inputBridgeRuntimeReady === true
+    };
+    const plan = createRepairPlan(report, repairOptions);
     runRepairActions(plan, { projectRoot });
     return check();
   }

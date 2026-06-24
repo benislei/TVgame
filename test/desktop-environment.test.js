@@ -136,7 +136,7 @@ test('missing required pieces return error cards and not ready', () => {
   assert.equal(summary.cards.inputBridge.detail, '请安装输入桥运行时或 .NET');
 });
 
-test('environment service check and repair use injected dependencies and pass runtime to repair plan', () => {
+test('environment service check and repair use injected dependencies and map runtime to repair options', () => {
   const reports = [createReadyReport(), createReadyReport(), createReadyReport()];
   reports[0].gstreamer.ready = false;
   const repairRuntime = { inputBridgeRuntimeReady: true, vigemBusReady: false };
@@ -146,8 +146,8 @@ test('environment service check and repair use injected dependencies and pass ru
       calls.push('createReport');
       return reports.shift();
     },
-    createRepairPlan: (report, runtime) => {
-      calls.push(['createRepairPlan', report.gstreamer.ready, runtime]);
+    createRepairPlan: (report, options) => {
+      calls.push(['createRepairPlan', report.gstreamer.ready, options]);
       return { ready: false, automaticActions: [{ id: 'install-gstreamer-devel' }], manualSteps: [] };
     },
     runRepairActions: (plan, options) => {
@@ -169,7 +169,11 @@ test('environment service check and repair use injected dependencies and pass ru
     'getRuntime',
     'createReport',
     'getRuntime',
-    ['createRepairPlan', true, repairRuntime],
+    ['createRepairPlan', true, {
+      inputBridgeRuntimeReady: true,
+      vigemBusReady: false,
+      hasInputBridgeRuntime: true
+    }],
     ['runRepairActions', 'install-gstreamer-devel', 'D:/workspace/project'],
     'createReport',
     'getRuntime'
