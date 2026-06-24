@@ -206,7 +206,7 @@ function createProcessService(options = {}) {
       child = spawn(command.command, command.args, command.options);
     } catch (error) {
       appendLogLine('[发送端]', `启动失败：${error && error.message ? error.message : String(error)}`);
-      throw error;
+      return { started: false };
     }
 
     streamProcess = child;

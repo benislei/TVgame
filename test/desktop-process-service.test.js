@@ -200,11 +200,11 @@ test('process service handles synchronous spawn failures without stale running s
   const streamHarness = createSpawnHarness({ throwOnCall: 1, throwError: new Error('bad cwd') });
   const streamService = createProcessService({ spawn: streamHarness.spawn });
 
-  assert.throws(() => streamService.startStream({
+  assert.deepEqual(streamService.startStream({
     projectRoot: 'D:/missing',
     device: { ip: '192.168.1.23' },
     quality: { profile: 'h264720p30' }
-  }), /bad cwd/);
+  }), { started: false });
   assert.deepEqual(streamService.status(), {
     streamRunning: false,
     inputBridgeRunning: false,
