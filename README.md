@@ -29,6 +29,28 @@ npm install
 
 `wrtc` 是 optional dependency。信令服务器和测试不需要它；发送端需要它。
 
+## Electron 桌面发送端打包
+
+开发调试桌面发送端：
+
+```bash
+npm.cmd run desktop
+```
+
+生成 Windows portable 桌面发送端：
+
+```bash
+npm.cmd run desktop:package
+```
+
+生成朋友试用包：
+
+```bash
+npm.cmd run package:friend
+```
+
+如果已经先完成 `npm.cmd run desktop:package`，并且项目根目录存在 `dist-desktop/win-unpacked/TVGame Sender.exe`，朋友试用包会额外包含 `desktop/` 桌面发送端目录和 `启动TVGame发送端.bat` 入口；如果桌面发送端还没有打包，朋友试用包仍会按原有方式生成。
+
 ## 快速验证 exe
 
 Windows 下可以直接双击工程根目录的 `QuickVerify.exe`。它会显示菜单：

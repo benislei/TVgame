@@ -6,6 +6,8 @@ const path = require('node:path');
 
 const PACKAGE_NAME = 'TVGame-Friend-Preview';
 const APK_SOURCE_RELATIVE = path.join('android-tv-receiver', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+const DESKTOP_SENDER_SOURCE_RELATIVE = path.join('dist-desktop', 'win-unpacked');
+const DESKTOP_SENDER_EXE = 'TVGame Sender.exe';
 const APP_ITEMS = [
   'package.json',
   'package-lock.json',
@@ -60,6 +62,19 @@ function copyDirectory(source, target) {
   }
 }
 
+function copyDirectoryContents(source, target) {
+  ensureDirectory(target);
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = path.join(source, entry.name);
+    const targetPath = path.join(target, entry.name);
+    if (entry.isDirectory()) {
+      copyDirectoryContents(sourcePath, targetPath);
+    } else if (entry.isFile()) {
+      copyFile(sourcePath, targetPath);
+    }
+  }
+}
+
 function copyItemIfExists(projectRoot, packageDir, relativePath) {
   const source = path.join(projectRoot, relativePath);
   if (!fs.existsSync(source)) return null;
@@ -72,6 +87,16 @@ function copyItemIfExists(projectRoot, packageDir, relativePath) {
     copyFile(source, target);
   }
   return target;
+}
+
+function copyDesktopSenderIfExists(projectRoot, packageDir) {
+  const desktopSource = path.join(projectRoot, DESKTOP_SENDER_SOURCE_RELATIVE);
+  const desktopExecutable = path.join(desktopSource, DESKTOP_SENDER_EXE);
+  if (!fs.existsSync(desktopExecutable)) return null;
+
+  const desktopTarget = path.join(packageDir, 'desktop');
+  copyDirectoryContents(desktopSource, desktopTarget);
+  return desktopTarget;
 }
 
 function publishInputBridgeRuntime(projectRoot, packageDir, spawnSync = childProcess.spawnSync) {
@@ -136,6 +161,24 @@ function createBatchScript(body) {
     body.trim(),
     'echo.',
     'pause',
+    ''
+  ].join('\n');
+
+  return toWindowsNewlines(text);
+}
+
+function createDesktopSenderBatch() {
+  const text = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'setlocal',
+    'if not exist "%~dp0desktop\\TVGame Sender.exe" (',
+    '  echo 未找到 desktop\\TVGame Sender.exe。',
+    '  echo 请先运行 npm.cmd run desktop:package，再重新生成朋友试用包。',
+    '  exit /b 1',
+    ')',
+    'cd /d "%~dp0desktop"',
+    'start "" "TVGame Sender.exe"',
     ''
   ].join('\n');
 
@@ -492,6 +535,7 @@ function createFriendPreviewPackage(options = {}) {
     const copied = copyItemIfExists(projectRoot, packageDir, item);
     if (copied) appFiles.push(copied);
   }
+  const desktopPackagePath = copyDesktopSenderIfExists(projectRoot, packageDir);
 
   let inputBridgeRuntimePath = null;
   if (publishInputBridge) {
@@ -501,6 +545,11 @@ function createFriendPreviewPackage(options = {}) {
   const readmePath = path.join(packageDir, 'README-朋友试用.md');
   writeText(readmePath, createReadme());
   const launcherPaths = writeLaunchers(packageDir);
+  if (desktopPackagePath) {
+    const desktopLauncherPath = path.join(packageDir, '启动TVGame发送端.bat');
+    writeText(desktopLauncherPath, createDesktopSenderBatch());
+    launcherPaths.push(desktopLauncherPath);
+  }
 
   let archivePath = null;
   if (createZip) {
@@ -519,6 +568,7 @@ function createFriendPreviewPackage(options = {}) {
     readmePath,
     launcherPaths,
     inputBridgeRuntimePath,
+    desktopPackagePath,
     appFiles
   };
 }

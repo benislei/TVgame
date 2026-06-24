@@ -1,0 +1,24 @@
+{
+  "appId": "com.tvgame.sender",
+  "productName": "TVGame Sender",
+  "directories": {
+    "output": "dist-desktop"
+  },
+  "extraMetadata": {
+    "main": "src/desktop/main.js"
+  },
+  "files": [
+    "package.json",
+    "src/**",
+    "scripts/**",
+    "InputBridgeRuntime/**",
+    "InputBridge/**",
+    "docs/**",
+    "public/**"
+  ],
+  "win": {
+    "target": [
+      "portable"
+    ]
+  }
+}

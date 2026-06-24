@@ -86,6 +86,29 @@ test('friend preview package copies APK, runtime app files and Chinese launchers
   assert.equal(fs.existsSync(path.join(report.packageDir, 'app', 'InputBridge', 'bin')), false);
 });
 
+test('friend preview package includes packaged Electron desktop sender when available', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'TVGame Sender.exe'), 'desktop exe');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'resources', 'app.asar'), 'asar');
+
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+
+  const desktopExe = path.join(report.packageDir, 'desktop', 'TVGame Sender.exe');
+  const desktopAsar = path.join(report.packageDir, 'desktop', 'resources', 'app.asar');
+  const desktopLauncher = path.join(report.packageDir, '启动TVGame发送端.bat');
+  assert.equal(fs.existsSync(desktopExe), true);
+  assert.equal(fs.readFileSync(desktopExe, 'utf8'), 'desktop exe');
+  assert.equal(fs.existsSync(desktopAsar), true);
+  assert.equal(fs.existsSync(desktopLauncher), true);
+  assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /cd \/d "%~dp0desktop"/);
+  assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /start "" "TVGame Sender\.exe"/);
+});
+
 test('friend preview launchers run the expected low-latency commands', () => {
   const { createFriendPreviewPackage } = require('../src/release-package/tooling');
   const projectRoot = createFakeProject();
