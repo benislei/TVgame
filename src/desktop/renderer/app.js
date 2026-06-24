@@ -118,6 +118,16 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 function deviceKey(device) {
   return String(device.id || device.ip || device.name || '');
 }
@@ -137,6 +147,10 @@ function normalizeEnvironment(result) {
 
   if (result.items && typeof result.items === 'object') {
     return result.items;
+  }
+
+  if (result.cards && typeof result.cards === 'object') {
+    return result.cards;
   }
 
   return result;
@@ -178,7 +192,7 @@ function getStreamTarget() {
 
 function renderQualityControls() {
   elements.qualitySelect.innerHTML = QUALITY_PRESETS.map(preset => (
-    `<option value="${preset.id}">${preset.label}</option>`
+    `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.label)}</option>`
   )).join('');
   elements.qualitySelect.value = state.selectedQuality;
 
@@ -187,8 +201,8 @@ function renderQualityControls() {
     return `
       <div class="preset-item">
         <div>
-          <div class="item-title">${preset.label}</div>
-          <div class="item-meta">${preset.note}</div>
+          <div class="item-title">${escapeHtml(preset.label)}</div>
+          <div class="item-meta">${escapeHtml(preset.note)}</div>
         </div>
         ${recommended ? '<span class="badge ok">推荐</span>' : '<span class="badge">预设</span>'}
       </div>
@@ -204,9 +218,9 @@ function renderDevices() {
   }
 
   elements.deviceSelect.innerHTML = state.devices.map(device => {
-    const key = deviceKey(device);
-    const name = device.name || device.model || '电视或盒子';
-    const ip = device.ip ? `（${device.ip}）` : '';
+    const key = escapeHtml(deviceKey(device));
+    const name = escapeHtml(device.name || device.model || '电视或盒子');
+    const ip = device.ip ? `（${escapeHtml(device.ip)}）` : '';
     return `<option value="${key}">${name}${ip}</option>`;
   }).join('');
 
@@ -216,9 +230,9 @@ function renderDevices() {
 
   elements.deviceSelect.value = state.selectedDevice;
   elements.deviceList.innerHTML = state.devices.map(device => {
-    const name = device.name || '电视或盒子';
-    const model = device.model || '接收端';
-    const ip = device.ip || '未知 IP';
+    const name = escapeHtml(device.name || '电视或盒子');
+    const model = escapeHtml(device.model || '接收端');
+    const ip = escapeHtml(device.ip || '未知 IP');
     return `
       <div class="device-item">
         <div>
@@ -235,25 +249,36 @@ function resolveDiagnostic(item) {
   const value = state.environment[item.key] || state.environment[item.label] || {};
 
   if (typeof value === 'boolean') {
-    return { ok: value, message: value ? '正常' : '需要处理' };
+    return {
+      ok: value,
+      message: value ? '正常' : '需要处理',
+      detail: '',
+      state: value ? 'ok' : 'warning'
+    };
   }
 
+  const cardState = value.state || (value.ok || value.available || value.installed ? 'ok' : 'warning');
+  const ok = cardState === 'ok';
+
   return {
-    ok: Boolean(value.ok || value.available || value.installed),
-    message: value.message || value.detail || value.path || (value.ok ? '正常' : '待检查')
+    ok,
+    message: value.message || value.detail || value.path || (ok ? '正常' : '待检查'),
+    detail: value.detail || '',
+    state: cardState
   };
 }
 
 function renderEnvironment() {
   const cards = DIAGNOSTIC_ITEMS.map(item => {
     const diagnostic = resolveDiagnostic(item);
-    const badgeClass = diagnostic.ok ? 'ok' : 'warn';
-    const badgeText = diagnostic.ok ? '正常' : '待处理';
+    const badgeClass = diagnostic.ok ? 'ok' : diagnostic.state === 'error' ? 'fail' : 'warn';
+    const badgeText = diagnostic.ok ? '正常' : diagnostic.state === 'warning' ? '警告' : '待处理';
+    const detail = diagnostic.detail ? ` · ${diagnostic.detail}` : '';
     return `
       <div class="diagnostic-card">
         <div>
-          <div class="status-name">${item.label}</div>
-          <div class="item-meta">${diagnostic.message}</div>
+          <div class="status-name">${escapeHtml(item.label)}</div>
+          <div class="item-meta">${escapeHtml(`${diagnostic.message}${detail}`)}</div>
         </div>
         <span class="badge ${badgeClass}">${badgeText}</span>
       </div>

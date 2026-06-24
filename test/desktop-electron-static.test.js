@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const Module = require('node:module');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const projectRoot = path.join(__dirname, '..');
 
@@ -49,6 +50,21 @@ function assertRendererNoMojibake(source, label) {
   for (const fragment of commonFragments) {
     assert.doesNotMatch(source, new RegExp(fragment), `${label} contains mojibake fragment ${fragment}`);
   }
+}
+
+function runRendererProbe(probeSource) {
+  const source = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+  const context = {
+    window: {
+      setInterval() {}
+    },
+    document: {
+      addEventListener() {}
+    }
+  };
+
+  vm.runInNewContext(`${source}\n;${probeSource}`, context);
+  return context.window.__probeResult;
 }
 
 function createFakeServices(overrides = {}) {
@@ -278,6 +294,71 @@ test('renderer avoids advanced custom streaming controls and mojibake', () => {
     assertRendererNoMojibake(source, label);
     assert.match(source, /[\u4E00-\u9FFF]/, `${label} should contain real Chinese text or comments`);
   }
+});
+
+test('renderer maps real environment cards state into diagnostics', () => {
+  const diagnostics = runRendererProbe(`
+    state.environment = normalizeEnvironment({
+      ready: false,
+      raw: {},
+      cards: {
+        gstreamer: {
+          state: 'ok',
+          title: 'GStreamer',
+          message: '已安装',
+          detail: 'gst-launch 可用'
+        },
+        encoder: {
+          state: 'warning',
+          title: '编码器',
+          message: 'HEVC 不可用',
+          detail: '将使用 H.264'
+        }
+      }
+    });
+    window.__probeResult = {
+      gstreamer: resolveDiagnostic({ key: 'gstreamer', label: 'GStreamer' }),
+      encoder: resolveDiagnostic({ key: 'encoder', label: '编码器' })
+    };
+  `);
+
+  assert.equal(diagnostics.gstreamer.ok, true);
+  assert.equal(diagnostics.gstreamer.message, '已安装');
+  assert.equal(diagnostics.gstreamer.detail, 'gst-launch 可用');
+  assert.equal(diagnostics.gstreamer.state, 'ok');
+  assert.equal(diagnostics.encoder.ok, false);
+  assert.equal(diagnostics.encoder.message, 'HEVC 不可用');
+  assert.equal(diagnostics.encoder.detail, '将使用 H.264');
+  assert.equal(diagnostics.encoder.state, 'warning');
+});
+
+test('renderer escapes untrusted device discovery fields before using innerHTML', () => {
+  const rendered = runRendererProbe(`
+    const select = { innerHTML: '', value: '' };
+    const list = { innerHTML: '', textContent: '' };
+    elements.deviceSelect = select;
+    elements.deviceList = list;
+    state.selectedDevice = '';
+    state.devices = [{
+      id: 'evil-device',
+      name: '<img src=x onerror=alert(1)>',
+      model: '<script>alert(2)</script>',
+      ip: '192.168.1.5"><script>alert(3)</script>'
+    }];
+    renderDevices();
+    window.__probeResult = {
+      select: select.innerHTML,
+      list: list.innerHTML
+    };
+  `);
+
+  assert.doesNotMatch(rendered.select, /<img/i);
+  assert.doesNotMatch(rendered.select, /<script/i);
+  assert.doesNotMatch(rendered.list, /<img/i);
+  assert.doesNotMatch(rendered.list, /<script/i);
+  assert.match(rendered.select, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(rendered.list, /&lt;script&gt;alert\(2\)&lt;\/script&gt;/);
+  assert.match(rendered.list, /192\.168\.1\.5&quot;&gt;&lt;script&gt;alert\(3\)&lt;\/script&gt;/);
 });
 
 test('stream:start rejects malformed payload before starting input bridge', () => {
