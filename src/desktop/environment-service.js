@@ -72,7 +72,8 @@ function createEnvironmentService(options = {}) {
 
   function repair(projectRoot) {
     const report = createReport();
-    const plan = createRepairPlan(report);
+    const runtime = getRuntime();
+    const plan = createRepairPlan(report, runtime);
     runRepairActions(plan, { projectRoot });
     return check();
   }
