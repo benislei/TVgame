@@ -76,6 +76,28 @@ test('parseDiscoveryMessage falls back to payload ip and real Chinese unknown la
   assert.equal(device.decoder, '未知');
 });
 
+test('parseDiscoveryMessage normalizes renderer-facing defaults', () => {
+  const missing = parseDiscoveryMessage(receiverPayload({
+    androidApi: undefined,
+    recommendedProfile: undefined
+  }), { address: '192.168.50.142' });
+  const invalid = parseDiscoveryMessage(receiverPayload({
+    androidApi: '34',
+    recommendedProfile: '   '
+  }), { address: '192.168.50.143' });
+  const nonStringProfile = parseDiscoveryMessage(receiverPayload({
+    androidApi: Number.NaN,
+    recommendedProfile: 123
+  }), { address: '192.168.50.144' });
+
+  assert.equal(missing.androidApi, 0);
+  assert.equal(missing.recommendedProfile, 'h2641080p30');
+  assert.equal(invalid.androidApi, 0);
+  assert.equal(invalid.recommendedProfile, 'h2641080p30');
+  assert.equal(nonStringProfile.androidApi, 0);
+  assert.equal(nonStringProfile.recommendedProfile, 'h2641080p30');
+});
+
 test('device discovery binds UDP port, listens for messages and reports newest-first list updates', () => {
   const sockets = [];
   const updates = [];
@@ -152,10 +174,55 @@ test('device discovery contains socket errors and exposes them through onError',
   assert.deepEqual(errors, [error]);
 });
 
+test('device discovery clears async socket errors and can start again', () => {
+  const sockets = [];
+  const errors = [];
+  const discovery = createDeviceDiscovery({
+    socketFactory: () => {
+      const socket = createFakeSocket();
+      sockets.push(socket);
+      return socket;
+    },
+    onError: error => errors.push(error)
+  });
+  const error = new Error('async bind failed');
+
+  discovery.start();
+  sockets[0].emit('error', error);
+  discovery.start();
+
+  assert.deepEqual(errors, [error]);
+  assert.equal(sockets.length, 2);
+  assert.equal(sockets[0].closeCalls, 1);
+  assert.deepEqual(sockets[1].bindCalls, [DISCOVERY_PORT]);
+});
+
+test('device discovery repeated updates for the same IP replace one list entry', () => {
+  const socket = createFakeSocket();
+  const updates = [];
+  const discovery = createDeviceDiscovery({ socketFactory: () => socket });
+
+  discovery.start(list => updates.push(list));
+  socket.emit('message', receiverPayload({
+    deviceName: 'Old Living Room TV',
+    decoder: 'old.decoder'
+  }), { address: '192.168.50.145' });
+  socket.emit('message', receiverPayload({
+    deviceName: 'New Living Room TV',
+    decoder: 'new.decoder'
+  }), { address: '192.168.50.145' });
+
+  assert.equal(updates.length, 2);
+  assert.equal(updates[1].length, 1);
+  assert.equal(updates[1][0].ip, '192.168.50.145');
+  assert.equal(updates[1][0].name, 'New Living Room TV');
+  assert.equal(updates[1][0].decoder, 'new.decoder');
+});
+
 test('desktop device discovery production text does not contain mojibake fragments', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'desktop', 'device-discovery.js'), 'utf8');
 
-  for (const fragment of ['缂?', '閸?', '鏉?', '濡?', '濮?', '閹?', '娑?', '閻?', '闁?', '缁?']) {
+  for (const fragment of ['缂?', '閸?', '鏉?', '濡?', '濮?', '閹?', '娑?', '閻?', '闁?', '缁?', '鏈煡']) {
     assert.equal(source.includes(fragment), false);
   }
 

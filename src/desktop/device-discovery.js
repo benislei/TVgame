@@ -6,6 +6,7 @@ const DISCOVERY_PORT = 8790;
 const RECEIVER_APP = 'TVGameReceiver';
 const UNKNOWN_DEVICE_NAME = '未知电视设备';
 const UNKNOWN_DECODER = '未知';
+const DEFAULT_RECOMMENDED_PROFILE = 'h2641080p30';
 
 function textOrFallback(value, fallback) {
   if (typeof value !== 'string') {
@@ -14,6 +15,10 @@ function textOrFallback(value, fallback) {
 
   const text = value.trim();
   return text || fallback;
+}
+
+function normalizeAndroidApi(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function parseDiscoveryMessage(message, remote = {}) {
@@ -37,9 +42,9 @@ function parseDiscoveryMessage(message, remote = {}) {
     id: ip,
     name: textOrFallback(parsed.deviceName, UNKNOWN_DEVICE_NAME),
     ip,
-    androidApi: parsed.androidApi,
+    androidApi: normalizeAndroidApi(parsed.androidApi),
     decoder: textOrFallback(parsed.decoder, UNKNOWN_DECODER),
-    recommendedProfile: parsed.recommendedProfile,
+    recommendedProfile: textOrFallback(parsed.recommendedProfile, DEFAULT_RECOMMENDED_PROFILE),
     lastSeenAt: Date.now()
   };
 }
@@ -53,6 +58,20 @@ function createDeviceDiscovery(options = {}) {
   function reportError(error) {
     if (typeof options.onError === 'function') {
       options.onError(error);
+    }
+  }
+
+  function clearSocket(failedSocket) {
+    if (socket === failedSocket) {
+      socket = null;
+    }
+
+    if (failedSocket && typeof failedSocket.close === 'function') {
+      try {
+        failedSocket.close();
+      } catch (error) {
+        reportError(error);
+      }
     }
   }
 
@@ -87,15 +106,14 @@ function createDeviceDiscovery(options = {}) {
 
     nextSocket.on('error', error => {
       reportError(error);
+      clearSocket(nextSocket);
     });
 
     try {
       nextSocket.bind(DISCOVERY_PORT);
     } catch (error) {
       reportError(error);
-      if (socket === nextSocket) {
-        socket = null;
-      }
+      clearSocket(nextSocket);
     }
   }
 
