@@ -91,6 +91,11 @@ test('friend preview package includes packaged Electron desktop sender when avai
   const projectRoot = createFakeProject();
   writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'TVGame Sender.exe'), 'desktop exe');
   writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'resources', 'app.asar'), 'asar');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'node_modules', 'large', 'index.js'), 'ignored');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'dist', 'old.zip'), 'ignored');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'dist-desktop', 'nested.exe'), 'ignored');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'InputBridge', 'bin', 'Debug', 'ignored.txt'), 'ignored');
+  writeFile(path.join(projectRoot, 'dist-desktop', 'win-unpacked', 'InputBridge', 'obj', 'Debug', 'ignored.txt'), 'ignored');
 
   const report = createFriendPreviewPackage({
     projectRoot,
@@ -105,8 +110,28 @@ test('friend preview package includes packaged Electron desktop sender when avai
   assert.equal(fs.readFileSync(desktopExe, 'utf8'), 'desktop exe');
   assert.equal(fs.existsSync(desktopAsar), true);
   assert.equal(fs.existsSync(desktopLauncher), true);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'node_modules')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'dist')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'dist-desktop')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'InputBridge', 'bin')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'InputBridge', 'obj')), false);
   assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /cd \/d "%~dp0desktop"/);
   assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /start "" "TVGame Sender\.exe"/);
+});
+
+test('friend preview package skips desktop sender files and launcher when desktop package is missing', () => {
+  const { createFriendPreviewPackage } = require('../src/release-package/tooling');
+  const projectRoot = createFakeProject();
+
+  const report = createFriendPreviewPackage({
+    projectRoot,
+    outputRoot: path.join(projectRoot, 'dist-test'),
+    createZip: false
+  });
+
+  assert.equal(report.desktopPackagePath, null);
+  assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, '启动TVGame发送端.bat')), false);
 });
 
 test('friend preview launchers run the expected low-latency commands', () => {

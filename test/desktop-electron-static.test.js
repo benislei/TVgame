@@ -112,6 +112,7 @@ function createFakeServices(overrides = {}) {
       }
     },
     process,
+    nodeRuntimePath: 'D:/TVGame/TVGame Sender.exe',
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'process'))
   };
 }
@@ -144,6 +145,31 @@ test('package exposes Electron desktop scripts', () => {
     packageJson.scripts['desktop:package'],
     'electron-builder --config src/desktop/electron-builder.json'
   );
+});
+
+test('Electron builder config creates a small portable Windows sender package', () => {
+  const builderConfig = JSON.parse(readProjectFile('src', 'desktop', 'electron-builder.json'));
+
+  assert.equal(builderConfig.appId, 'com.tvgame.sender');
+  assert.equal(builderConfig.productName, 'TVGame Sender');
+  assert.equal(builderConfig.directories.output, 'dist-desktop');
+  assert.equal(builderConfig.asar, false);
+  assert.deepEqual(builderConfig.win.target, ['portable']);
+
+  for (const required of ['package.json', 'src/**', 'scripts/**', 'InputBridgeRuntime/**', 'InputBridge/**', 'docs/**']) {
+    assert.ok(builderConfig.files.includes(required), `missing builder file include ${required}`);
+  }
+
+  for (const excluded of [
+    '!node_modules/**',
+    '!dist/**',
+    '!dist-desktop/**',
+    '!build/**',
+    '!InputBridge/bin/**',
+    '!InputBridge/obj/**'
+  ]) {
+    assert.ok(builderConfig.files.includes(excluded), `missing builder file exclude ${excluded}`);
+  }
 });
 
 test('preload exposes only the safe TVGame API through contextBridge', () => {
@@ -201,7 +227,7 @@ test('IPC handlers register the desktop channels and delegate to services', () =
   assert.match(source, /services\.environment\.repair\(services\.projectRoot\)/);
   assert.match(source, /services\.discovery\.list\(\)/);
   assert.match(source, /services\.process\.startInputBridge\(\{\s*projectRoot:\s*services\.projectRoot,\s*inputBridgeRuntimePath:\s*services\.inputBridgeRuntimePath\s*\}\)/s);
-  assert.match(source, /services\.process\.startStream\(\{\s*projectRoot:\s*services\.projectRoot,\s*device:\s*payload\.device,\s*quality:\s*payload\.quality,\s*performanceProtection:\s*payload\.performanceProtection\s*\}\)/s);
+  assert.match(source, /services\.process\.startStream\(\{\s*projectRoot:\s*services\.projectRoot,\s*nodeRuntimePath:\s*services\.nodeRuntimePath,\s*device:\s*payload\.device,\s*quality:\s*payload\.quality,\s*performanceProtection:\s*payload\.performanceProtection\s*\}\)/s);
   assert.match(source, /services\.process\.stopStream\(\)/);
   assert.match(source, /services\.process\.status\(\)/);
   assert.match(source, /module\.exports\s*=\s*\{\s*registerIpcHandlers\s*\}/);
@@ -482,4 +508,40 @@ test('main cleanup stops stream, input bridge and discovery', () => {
     'stopInputBridge',
     'discovery.stop'
   ]);
+});
+
+test('main resolves project root and InputBridge runtime in dev and packaged layouts', () => {
+  const main = requireMainWithElectronMock({
+    app: {},
+    BrowserWindow: function BrowserWindow() {},
+    ipcMain: {}
+  });
+
+  assert.equal(
+    main.resolveProjectRoot('D:/repo/src/desktop'),
+    path.normalize('D:/repo')
+  );
+  assert.equal(
+    main.resolveProjectRoot('D:/TVGame/resources/app/src/desktop'),
+    path.normalize('D:/TVGame/resources/app')
+  );
+  assert.equal(
+    main.resolveProjectRoot('D:/TVGame/resources/app.asar/src/desktop'),
+    path.normalize('D:/TVGame/resources/app')
+  );
+
+  const services = main.createServices({
+    getPath() {
+      return 'D:/user-data';
+    }
+  }, {
+    desktopDir: 'D:/TVGame/resources/app/src/desktop'
+  });
+
+  assert.equal(services.projectRoot, path.normalize('D:/TVGame/resources/app'));
+  assert.equal(services.nodeRuntimePath, process.execPath);
+  assert.equal(
+    services.inputBridgeRuntimePath,
+    path.normalize('D:/TVGame/resources/app/InputBridgeRuntime/InputBridge.exe')
+  );
 });

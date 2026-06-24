@@ -6,19 +6,8 @@ const { StringDecoder } = require('node:string_decoder');
 
 const MAX_LOG_LINES = 300;
 
-function buildRtpCommand({ projectRoot, device, quality, performanceProtection }) {
-  if (!device || !device.ip) {
-    throw new Error('缺少电视 IP');
-  }
-
-  if (!quality || !quality.profile) {
-    throw new Error('缺少画质档位');
-  }
-
+function buildRtpArgs({ device, quality, performanceProtection }) {
   const args = [
-    'run',
-    'native:rtp',
-    '--',
     '--host',
     device.ip,
     '--encoder',
@@ -33,9 +22,45 @@ function buildRtpCommand({ projectRoot, device, quality, performanceProtection }
     args.push('--process-priority', 'high');
   }
 
+  return args;
+}
+
+function buildRtpCommand({ projectRoot, nodeRuntimePath, device, quality, performanceProtection }) {
+  if (!device || !device.ip) {
+    throw new Error('缺少电视 IP');
+  }
+
+  if (!quality || !quality.profile) {
+    throw new Error('缺少画质档位');
+  }
+
+  if (nodeRuntimePath) {
+    return {
+      command: nodeRuntimePath,
+      args: [
+        path.join(projectRoot, 'src', 'native-streamer', 'cli.js'),
+        'rtp',
+        ...buildRtpArgs({ device, quality, performanceProtection })
+      ],
+      options: {
+        cwd: projectRoot,
+        windowsHide: true,
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1'
+        }
+      }
+    };
+  }
+
   return {
     command: 'npm.cmd',
-    args,
+    args: [
+      'run',
+      'native:rtp',
+      '--',
+      ...buildRtpArgs({ device, quality, performanceProtection })
+    ],
     options: {
       cwd: projectRoot,
       windowsHide: true

@@ -32,6 +32,7 @@ function registerIpcHandlers(ipcMain, services) {
     try {
       const result = services.process.startStream({
         projectRoot: services.projectRoot,
+        nodeRuntimePath: services.nodeRuntimePath,
         device: payload.device,
         quality: payload.quality,
         performanceProtection: payload.performanceProtection

@@ -4,6 +4,7 @@
   "directories": {
     "output": "dist-desktop"
   },
+  "asar": false,
   "extraMetadata": {
     "main": "src/desktop/main.js"
   },
@@ -14,7 +15,13 @@
     "InputBridgeRuntime/**",
     "InputBridge/**",
     "docs/**",
-    "public/**"
+    "public/**",
+    "!node_modules/**",
+    "!dist/**",
+    "!dist-desktop/**",
+    "!build/**",
+    "!InputBridge/bin/**",
+    "!InputBridge/obj/**"
   ],
   "win": {
     "target": [

@@ -23,6 +23,7 @@ const EXCLUDED_DIRECTORIES = new Set([
   '.gradle',
   'node_modules',
   'dist',
+  'dist-desktop',
   'build',
   'bin',
   'obj',
@@ -65,6 +66,7 @@ function copyDirectory(source, target) {
 function copyDirectoryContents(source, target) {
   ensureDirectory(target);
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (entry.isDirectory() && shouldSkipDirectory(entry.name)) continue;
     const sourcePath = path.join(source, entry.name);
     const targetPath = path.join(target, entry.name);
     if (entry.isDirectory()) {

@@ -8,7 +8,24 @@ const { createProcessService } = require('./process-service');
 const { createDeviceDiscovery } = require('./device-discovery');
 const { registerIpcHandlers } = require('./ipc-handlers');
 
-const projectRoot = path.resolve(__dirname, '..', '..');
+function replacePathSegment(source, segment, replacement) {
+  const normalized = path.normalize(source);
+  const parts = normalized.split(/[\\/]+/);
+  const index = parts.lastIndexOf(segment);
+  if (index === -1) return null;
+
+  parts[index] = replacement;
+  return path.normalize(parts.slice(0, index + 1).join(path.sep));
+}
+
+function resolveProjectRoot(desktopDir = __dirname) {
+  const asarRoot = replacePathSegment(desktopDir, 'app.asar', 'app');
+  if (asarRoot) return asarRoot;
+
+  return path.resolve(desktopDir, '..', '..');
+}
+
+const projectRoot = resolveProjectRoot();
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -28,10 +45,13 @@ function createWindow() {
   return window;
 }
 
-function createServices(electronApp = app) {
+function createServices(electronApp = app, options = {}) {
+  const serviceProjectRoot = resolveProjectRoot(options.desktopDir || __dirname);
+
   return {
-    projectRoot,
-    inputBridgeRuntimePath: path.join(projectRoot, 'InputBridgeRuntime', 'InputBridge.exe'),
+    projectRoot: serviceProjectRoot,
+    inputBridgeRuntimePath: path.join(serviceProjectRoot, 'InputBridgeRuntime', 'InputBridge.exe'),
+    nodeRuntimePath: process.execPath,
     config: createConfigStore({ appDataDir: electronApp.getPath('userData') }),
     environment: createEnvironmentService(),
     process: createProcessService(),
@@ -92,5 +112,6 @@ module.exports = {
   createServices,
   cleanupServices,
   registerApp,
+  resolveProjectRoot,
   projectRoot
 };

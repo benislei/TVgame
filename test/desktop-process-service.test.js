@@ -84,6 +84,35 @@ test('RTP command includes host, encoder, profile and performance protection', (
   assert.equal(command.options.windowsHide, true);
 });
 
+test('RTP command can use the Electron runtime as Node in packaged desktop builds', () => {
+  const command = buildRtpCommand({
+    projectRoot: 'D:/TVGame/resources/app',
+    nodeRuntimePath: 'D:/TVGame/TVGame Sender.exe',
+    device: { ip: '192.168.1.23' },
+    quality: { profile: 'hevc1080p30' },
+    performanceProtection: true
+  });
+
+  assert.equal(command.command, 'D:/TVGame/TVGame Sender.exe');
+  assert.deepEqual(command.args, [
+    path.join('D:/TVGame/resources/app', 'src', 'native-streamer', 'cli.js'),
+    'rtp',
+    '--host',
+    '192.168.1.23',
+    '--encoder',
+    'auto',
+    '--encoder-preset',
+    'auto',
+    '--profile',
+    'hevc1080p30',
+    '--process-priority',
+    'high'
+  ]);
+  assert.equal(command.options.cwd, 'D:/TVGame/resources/app');
+  assert.equal(command.options.windowsHide, true);
+  assert.equal(command.options.env.ELECTRON_RUN_AS_NODE, '1');
+});
+
 test('RTP command requires television IP and quality profile with Chinese errors', () => {
   assert.throws(
     () => buildRtpCommand({ projectRoot: 'D:/project', device: {}, quality: { profile: 'h264720p30' } }),
