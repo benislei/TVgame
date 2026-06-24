@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const Module = require('node:module');
 const path = require('node:path');
 
 const projectRoot = path.join(__dirname, '..');
@@ -14,6 +15,86 @@ function readProjectFile(...segments) {
 function assertNoMojibake(source, label) {
   for (const fragment of ['�', '锛', '鐢', '杈', '鍙', '绔', '妗', '缂', '鏃']) {
     assert.doesNotMatch(source, new RegExp(fragment), `${label} contains mojibake fragment ${fragment}`);
+  }
+}
+
+function createFakeIpcMain() {
+  const handlers = new Map();
+
+  return {
+    handlers,
+    handle(channel, handler) {
+      handlers.set(channel, handler);
+    }
+  };
+}
+
+function createFakeServices(overrides = {}) {
+  const calls = [];
+  const process = {
+    startInputBridge(args) {
+      calls.push(['startInputBridge', args]);
+      return { alreadyRunning: false };
+    },
+    startStream(args) {
+      calls.push(['startStream', args]);
+      return { started: true };
+    },
+    stopInputBridge() {
+      calls.push(['stopInputBridge']);
+      return { stopped: true };
+    },
+    stopStream() {
+      calls.push(['stopStream']);
+      return { stopped: true };
+    },
+    status() {
+      calls.push(['status']);
+      return { streamRunning: false, inputBridgeRunning: false, logs: [] };
+    },
+    ...overrides.process
+  };
+
+  return {
+    calls,
+    projectRoot: 'D:/project',
+    inputBridgeRuntimePath: 'D:/project/InputBridgeRuntime/InputBridge.exe',
+    config: {
+      load: () => ({}),
+      save: payload => payload
+    },
+    environment: {
+      check: () => ({}),
+      repair: () => ({})
+    },
+    discovery: {
+      list: () => [],
+      stop() {
+        calls.push(['discovery.stop']);
+      }
+    },
+    process,
+    ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'process'))
+  };
+}
+
+function requireMainWithElectronMock(electronMock) {
+  const mainPath = path.join(projectRoot, 'src', 'desktop', 'main.js');
+  const originalLoad = Module._load;
+
+  delete require.cache[require.resolve(mainPath)];
+  Module._load = function load(request, parent, isMain) {
+    if (request === 'electron') {
+      return electronMock;
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  try {
+    return require(mainPath);
+  } finally {
+    Module._load = originalLoad;
   }
 }
 
@@ -89,6 +170,89 @@ test('IPC handlers register the desktop channels and delegate to services', () =
   assertNoMojibake(source, 'ipc-handlers.js');
 });
 
+test('stream:start rejects malformed payload before starting input bridge', () => {
+  const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
+  const ipcMain = createFakeIpcMain();
+  const services = createFakeServices();
+
+  registerIpcHandlers(ipcMain, services);
+
+  assert.throws(() => ipcMain.handlers.get('stream:start')({}, null), /缺少电视 IP/);
+  assert.deepEqual(services.calls, []);
+});
+
+test('stream:start rolls back input bridge when stream start throws', () => {
+  const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
+  const ipcMain = createFakeIpcMain();
+  const services = createFakeServices({
+    process: {
+      startStream(args) {
+        services.calls.push(['startStream', args]);
+        throw new Error('stream failed');
+      }
+    }
+  });
+
+  registerIpcHandlers(ipcMain, services);
+
+  assert.throws(
+    () => ipcMain.handlers.get('stream:start')({}, {
+      device: { ip: '192.168.1.23' },
+      quality: { profile: 'h264720p30' },
+      performanceProtection: true
+    }),
+    /stream failed/
+  );
+  assert.deepEqual(services.calls.map(call => call[0]), [
+    'startInputBridge',
+    'startStream',
+    'stopInputBridge'
+  ]);
+});
+
+test('stream:start rolls back input bridge when stream start reports failure', () => {
+  const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
+  const ipcMain = createFakeIpcMain();
+  const services = createFakeServices({
+    process: {
+      startStream(args) {
+        services.calls.push(['startStream', args]);
+        return { started: false };
+      }
+    }
+  });
+
+  registerIpcHandlers(ipcMain, services);
+
+  assert.deepEqual(
+    ipcMain.handlers.get('stream:start')({}, {
+      device: { ip: '192.168.1.23' },
+      quality: { profile: 'h264720p30' },
+      performanceProtection: true
+    }),
+    { started: false }
+  );
+  assert.deepEqual(services.calls.map(call => call[0]), [
+    'startInputBridge',
+    'startStream',
+    'stopInputBridge'
+  ]);
+});
+
+test('stream:stop stops stream and input bridge together', () => {
+  const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
+  const ipcMain = createFakeIpcMain();
+  const services = createFakeServices();
+
+  registerIpcHandlers(ipcMain, services);
+
+  assert.deepEqual(ipcMain.handlers.get('stream:stop')(), {
+    stream: { stopped: true },
+    inputBridge: { stopped: true }
+  });
+  assert.deepEqual(services.calls.map(call => call[0]), ['stopStream', 'stopInputBridge']);
+});
+
 test('main creates the Electron window with secure webPreferences and starts discovery', () => {
   const source = readProjectFile('src', 'desktop', 'main.js');
 
@@ -110,4 +274,21 @@ test('main creates the Electron window with secure webPreferences and starts dis
 
   const titleCodepoints = Array.from('TVGame 发送端').map(char => char.codePointAt(0).toString(16));
   assert.deepEqual(titleCodepoints, ['54', '56', '47', '61', '6d', '65', '20', '53d1', '9001', '7aef']);
+});
+
+test('main cleanup stops stream, input bridge and discovery', () => {
+  const main = requireMainWithElectronMock({
+    app: {},
+    BrowserWindow: function BrowserWindow() {},
+    ipcMain: {}
+  });
+  const services = createFakeServices();
+
+  main.cleanupServices(services);
+
+  assert.deepEqual(services.calls.map(call => call[0]), [
+    'stopStream',
+    'stopInputBridge',
+    'discovery.stop'
+  ]);
 });

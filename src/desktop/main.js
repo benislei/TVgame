@@ -39,15 +39,46 @@ function createServices(electronApp = app) {
   };
 }
 
+function cleanupServices(services) {
+  if (!services) {
+    return {
+      stream: { stopped: false },
+      inputBridge: { stopped: false },
+      discovery: { stopped: false }
+    };
+  }
+
+  const stream = services.process.stopStream();
+  const inputBridge = services.process.stopInputBridge();
+  services.discovery.stop();
+
+  return {
+    stream,
+    inputBridge,
+    discovery: { stopped: true }
+  };
+}
+
 function registerApp() {
+  let services = null;
+
+  function cleanupActiveServices() {
+    cleanupServices(services);
+  }
+
   app.whenReady().then(() => {
-    const services = createServices(app);
+    services = createServices(app);
     registerIpcHandlers(ipcMain, services);
     services.discovery.start();
     createWindow();
   });
 
+  app.on('before-quit', () => {
+    cleanupActiveServices();
+  });
+
   app.on('window-all-closed', () => {
+    cleanupActiveServices();
     app.quit();
   });
 }
@@ -59,6 +90,7 @@ if (require.main === module) {
 module.exports = {
   createWindow,
   createServices,
+  cleanupServices,
   registerApp,
   projectRoot
 };
