@@ -10,6 +10,7 @@ import java.util.Locale;
 
 public final class DiscoveryBroadcaster {
     private static final int DISCOVERY_PORT = 8790;
+    private static final int BROADCAST_INTERVAL_MS = 2000;
     private static final String BROADCAST_ADDRESS = "255.255.255.255";
 
     private final StatsModel stats;
@@ -49,7 +50,7 @@ public final class DiscoveryBroadcaster {
         while (running && currentThread == thread) {
             broadcastOnce();
             try {
-                Thread.sleep(2000);
+                Thread.sleep(BROADCAST_INTERVAL_MS);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 return;
@@ -113,7 +114,42 @@ public final class DiscoveryBroadcaster {
         if (text == null) {
             return "";
         }
-        return text.replace("\\", "\\\\").replace("\"", "\\\"");
+
+        StringBuilder escaped = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char value = text.charAt(i);
+            switch (value) {
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (value < 0x20) {
+                        escaped.append(String.format(Locale.US, "\\u%04x", (int) value));
+                    } else {
+                        escaped.append(value);
+                    }
+                    break;
+            }
+        }
+        return escaped.toString();
     }
 
     private static String cleanBuildText(String text) {
