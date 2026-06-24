@@ -174,7 +174,11 @@ test('process service keeps only the last 300 log lines', () => {
 test('desktop process service production text does not contain mojibake fragments', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'desktop', 'process-service.js'), 'utf8');
 
-  for (const fragment of ['缂', '鍙', '杈', '妗', '姝', '鎵', '涓']) {
+  for (const fragment of ['缂', '鍙', '杈', '妗', '姝', '鎵', '涓', '鐢', '閫', '绗']) {
     assert.doesNotMatch(source, new RegExp(fragment));
+  }
+
+  for (const fragment of ['缺少电视 IP', '输入桥', '发送端已经在运行']) {
+    assert.match(source, new RegExp(fragment));
   }
 });
