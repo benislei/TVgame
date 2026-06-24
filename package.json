@@ -21,6 +21,8 @@
     "android:build": "node src/android-build/cli.js build",
     "android:apk": "node src/android-build/cli.js apk",
     "package:friend": "node src/release-package/cli.js friend",
+    "desktop": "electron src/desktop/main.js",
+    "desktop:package": "electron-builder --config src/desktop/electron-builder.json",
     "test": "node --test"
   },
   "dependencies": {
@@ -28,8 +30,11 @@
   },
   "optionalDependencies": {
     "@roamhq/wrtc": "^0.10.0",
-    "wrtc": "^0.4.7",
-    "naudiodon": "^2.4.2"
+    "naudiodon": "^2.4.2",
+    "wrtc": "^0.4.7"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3"
+  }
 }
