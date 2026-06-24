@@ -12,26 +12,38 @@ const {
   createProcessService
 } = require('../src/desktop/process-service');
 
-function createFakeChild() {
+function createFakeChild(options = {}) {
   const child = new EventEmitter();
-  child.stdout = new EventEmitter();
-  child.stderr = new EventEmitter();
+  if (options.stdout !== false) {
+    child.stdout = new EventEmitter();
+  }
+  if (options.stderr !== false) {
+    child.stderr = new EventEmitter();
+  }
   child.killed = false;
   child.killCalls = 0;
   child.kill = () => {
-    child.killed = true;
     child.killCalls += 1;
-    child.emit('exit', 0, null);
+    if (options.killError) {
+      throw options.killError;
+    }
+
+    if (options.killResult === false) {
+      return false;
+    }
+
+    child.killed = true;
     return true;
   };
   return child;
 }
 
-function createSpawnHarness() {
+function createSpawnHarness(harnessOptions = {}) {
   const children = [];
   const calls = [];
   const spawn = (command, args, options) => {
-    const child = createFakeChild();
+    const childOptions = Array.isArray(harnessOptions.children) ? harnessOptions.children[children.length] : undefined;
+    const child = createFakeChild(childOptions);
     children.push(child);
     calls.push({ command, args, options, child });
     return child;
@@ -153,6 +165,77 @@ test('process service stop methods kill running processes and report idle stops'
   assert.equal(harness.children[1].killCalls, 1);
   assert.equal(service.status().inputBridgeRunning, false);
   assert.equal(service.status().streamRunning, false);
+});
+
+test('process service logs child errors and restores running state', () => {
+  const harness = createSpawnHarness();
+  const service = createProcessService({ spawn: harness.spawn });
+
+  service.startInputBridge({ projectRoot: 'D:/project' });
+  service.startStream({
+    projectRoot: 'D:/project',
+    device: { ip: '192.168.1.23' },
+    quality: { profile: 'h264720p30' }
+  });
+
+  harness.children[0].emit('error', new Error('bridge missing'));
+  harness.children[1].emit('error', new Error('rtp failed'));
+
+  assert.deepEqual(service.status(), {
+    streamRunning: false,
+    inputBridgeRunning: false,
+    logs: ['[输入桥] 启动失败：bridge missing', '[发送端] 启动失败：rtp failed']
+  });
+});
+
+test('process service decodes split UTF-8 chunks without corrupting Chinese logs', () => {
+  const harness = createSpawnHarness();
+  const service = createProcessService({ spawn: harness.spawn });
+
+  service.startInputBridge({ projectRoot: 'D:/project' });
+
+  const message = Buffer.from('输入桥已启动\n');
+  harness.children[0].stdout.emit('data', message.subarray(0, 5));
+  harness.children[0].stdout.emit('data', message.subarray(5));
+
+  assert.deepEqual(service.status().logs, ['[输入桥] 输入桥已启动']);
+});
+
+test('process service keeps running state when kill returns false', () => {
+  const harness = createSpawnHarness({ children: [{ killResult: false }] });
+  const service = createProcessService({ spawn: harness.spawn });
+
+  service.startInputBridge({ projectRoot: 'D:/project' });
+
+  assert.deepEqual(service.stopInputBridge(), { stopped: false });
+  assert.equal(service.status().inputBridgeRunning, true);
+  assert.deepEqual(service.status().logs, ['[输入桥] 停止请求失败']);
+});
+
+test('process service keeps running state when kill throws', () => {
+  const harness = createSpawnHarness({ children: [{}, { killError: new Error('access denied') }] });
+  const service = createProcessService({ spawn: harness.spawn });
+
+  service.startInputBridge({ projectRoot: 'D:/project' });
+  service.startStream({
+    projectRoot: 'D:/project',
+    device: { ip: '192.168.1.23' },
+    quality: { profile: 'h264720p30' }
+  });
+
+  assert.deepEqual(service.stopStream(), { stopped: false });
+  assert.equal(service.status().streamRunning, true);
+  assert.deepEqual(service.status().logs, ['[发送端] 停止失败：access denied']);
+});
+
+test('process service does not crash when child streams are missing', () => {
+  const harness = createSpawnHarness({ children: [{ stdout: false, stderr: false }] });
+  const service = createProcessService({ spawn: harness.spawn });
+
+  assert.deepEqual(service.startInputBridge({ projectRoot: 'D:/project' }), { alreadyRunning: false });
+  harness.children[0].emit('exit', 0);
+
+  assert.equal(service.status().inputBridgeRunning, false);
 });
 
 test('process service keeps only the last 300 log lines', () => {

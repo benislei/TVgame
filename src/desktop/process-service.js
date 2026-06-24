@@ -2,6 +2,7 @@
 
 const childProcess = require('node:child_process');
 const path = require('node:path');
+const { StringDecoder } = require('node:string_decoder');
 
 const MAX_LOG_LINES = 300;
 
@@ -59,32 +60,81 @@ function createProcessService(options = {}) {
   let inputBridgeProcess = null;
   let streamProcess = null;
 
-  function appendLog(prefix, chunk) {
-    const lines = String(chunk).split(/\r?\n/);
+  function appendLogLine(prefix, line) {
+    const text = line.trim();
+    if (!text) {
+      return;
+    }
 
-    for (const line of lines) {
-      const text = line.trim();
-      if (!text) {
-        continue;
-      }
-
-      logs.push(`${prefix} ${text}`);
-      if (logs.length > MAX_LOG_LINES) {
-        logs.splice(0, logs.length - MAX_LOG_LINES);
-      }
+    logs.push(`${prefix} ${text}`);
+    if (logs.length > MAX_LOG_LINES) {
+      logs.splice(0, logs.length - MAX_LOG_LINES);
     }
   }
 
+  function createLogSink(prefix) {
+    const decoder = new StringDecoder('utf8');
+    let pending = '';
+
+    function appendText(text) {
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop();
+
+      for (const line of lines) {
+        appendLogLine(prefix, line);
+      }
+    }
+
+    function write(chunk) {
+      if (typeof chunk === 'string') {
+        appendText(chunk);
+        return;
+      }
+
+      appendText(decoder.write(chunk));
+    }
+
+    function flush() {
+      appendText(decoder.end());
+      appendLogLine(prefix, pending);
+      pending = '';
+    }
+
+    return { write, flush };
+  }
+
   function attachProcess(child, prefix, onExit) {
+    const sinks = [];
+
     if (child.stdout && typeof child.stdout.on === 'function') {
-      child.stdout.on('data', data => appendLog(prefix, data));
+      const stdoutSink = createLogSink(prefix);
+      sinks.push(stdoutSink);
+      child.stdout.on('data', data => stdoutSink.write(data));
     }
 
     if (child.stderr && typeof child.stderr.on === 'function') {
-      child.stderr.on('data', data => appendLog(prefix, data));
+      const stderrSink = createLogSink(prefix);
+      sinks.push(stderrSink);
+      child.stderr.on('data', data => stderrSink.write(data));
     }
 
-    child.on('exit', onExit);
+    function flushSinks() {
+      for (const sink of sinks) {
+        sink.flush();
+      }
+    }
+
+    child.on('exit', () => {
+      flushSinks();
+      onExit();
+    });
+
+    child.on('error', error => {
+      flushSinks();
+      appendLogLine(prefix, `启动失败：${error && error.message ? error.message : String(error)}`);
+      onExit();
+    });
   }
 
   function startInputBridge(args) {
@@ -110,8 +160,19 @@ function createProcessService(options = {}) {
     }
 
     const child = inputBridgeProcess;
-    inputBridgeProcess = null;
-    child.kill();
+    try {
+      if (!child.kill()) {
+        appendLogLine('[输入桥]', '停止请求失败');
+        return { stopped: false };
+      }
+    } catch (error) {
+      appendLogLine('[输入桥]', `停止失败：${error && error.message ? error.message : String(error)}`);
+      return { stopped: false };
+    }
+
+    if (inputBridgeProcess === child) {
+      inputBridgeProcess = null;
+    }
 
     return { stopped: true };
   }
@@ -139,8 +200,19 @@ function createProcessService(options = {}) {
     }
 
     const child = streamProcess;
-    streamProcess = null;
-    child.kill();
+    try {
+      if (!child.kill()) {
+        appendLogLine('[发送端]', '停止请求失败');
+        return { stopped: false };
+      }
+    } catch (error) {
+      appendLogLine('[发送端]', `停止失败：${error && error.message ? error.message : String(error)}`);
+      return { stopped: false };
+    }
+
+    if (streamProcess === child) {
+      streamProcess = null;
+    }
 
     return { stopped: true };
   }
