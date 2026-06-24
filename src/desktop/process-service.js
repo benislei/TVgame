@@ -34,7 +34,7 @@ function buildRtpCommand({ projectRoot, device, quality, performanceProtection }
   }
 
   return {
-    command: process.platform === 'win32' ? 'npm.cmd' : 'npm',
+    command: 'npm.cmd',
     args,
     options: {
       cwd: projectRoot,
@@ -106,6 +106,7 @@ function createProcessService(options = {}) {
 
   function attachProcess(child, prefix, onExit) {
     const sinks = [];
+    let finalized = false;
 
     if (child.stdout && typeof child.stdout.on === 'function') {
       const stdoutSink = createLogSink(prefix);
@@ -125,12 +126,26 @@ function createProcessService(options = {}) {
       }
     }
 
-    child.on('exit', () => {
+    function finalize() {
+      if (finalized) {
+        return;
+      }
+
+      finalized = true;
       flushSinks();
       onExit();
+    }
+
+    child.on('close', () => {
+      finalize();
     });
 
     child.on('error', error => {
+      if (finalized) {
+        return;
+      }
+
+      finalized = true;
       flushSinks();
       appendLogLine(prefix, `启动失败：${error && error.message ? error.message : String(error)}`);
       onExit();
@@ -143,7 +158,14 @@ function createProcessService(options = {}) {
     }
 
     const command = buildInputBridgeCommand(args);
-    const child = spawn(command.command, command.args, command.options);
+    let child;
+    try {
+      child = spawn(command.command, command.args, command.options);
+    } catch (error) {
+      appendLogLine('[输入桥]', `启动失败：${error && error.message ? error.message : String(error)}`);
+      return { alreadyRunning: false, started: false };
+    }
+
     inputBridgeProcess = child;
     attachProcess(child, '[输入桥]', () => {
       if (inputBridgeProcess === child) {
@@ -170,10 +192,6 @@ function createProcessService(options = {}) {
       return { stopped: false };
     }
 
-    if (inputBridgeProcess === child) {
-      inputBridgeProcess = null;
-    }
-
     return { stopped: true };
   }
 
@@ -183,7 +201,14 @@ function createProcessService(options = {}) {
     }
 
     const command = buildRtpCommand(args);
-    const child = spawn(command.command, command.args, command.options);
+    let child;
+    try {
+      child = spawn(command.command, command.args, command.options);
+    } catch (error) {
+      appendLogLine('[发送端]', `启动失败：${error && error.message ? error.message : String(error)}`);
+      throw error;
+    }
+
     streamProcess = child;
     attachProcess(child, '[发送端]', () => {
       if (streamProcess === child) {
@@ -208,10 +233,6 @@ function createProcessService(options = {}) {
     } catch (error) {
       appendLogLine('[发送端]', `停止失败：${error && error.message ? error.message : String(error)}`);
       return { stopped: false };
-    }
-
-    if (streamProcess === child) {
-      streamProcess = null;
     }
 
     return { stopped: true };
