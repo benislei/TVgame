@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG = Object.freeze({
   firstRunComplete: false,
   selectedDevice: null,
   selectedQuality: 'hevc1080p30',
   performanceProtection: true
-};
+});
 
 function normalizeConfig(config) {
   const nextConfig = config && typeof config === 'object' && !Array.isArray(config)
@@ -32,10 +32,26 @@ function createConfigStore(options = {}) {
   const file = path.join(appDataDir, 'config.json');
 
   function load() {
+    let rawConfig;
+
     try {
-      return normalizeConfig(JSON.parse(fs.readFileSync(file, 'utf8')));
-    } catch {
-      return { ...DEFAULT_CONFIG };
+      rawConfig = fs.readFileSync(file, 'utf8');
+    } catch (error) {
+      if (error && error.code === 'ENOENT') {
+        return { ...DEFAULT_CONFIG };
+      }
+
+      throw error;
+    }
+
+    try {
+      return normalizeConfig(JSON.parse(rawConfig));
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return { ...DEFAULT_CONFIG };
+      }
+
+      throw error;
     }
   }
 

@@ -9,6 +9,15 @@ const path = require('node:path');
 const { QUALITY_PRESETS, getQualityPreset } = require('../src/desktop/quality-presets');
 const { DEFAULT_CONFIG, createConfigStore } = require('../src/desktop/config-store');
 
+function createTempAppDataDir(prefix) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+function writeConfigFile(appDataDir, configText) {
+  fs.mkdirSync(appDataDir, { recursive: true });
+  fs.writeFileSync(path.join(appDataDir, 'config.json'), configText, 'utf8');
+}
+
 test('desktop quality presets expose the six confirmed presets in order', () => {
   assert.deepEqual(QUALITY_PRESETS.map(preset => preset.id), [
     'h264720p30',
@@ -65,7 +74,7 @@ test('desktop quality preset lookup marks HEVC 1080P30 as recommended and return
 });
 
 test('desktop config store loads defaults when no config file exists', () => {
-  const appDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-config-defaults-'));
+  const appDataDir = createTempAppDataDir('desktop-config-defaults-');
   const store = createConfigStore({ appDataDir });
 
   assert.deepEqual(DEFAULT_CONFIG, {
@@ -77,8 +86,53 @@ test('desktop config store loads defaults when no config file exists', () => {
   assert.deepEqual(store.load(), DEFAULT_CONFIG);
 });
 
+test('desktop config store loads defaults when config JSON is malformed', () => {
+  const appDataDir = createTempAppDataDir('desktop-config-corrupt-');
+  writeConfigFile(appDataDir, '{ "selectedQuality": ');
+  const store = createConfigStore({ appDataDir });
+
+  assert.deepEqual(store.load(), DEFAULT_CONFIG);
+});
+
+test('desktop config store merges loaded partial config with defaults', () => {
+  const appDataDir = createTempAppDataDir('desktop-config-partial-');
+  writeConfigFile(appDataDir, JSON.stringify({ firstRunComplete: true }));
+  const store = createConfigStore({ appDataDir });
+
+  assert.deepEqual(store.load(), {
+    firstRunComplete: true,
+    selectedDevice: null,
+    selectedQuality: 'hevc1080p30',
+    performanceProtection: true
+  });
+});
+
+test('desktop config store normalizes missing selectedDevice to null when loading config', () => {
+  const appDataDir = createTempAppDataDir('desktop-config-missing-device-');
+  writeConfigFile(appDataDir, JSON.stringify({
+    selectedQuality: 'h264720p30',
+    performanceProtection: false
+  }));
+  const store = createConfigStore({ appDataDir });
+
+  assert.deepEqual(store.load(), {
+    firstRunComplete: false,
+    selectedDevice: null,
+    selectedQuality: 'h264720p30',
+    performanceProtection: false
+  });
+});
+
+test('desktop config store rethrows non-missing-file read errors', () => {
+  const appDataDir = createTempAppDataDir('desktop-config-read-error-');
+  fs.mkdirSync(path.join(appDataDir, 'config.json'));
+  const store = createConfigStore({ appDataDir });
+
+  assert.throws(() => store.load());
+});
+
 test('desktop config store saves and loads selected device and quality', () => {
-  const appDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-config-save-'));
+  const appDataDir = createTempAppDataDir('desktop-config-save-');
   const store = createConfigStore({ appDataDir });
 
   const saved = store.save({
