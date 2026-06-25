@@ -122,14 +122,6 @@
                     <dt>串流时长</dt>
                     <dd id="streamRuntimeText">00:00:00</dd>
                   </div>
-                  <div>
-                    <dt>目标设备</dt>
-                    <dd id="streamTargetText">等待选择</dd>
-                  </div>
-                  <div>
-                    <dt>发送档位</dt>
-                    <dd id="streamQualityText">HEVC 1080P30</dd>
-                  </div>
                 </dl>
               </section>
 
@@ -175,14 +167,16 @@
                       <p>只保留验证过的预设档位，优先选择接收端能稳定解码的组合。</p>
                     </div>
                   </div>
-                  <label class="field sr-only-field">
-                    <span>画质档位</span>
-                    <select id="qualitySelect"></select>
-                  </label>
-                  <div class="preset-list compact" id="presetList"></div>
+                  <div class="quality-select-row">
+                    <label class="field quality-select-field">
+                      <span>画质档位</span>
+                      <select id="qualitySelect"></select>
+                    </label>
+                    <div class="selected-quality-details" id="selectedQualityDetails"></div>
+                  </div>
                 </section>
 
-                <section class="stage-block stage-inline">
+                <section class="stage-block">
                   <div class="stage-title">
                     <span class="stage-index">3</span>
                     <div>
@@ -197,7 +191,7 @@
                   </label>
                 </section>
 
-                <section class="stage-block stage-action">
+                <section class="stage-block">
                   <div class="stage-title">
                     <span class="stage-index">4</span>
                     <div>

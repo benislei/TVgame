@@ -154,11 +154,10 @@ function cacheElements() {
     currentQualityText: getElement('currentQualityText'),
     streamRuntimeStatus: getElement('streamRuntimeStatus'),
     streamRuntimeText: getElement('streamRuntimeText'),
-    streamTargetText: getElement('streamTargetText'),
-    streamQualityText: getElement('streamQualityText'),
     deviceSelect: getElement('deviceSelect'),
     manualIpInput: getElement('manualIpInput'),
     qualitySelect: getElement('qualitySelect'),
+    selectedQualityDetails: getElement('selectedQualityDetails'),
     performanceProtectionInput: getElement('performanceProtectionInput'),
     modeAuto: getElement('modeAuto'),
     modeManual: getElement('modeManual'),
@@ -169,7 +168,6 @@ function cacheElements() {
     actionStatus: getElement('actionStatus'),
     refreshDevicesButton: getElement('refreshDevicesButton'),
     deviceList: getElement('deviceList'),
-    presetList: getElement('presetList'),
     qualityPresetMirror: getElement('qualityPresetMirror'),
     checkEnvironmentButton: getElement('checkEnvironmentButton'),
     repairEnvironmentButton: getElement('repairEnvironmentButton'),
@@ -314,14 +312,10 @@ function syncStreamingClock() {
 
 function renderStreamRuntime() {
   const running = isStreamRunning();
-  const device = getStreamTarget();
-  const quality = getSelectedQuality();
   const runtime = running && state.streamStartedAt ? formatDuration(Date.now() - state.streamStartedAt) : '00:00:00';
 
   setText(elements.streamRuntimeStatus, running ? '正在串流' : '未启动');
   setText(elements.streamRuntimeText, runtime);
-  setText(elements.streamTargetText, device && device.ip ? `${device.name || '电视或盒子'} · ${device.ip}` : '等待选择');
-  setText(elements.streamQualityText, quality.label);
 
   const panel = elements.streamRuntimeStatus && elements.streamRuntimeStatus.closest('.stream-runtime-panel');
   if (panel) {
@@ -361,6 +355,22 @@ function renderQualityCard(preset, mirror) {
   `;
 }
 
+function renderSelectedQualityDetails() {
+  const preset = getSelectedQuality();
+  const recommended = preset.id === 'hevc1080p30';
+  const badge = recommended ? '推荐' : preset.codec;
+  const badgeClass = recommended ? 'ok' : preset.codec === 'HEVC' ? 'warn' : '';
+
+  setHtml(elements.selectedQualityDetails, `
+    <div>
+      <span class="item-meta">当前选择</span>
+      <strong>${escapeHtml(preset.label)}</strong>
+    </div>
+    <span class="badge ${badgeClass}">${escapeHtml(badge)}</span>
+    <p>${escapeHtml(preset.note)}</p>
+  `);
+}
+
 function renderQualityControls() {
   if (elements.qualitySelect) {
     elements.qualitySelect.innerHTML = QUALITY_PRESETS.map(preset => (
@@ -369,11 +379,10 @@ function renderQualityControls() {
     elements.qualitySelect.value = state.selectedQuality;
   }
 
-  const cards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, false)).join('');
   const mirrorCards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, true)).join('');
-  setHtml(elements.presetList, cards);
   setHtml(elements.qualityPresetMirror, mirrorCards);
   setText(elements.currentQualityText, getSelectedQuality().label);
+  renderSelectedQualityDetails();
 }
 
 function selectDevice(deviceId) {
@@ -696,7 +705,6 @@ function bindEvents() {
     selectQuality(event.target.value);
   });
 
-  bindQualityList(elements.presetList);
   bindQualityList(elements.qualityPresetMirror);
 
   elements.deviceList.addEventListener('click', event => {

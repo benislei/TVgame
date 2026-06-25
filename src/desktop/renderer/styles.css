@@ -392,7 +392,7 @@ button:disabled {
 
 .runtime-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(180px, 260px);
   gap: 8px;
   margin: 0;
 }
@@ -422,25 +422,16 @@ button:disabled {
 
 .control-stage {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .stage-block {
   display: grid;
-  grid-column: 1 / -1;
   gap: 10px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.025);
-}
-
-.stage-block.stage-inline,
-.stage-block.stage-action {
-  grid-column: auto;
-  grid-template-columns: 1fr;
-  align-items: stretch;
 }
 
 .stage-title {
@@ -503,6 +494,47 @@ button:disabled {
   border-color: var(--brand-signal);
   box-shadow: 0 0 0 3px var(--brand-signal-soft);
   outline: none;
+}
+
+.quality-select-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.quality-select-field select {
+  height: 44px;
+  font-weight: 800;
+}
+
+.selected-quality-details {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--ink-900);
+}
+
+.selected-quality-details strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 16px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-quality-details p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .segmented-row {
@@ -725,17 +757,6 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.stage-action .button-row {
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-
-.stage-action .primary-button,
-.stage-action .secondary-button {
-  min-height: 38px;
-  padding: 0 11px;
-}
-
 .primary-button,
 .secondary-button,
 .ghost-button {
@@ -909,25 +930,18 @@ button:disabled {
   .topbar,
   .topbar-actions,
   .workflow-heading,
-  .panel-heading,
-  .stage-block.stage-inline,
-  .stage-block.stage-action {
+  .panel-heading {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .stage-block.stage-inline,
-  .stage-block.stage-action,
   .field-pair,
+  .quality-select-row,
   .control-stage,
   .preset-list,
   .preset-list.compact,
   .runtime-grid {
     grid-template-columns: 1fr;
-  }
-
-  .stage-block {
-    grid-column: auto;
   }
 }
 

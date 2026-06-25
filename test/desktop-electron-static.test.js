@@ -348,17 +348,43 @@ test('renderer home screen shows live streaming runtime information', () => {
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
 
-  for (const text of ['串流信息', '串流时长', '目标设备', '发送档位']) {
+  for (const text of ['串流信息', '串流时长']) {
     assert.match(html, new RegExp(text), `missing runtime label ${text}`);
   }
 
-  for (const id of ['streamRuntimeStatus', 'streamRuntimeText', 'streamTargetText', 'streamQualityText']) {
+  for (const id of ['streamRuntimeStatus', 'streamRuntimeText']) {
     assert.match(html, new RegExp(`id="${id}"`), `missing runtime element ${id}`);
   }
 
+  assert.doesNotMatch(html, /id="streamTargetText"/);
+  assert.doesNotMatch(html, /id="streamQualityText"/);
+  assert.doesNotMatch(html, /目标设备/);
+  assert.doesNotMatch(html, /发送档位/);
   assert.match(appJs, /streamStartedAt/);
   assert.match(appJs, /function formatDuration\(/);
   assert.match(appJs, /function renderStreamRuntime\(/);
+});
+
+test('renderer home screen keeps the guided steps vertical and compact', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
+
+  assert.doesNotMatch(html, /stage-block stage-inline/);
+  assert.doesNotMatch(html, /stage-block stage-action/);
+  assert.doesNotMatch(styles, /\.stage-block\.stage-inline/);
+  assert.doesNotMatch(styles, /\.stage-block\.stage-action/);
+  assert.doesNotMatch(styles, /\.control-stage\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+});
+
+test('renderer home quality choice is a dropdown with selected preset details only', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  assert.match(html, /<select id="qualitySelect"><\/select>/);
+  assert.match(html, /id="selectedQualityDetails"/);
+  assert.doesNotMatch(html, /id="presetList"/);
+  assert.doesNotMatch(appJs, /bindQualityList\(elements\.presetList\)/);
+  assert.match(appJs, /function renderSelectedQualityDetails\(/);
 });
 
 test('renderer formats streaming runtime as stable clock text', () => {
