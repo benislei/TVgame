@@ -585,7 +585,7 @@ function runRtpSender(args, options = {}) {
     try {
       child = spawn(gstLaunch, command.args, {
         stdio: 'inherit',
-        windowsHide: false
+        windowsHide: true
       });
     } catch (error) {
       console.error(`启动失败：${command.title}：${error.message}`);

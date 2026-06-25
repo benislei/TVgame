@@ -564,6 +564,27 @@ test('runRtpSender uses the resolved gst-launch path from stage2 report', () => 
   assert.deepEqual(executables, [gstLaunch, gstLaunch]);
 });
 
+test('runRtpSender starts GStreamer RTP child processes without visible console windows', () => {
+  const spawnOptions = [];
+
+  withPatchedSpawn((executable, args, options) => {
+    spawnOptions.push(options);
+    return new EventEmitter();
+  }, () => {
+    runRtpSender(
+      parseArgs(['rtp', '--host', '192.168.1.50']),
+      {
+        createReport: () => createReadyStage2Report(),
+        spawnSync: createSuccessfulPresetProbe()
+      }
+    );
+  });
+
+  assert.equal(spawnOptions.length, 2);
+  assert.equal(spawnOptions[0].windowsHide, true);
+  assert.equal(spawnOptions[1].windowsHide, true);
+});
+
 test('runRtpSender stops sibling RTP process when spawn errors', () => {
   const firstChild = new EventEmitter();
   const secondChild = new EventEmitter();
