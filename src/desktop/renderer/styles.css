@@ -242,43 +242,6 @@ button:disabled {
   gap: 12px;
 }
 
-.topbar-meta {
-  display: grid;
-  gap: 2px;
-  min-width: 150px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.topbar-meta span {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.topbar-meta strong {
-  color: var(--text-strong);
-  font-size: 13px;
-}
-
-.status-pill {
-  min-width: 94px;
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted-strong);
-  text-align: center;
-  transition: border-color var(--motion), background var(--motion), color var(--motion);
-}
-
-.status-pill.is-running {
-  border-color: rgba(24, 160, 88, 0.5);
-  background: var(--brand-signal-soft);
-  color: var(--text-strong);
-}
-
 .page {
   display: none;
 }
@@ -498,9 +461,10 @@ button:disabled {
 
 .quality-select-row {
   display: grid;
-  grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 390px) minmax(220px, 340px);
   gap: 12px;
   align-items: stretch;
+  justify-content: start;
 }
 
 .quality-select-field select {
@@ -535,6 +499,22 @@ button:disabled {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.selected-quality-details.is-compact {
+  align-self: end;
+  min-height: 44px;
+  padding: 7px 10px;
+}
+
+.selected-quality-details.is-compact strong {
+  font-size: 14px;
+}
+
+.selected-quality-details.is-compact p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .segmented-row {
@@ -755,6 +735,16 @@ button:disabled {
 
 .button-row.compact {
   justify-content: flex-end;
+}
+
+.topbar-stream-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.topbar-stream-actions .primary-button,
+.topbar-stream-actions .secondary-button {
+  min-width: 104px;
 }
 
 .primary-button,

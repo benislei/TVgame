@@ -93,11 +93,20 @@
             <h2 id="pageTitle">日常主屏</h2>
           </div>
           <div class="topbar-actions">
-            <div class="topbar-meta">
-              <span>当前档位</span>
-              <strong id="currentQualityText">HEVC 1080P30</strong>
+            <div class="button-row topbar-stream-actions">
+              <button class="primary-button" type="button" id="startButton">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m8 5 11 7-11 7z"></path>
+                </svg>
+                <span>开始串流</span>
+              </button>
+              <button class="secondary-button" type="button" id="stopButton">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 8h8v8H8z"></path>
+                </svg>
+                <span>停止串流</span>
+              </button>
             </div>
-            <div class="status-pill" id="streamStatusText">未启动</div>
           </div>
         </header>
 
@@ -172,7 +181,7 @@
                       <span>画质档位</span>
                       <select id="qualitySelect"></select>
                     </label>
-                    <div class="selected-quality-details" id="selectedQualityDetails"></div>
+                    <div class="selected-quality-details is-compact" id="selectedQualityDetails"></div>
                   </div>
                 </section>
 
@@ -189,30 +198,6 @@
                     <span class="switch-visual" aria-hidden="true"></span>
                     <span>启用性能保护</span>
                   </label>
-                </section>
-
-                <section class="stage-block">
-                  <div class="stage-title">
-                    <span class="stage-index">4</span>
-                    <div>
-                      <h4>启动串流</h4>
-                      <p>启动后会同时拉起输入桥，用于键鼠和手柄回传。</p>
-                    </div>
-                  </div>
-                  <div class="button-row">
-                    <button class="primary-button" type="button" id="startButton">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="m8 5 11 7-11 7z"></path>
-                      </svg>
-                      <span>开始串流</span>
-                    </button>
-                    <button class="secondary-button" type="button" id="stopButton">
-                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M8 8h8v8H8z"></path>
-                      </svg>
-                      <span>停止串流</span>
-                    </button>
-                  </div>
                 </section>
               </div>
             </section>

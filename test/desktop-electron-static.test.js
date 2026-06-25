@@ -334,7 +334,7 @@ test('renderer shell uses unified vector icons and no emoji functional icons', (
 test('renderer home screen presents the approved guided streaming workflow', () => {
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
 
-  for (const text of ['设备连接', '画质选择', '性能保护', '启动串流', '串流准备']) {
+  for (const text of ['设备连接', '画质选择', '性能保护', '串流准备']) {
     assert.match(html, new RegExp(text), `missing workflow label ${text}`);
   }
 
@@ -371,9 +371,23 @@ test('renderer home screen keeps the guided steps vertical and compact', () => {
 
   assert.doesNotMatch(html, /stage-block stage-inline/);
   assert.doesNotMatch(html, /stage-block stage-action/);
+  assert.doesNotMatch(html, /<span class="stage-index">4<\/span>/);
+  assert.doesNotMatch(html, /<h4>启动串流<\/h4>/);
   assert.doesNotMatch(styles, /\.stage-block\.stage-inline/);
   assert.doesNotMatch(styles, /\.stage-block\.stage-action/);
   assert.doesNotMatch(styles, /\.control-stage\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+});
+
+test('renderer home screen places stream actions in the top right instead of duplicate status cards', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  assert.match(html, /<div class="topbar-actions">[\s\S]*id="startButton"[\s\S]*id="stopButton"[\s\S]*<\/div>\s*<\/header>/);
+  assert.doesNotMatch(html, /class="topbar-meta"/);
+  assert.doesNotMatch(html, /id="currentQualityText"/);
+  assert.doesNotMatch(html, /id="streamStatusText"/);
+  assert.doesNotMatch(appJs, /currentQualityText/);
+  assert.doesNotMatch(appJs, /streamStatusText/);
 });
 
 test('renderer home quality choice is a dropdown with selected preset details only', () => {
@@ -382,6 +396,7 @@ test('renderer home quality choice is a dropdown with selected preset details on
 
   assert.match(html, /<select id="qualitySelect"><\/select>/);
   assert.match(html, /id="selectedQualityDetails"/);
+  assert.match(html, /class="selected-quality-details is-compact"/);
   assert.doesNotMatch(html, /id="presetList"/);
   assert.doesNotMatch(appJs, /bindQualityList\(elements\.presetList\)/);
   assert.match(appJs, /function renderSelectedQualityDetails\(/);

@@ -149,9 +149,7 @@ function getElement(id) {
 function cacheElements() {
   Object.assign(elements, {
     pageTitle: getElement('pageTitle'),
-    streamStatusText: getElement('streamStatusText'),
     sidebarStatusText: getElement('sidebarStatusText'),
-    currentQualityText: getElement('currentQualityText'),
     streamRuntimeStatus: getElement('streamRuntimeStatus'),
     streamRuntimeText: getElement('streamRuntimeText'),
     deviceSelect: getElement('deviceSelect'),
@@ -381,7 +379,6 @@ function renderQualityControls() {
 
   const mirrorCards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, true)).join('');
   setHtml(elements.qualityPresetMirror, mirrorCards);
-  setText(elements.currentQualityText, getSelectedQuality().label);
   renderSelectedQualityDetails();
 }
 
@@ -505,11 +502,6 @@ function renderStatus() {
   const label = statusLabel();
   const running = isStreamRunning();
 
-  setText(elements.streamStatusText, label);
-  if (elements.streamStatusText) {
-    elements.streamStatusText.classList.toggle('is-running', running);
-  }
-
   setText(elements.sidebarStatusText, running ? '正在向电视发送画面' : '等待串流准备');
   if (elements.sidebarStatusText && elements.sidebarStatusText.parentElement) {
     elements.sidebarStatusText.parentElement.classList.toggle('is-running', running);
@@ -519,7 +511,6 @@ function renderStatus() {
     setActionStatus(label, running ? 'is-ok' : '');
   }
 
-  setText(elements.currentQualityText, getSelectedQuality().label);
   renderStreamRuntime();
 
   const logs = asArray(state.status && state.status.logs);
