@@ -41,6 +41,7 @@ function createWindow() {
     }
   });
 
+  window.setMenuBarVisibility(false);
   window.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   return window;
 }

@@ -10,20 +10,80 @@
     <div class="app-shell">
       <aside class="sidebar" aria-label="主导航">
         <div class="brand">
-          <span class="brand-mark">TV</span>
+          <span class="brand-mark" aria-hidden="true">
+            <svg class="brand-glyph" viewBox="0 0 48 48" role="img" focusable="false">
+              <path d="M10 15.5h28a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4v-14a4 4 0 0 1 4-4Z"></path>
+              <path d="m17 11 7 4.5 7-4.5"></path>
+              <path d="M17 26h8"></path>
+              <path d="M30.5 22.5v7"></path>
+              <path d="M34 26h-7"></path>
+            </svg>
+          </span>
           <div>
             <h1>TVGame 发送端</h1>
             <p>局域网游戏串流控制台</p>
           </div>
         </div>
+
         <nav class="nav-list">
-          <button class="nav-item is-active" type="button" data-page="home">日常主屏</button>
-          <button class="nav-item" type="button" data-page="setup">首次配置</button>
-          <button class="nav-item" type="button" data-page="devices">电视设备</button>
-          <button class="nav-item" type="button" data-page="quality">画质档位</button>
-          <button class="nav-item" type="button" data-page="diagnostics">环境诊断</button>
-          <button class="nav-item" type="button" data-page="logs">日志</button>
+          <button class="nav-item is-active" type="button" data-page="home">
+            <svg class="icon icon-home" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11.5 12 5l8 6.5"></path>
+              <path d="M6.5 10.5V19h11v-8.5"></path>
+              <path d="M10 19v-5h4v5"></path>
+            </svg>
+            <span>日常主屏</span>
+          </button>
+          <button class="nav-item" type="button" data-page="setup">
+            <svg class="icon icon-setup" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 4v16"></path>
+              <path d="M6 8h12"></path>
+              <path d="M8 16h8"></path>
+              <path d="M8 8a2 2 0 1 0 4 0"></path>
+              <path d="M12 16a2 2 0 1 0 4 0"></path>
+            </svg>
+            <span>首次配置</span>
+          </button>
+          <button class="nav-item" type="button" data-page="devices">
+            <svg class="icon icon-device" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6.5h16v10H4z"></path>
+              <path d="M9 20h6"></path>
+              <path d="M12 16.5V20"></path>
+            </svg>
+            <span>电视设备</span>
+          </button>
+          <button class="nav-item" type="button" data-page="quality">
+            <svg class="icon icon-quality" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 7h14"></path>
+              <path d="M5 12h14"></path>
+              <path d="M5 17h14"></path>
+              <path d="M8 7v10"></path>
+              <path d="M16 7v10"></path>
+            </svg>
+            <span>画质档位</span>
+          </button>
+          <button class="nav-item" type="button" data-page="diagnostics">
+            <svg class="icon icon-diagnostics" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 4 5 7v5c0 4.5 3 7 7 8 4-1 7-3.5 7-8V7z"></path>
+              <path d="m9 12 2 2 4-5"></path>
+            </svg>
+            <span>环境诊断</span>
+          </button>
+          <button class="nav-item" type="button" data-page="logs">
+            <svg class="icon icon-log" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 5h12v14H6z"></path>
+              <path d="M9 9h6"></path>
+              <path d="M9 13h6"></path>
+              <path d="M9 17h3"></path>
+            </svg>
+            <span>日志</span>
+          </button>
         </nav>
+
+        <div class="sidebar-footer">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="sidebarStatusText">等待串流准备</span>
+        </div>
       </aside>
 
       <main class="main-content">
@@ -32,61 +92,136 @@
             <p class="section-label">发送端状态</p>
             <h2 id="pageTitle">日常主屏</h2>
           </div>
-          <div class="status-pill" id="streamStatusText">未启动</div>
+          <div class="topbar-actions">
+            <div class="topbar-meta">
+              <span>当前档位</span>
+              <strong id="currentQualityText">HEVC 1080P30</strong>
+            </div>
+            <div class="status-pill" id="streamStatusText">未启动</div>
+          </div>
         </header>
 
         <section class="page is-active" id="page-home" aria-labelledby="homeTitle">
-          <div class="summary-grid">
-            <article class="panel">
-              <h3 id="homeTitle">当前环境状态摘要</h3>
-              <div class="status-list" id="environmentSummary">
-                <span>正在检查环境...</span>
-              </div>
-            </article>
-            <article class="panel">
-              <h3>串流控制</h3>
-              <div class="control-grid">
-                <fieldset class="radio-row">
-                  <legend>连接方式</legend>
-                  <label>
-                    <input type="radio" name="deviceMode" value="auto" id="modeAuto" checked>
-                    自动搜索电视
-                  </label>
-                  <label>
-                    <input type="radio" name="deviceMode" value="manual" id="modeManual">
-                    手动输入 IP
-                  </label>
-                </fieldset>
-
-                <label class="field">
-                  <span>自动发现的电视/盒子</span>
-                  <select id="deviceSelect">
-                    <option value="">正在搜索...</option>
-                  </select>
-                </label>
-
-                <label class="field">
-                  <span>手动输入 IP</span>
-                  <input id="manualIpInput" type="text" inputmode="numeric" autocomplete="off" placeholder="例如 192.168.1.23">
-                </label>
-
-                <label class="field">
-                  <span>画质档位</span>
-                  <select id="qualitySelect"></select>
-                </label>
-
-                <label class="checkbox-row">
-                  <input id="performanceProtectionInput" type="checkbox">
-                  <span>启用性能保护</span>
-                </label>
-
-                <div class="button-row">
-                  <button class="primary-button" type="button" id="startButton">开始串流</button>
-                  <button class="secondary-button" type="button" id="stopButton">停止串流</button>
+          <div class="home-layout">
+            <section class="workflow-panel" aria-labelledby="homeTitle">
+              <div class="workflow-heading">
+                <div>
+                  <p class="section-label">串流准备</p>
+                  <h3 id="homeTitle">开始一次低延迟串流</h3>
                 </div>
-                <p class="inline-status" id="actionStatus">未启动</p>
+                <p class="workflow-summary" id="actionStatus">未启动</p>
               </div>
-            </article>
+
+              <div class="control-stage">
+                <section class="stage-block">
+                  <div class="stage-title">
+                    <span class="stage-index">1</span>
+                    <div>
+                      <h4>设备连接</h4>
+                      <p>默认自动搜索电视或盒子，也可以手动输入 IP。</p>
+                    </div>
+                  </div>
+                  <fieldset class="segmented-row">
+                    <legend class="sr-only">连接方式</legend>
+                    <label class="segment-option" id="modeAutoOption">
+                      <input type="radio" name="deviceMode" value="auto" id="modeAuto" checked>
+                      <span>自动搜索电视</span>
+                    </label>
+                    <label class="segment-option" id="modeManualOption">
+                      <input type="radio" name="deviceMode" value="manual" id="modeManual">
+                      <span>手动输入 IP</span>
+                    </label>
+                  </fieldset>
+                  <div class="field-pair">
+                    <label class="field">
+                      <span>自动发现的电视/盒子</span>
+                      <select id="deviceSelect">
+                        <option value="">正在搜索...</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>手动输入 IP</span>
+                      <input id="manualIpInput" type="text" inputmode="numeric" autocomplete="off" placeholder="例如 192.168.1.23">
+                    </label>
+                  </div>
+                </section>
+
+                <section class="stage-block">
+                  <div class="stage-title">
+                    <span class="stage-index">2</span>
+                    <div>
+                      <h4>画质选择</h4>
+                      <p>只保留验证过的预设档位，优先选择接收端能稳定解码的组合。</p>
+                    </div>
+                  </div>
+                  <label class="field sr-only-field">
+                    <span>画质档位</span>
+                    <select id="qualitySelect"></select>
+                  </label>
+                  <div class="preset-list compact" id="presetList"></div>
+                </section>
+
+                <section class="stage-block stage-inline">
+                  <div class="stage-title">
+                    <span class="stage-index">3</span>
+                    <div>
+                      <h4>性能保护</h4>
+                      <p>运行大型游戏时，为发送端保留捕获和编码余量。</p>
+                    </div>
+                  </div>
+                  <label class="switch-row">
+                    <input id="performanceProtectionInput" type="checkbox">
+                    <span class="switch-visual" aria-hidden="true"></span>
+                    <span>启用性能保护</span>
+                  </label>
+                </section>
+
+                <section class="stage-block stage-action">
+                  <div class="stage-title">
+                    <span class="stage-index">4</span>
+                    <div>
+                      <h4>启动串流</h4>
+                      <p>启动后会同时拉起输入桥，用于键鼠和手柄回传。</p>
+                    </div>
+                  </div>
+                  <div class="button-row">
+                    <button class="primary-button" type="button" id="startButton">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m8 5 11 7-11 7z"></path>
+                      </svg>
+                      <span>开始串流</span>
+                    </button>
+                    <button class="secondary-button" type="button" id="stopButton">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8 8h8v8H8z"></path>
+                      </svg>
+                      <span>停止串流</span>
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <aside class="right-rail" aria-label="当前状态">
+              <section class="panel quick-status-panel">
+                <div class="panel-heading compact-heading">
+                  <div>
+                    <p class="section-label">环境摘要</p>
+                    <h3>当前环境状态摘要</h3>
+                  </div>
+                  <button class="ghost-button" type="button" id="quickCheckButton">重新检查</button>
+                </div>
+                <div class="quick-status-grid" id="environmentSummary">
+                  <span>正在检查环境...</span>
+                </div>
+              </section>
+
+              <section class="panel connection-panel">
+                <p class="section-label">目标设备</p>
+                <h3 id="targetDeviceTitle">等待选择</h3>
+                <p id="targetDeviceMeta">请先搜索或输入电视/盒子 IP。</p>
+              </section>
+            </aside>
           </div>
         </section>
 
@@ -108,10 +243,17 @@
           <article class="panel">
             <div class="panel-heading">
               <div>
+                <p class="section-label">接收端发现</p>
                 <h3 id="devicesTitle">电视设备</h3>
                 <p>刷新局域网内可用的接收端。</p>
               </div>
-              <button class="secondary-button" type="button" id="refreshDevicesButton">刷新/自动搜索</button>
+              <button class="secondary-button" type="button" id="refreshDevicesButton">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 12a8 8 0 1 1-2.4-5.7"></path>
+                  <path d="M20 5v6h-6"></path>
+                </svg>
+                <span>刷新/自动搜索</span>
+              </button>
             </div>
             <div class="device-list" id="deviceList">还没有发现电视或盒子</div>
           </article>
@@ -119,8 +261,14 @@
 
         <section class="page" id="page-quality" aria-labelledby="qualityTitle">
           <article class="panel">
-            <h3 id="qualityTitle">画质档位</h3>
-            <div class="preset-list" id="presetList"></div>
+            <div class="panel-heading">
+              <div>
+                <p class="section-label">预设档位</p>
+                <h3 id="qualityTitle">画质档位</h3>
+                <p>只展示可直接用于发送端启动的档位。</p>
+              </div>
+            </div>
+            <div class="preset-list" id="qualityPresetMirror"></div>
           </article>
         </section>
 
@@ -128,6 +276,7 @@
           <article class="panel">
             <div class="panel-heading">
               <div>
+                <p class="section-label">依赖与修复</p>
                 <h3 id="diagnosticsTitle">环境诊断</h3>
                 <p>检查发送端依赖，并在可行时自动修复。</p>
               </div>
@@ -142,7 +291,12 @@
 
         <section class="page" id="page-logs" aria-labelledby="logsTitle">
           <article class="panel">
-            <h3 id="logsTitle">日志</h3>
+            <div class="panel-heading">
+              <div>
+                <p class="section-label">运行记录</p>
+                <h3 id="logsTitle">日志</h3>
+              </div>
+            </div>
             <pre class="log-view" id="logView">暂无日志</pre>
           </article>
         </section>

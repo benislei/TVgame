@@ -307,6 +307,52 @@ test('renderer script defines only the supported quality presets and uses the TV
   assert.match(appJs, /firstRunComplete/);
 });
 
+test('renderer main screen uses TVGame brand tokens instead of a generic purple blue theme', () => {
+  const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
+
+  assert.match(styles, /--ink-950:\s*#0b1114/i);
+  assert.match(styles, /--brand-signal:\s*#18a058/i);
+  assert.match(styles, /--brand-amber:\s*#d99a26/i);
+  assert.match(styles, /--font-ui:\s*"Microsoft YaHei UI"/);
+  assert.doesNotMatch(styles, /#1769aa|#0f578e|#4338ca|#4f46e5|#6366f1|#7c3aed/i);
+});
+
+test('renderer shell uses unified vector icons and no emoji functional icons', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const combined = [
+    html,
+    readProjectFile('src', 'desktop', 'renderer', 'app.js')
+  ].join('\n');
+
+  assert.match(html, /<svg[^>]+class="brand-glyph"/);
+  assert.match(html, /class="icon icon-home"/);
+  assert.match(html, /class="icon icon-device"/);
+  assert.doesNotMatch(html, /class="brand-mark">TV<\/span>/);
+  assert.doesNotMatch(combined, /[\u{1F300}-\u{1FAFF}]/u);
+});
+
+test('renderer home screen presents the approved guided streaming workflow', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+
+  for (const text of ['设备连接', '画质选择', '性能保护', '启动串流', '串流准备']) {
+    assert.match(html, new RegExp(text), `missing workflow label ${text}`);
+  }
+
+  assert.match(html, /class="workflow-panel"/);
+  assert.match(html, /class="control-stage"/);
+  assert.match(html, /class="quick-status-grid"/);
+});
+
+test('renderer supports clickable quality cards and busy start button feedback', () => {
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  assert.match(appJs, /function selectQuality\(/);
+  assert.match(appJs, /function setBusyState\(/);
+  assert.match(appJs, /data-quality-id/);
+  assert.match(appJs, /aria-pressed/);
+  assert.match(appJs, /quality-card/);
+});
+
 test('renderer avoids advanced custom streaming controls and mojibake', () => {
   const rendererSources = {
     'index.html': readProjectFile('src', 'desktop', 'renderer', 'index.html'),
@@ -487,6 +533,7 @@ test('main creates the Electron window with secure webPreferences and starts dis
   assert.match(source, /preload:\s*path\.join\(__dirname,\s*['"]preload\.js['"]\)/);
   assert.match(source, /contextIsolation:\s*true/);
   assert.match(source, /nodeIntegration:\s*false/);
+  assert.match(source, /setMenuBarVisibility\(false\)/);
   assert.match(source, /createDeviceDiscovery\(/);
   assert.match(source, /services\.discovery\.start\(\)/);
   assert.match(source, /loadFile\(path\.join\(__dirname,\s*['"]renderer['"],\s*['"]index\.html['"]\)\)/);
