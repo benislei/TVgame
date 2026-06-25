@@ -340,7 +340,41 @@ test('renderer home screen presents the approved guided streaming workflow', () 
 
   assert.match(html, /class="workflow-panel"/);
   assert.match(html, /class="control-stage"/);
-  assert.match(html, /class="quick-status-grid"/);
+  assert.doesNotMatch(html, /class="quick-status-panel"/);
+  assert.doesNotMatch(html, /环境摘要/);
+});
+
+test('renderer home screen shows live streaming runtime information', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  for (const text of ['串流信息', '串流时长', '目标设备', '发送档位']) {
+    assert.match(html, new RegExp(text), `missing runtime label ${text}`);
+  }
+
+  for (const id of ['streamRuntimeStatus', 'streamRuntimeText', 'streamTargetText', 'streamQualityText']) {
+    assert.match(html, new RegExp(`id="${id}"`), `missing runtime element ${id}`);
+  }
+
+  assert.match(appJs, /streamStartedAt/);
+  assert.match(appJs, /function formatDuration\(/);
+  assert.match(appJs, /function renderStreamRuntime\(/);
+});
+
+test('renderer formats streaming runtime as stable clock text', () => {
+  const durations = runRendererProbe(`
+    window.__probeResult = {
+      zero: formatDuration(0),
+      minute: formatDuration(65000),
+      hour: formatDuration(3661000)
+    };
+  `);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(durations)), {
+    zero: '00:00:00',
+    minute: '00:01:05',
+    hour: '01:01:01'
+  });
 });
 
 test('renderer supports clickable quality cards and busy start button feedback', () => {

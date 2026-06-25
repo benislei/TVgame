@@ -112,6 +112,27 @@
                 <p class="workflow-summary" id="actionStatus">未启动</p>
               </div>
 
+              <section class="stream-runtime-panel" aria-label="串流信息">
+                <div class="runtime-title">
+                  <p class="section-label">串流信息</p>
+                  <h4 id="streamRuntimeStatus">未启动</h4>
+                </div>
+                <dl class="runtime-grid">
+                  <div>
+                    <dt>串流时长</dt>
+                    <dd id="streamRuntimeText">00:00:00</dd>
+                  </div>
+                  <div>
+                    <dt>目标设备</dt>
+                    <dd id="streamTargetText">等待选择</dd>
+                  </div>
+                  <div>
+                    <dt>发送档位</dt>
+                    <dd id="streamQualityText">HEVC 1080P30</dd>
+                  </div>
+                </dl>
+              </section>
+
               <div class="control-stage">
                 <section class="stage-block">
                   <div class="stage-title">
@@ -201,27 +222,6 @@
                 </section>
               </div>
             </section>
-
-            <aside class="right-rail" aria-label="当前状态">
-              <section class="panel quick-status-panel">
-                <div class="panel-heading compact-heading">
-                  <div>
-                    <p class="section-label">环境摘要</p>
-                    <h3>当前环境状态摘要</h3>
-                  </div>
-                  <button class="ghost-button" type="button" id="quickCheckButton">重新检查</button>
-                </div>
-                <div class="quick-status-grid" id="environmentSummary">
-                  <span>正在检查环境...</span>
-                </div>
-              </section>
-
-              <section class="panel connection-panel">
-                <p class="section-label">目标设备</p>
-                <h3 id="targetDeviceTitle">等待选择</h3>
-                <p id="targetDeviceMeta">请先搜索或输入电视/盒子 IP。</p>
-              </section>
-            </aside>
           </div>
         </section>
 

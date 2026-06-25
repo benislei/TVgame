@@ -68,6 +68,7 @@ const state = {
   performanceProtection: true,
   manualIp: '',
   deviceMode: 'auto',
+  streamStartedAt: null,
   busy: false
 };
 
@@ -80,6 +81,7 @@ function ensurePreviewStub() {
 
   const previewLogs = ['开发预览模式：未检测到 Electron preload，已启用本地示例数据。'];
   let previewRunning = false;
+  let previewStartedAt = null;
 
   window.tvgame = {
     loadConfig() {
@@ -119,16 +121,23 @@ function ensurePreviewStub() {
     },
     startStream(payload) {
       previewRunning = true;
+      previewStartedAt = Date.now();
       previewLogs.push(`开始串流到 ${payload.device.ip}，档位 ${payload.quality.label}`);
       return { started: true };
     },
     stopStream() {
       previewRunning = false;
+      previewStartedAt = null;
       previewLogs.push('停止串流。');
       return { stopped: true };
     },
     getStatus() {
-      return { streamRunning: previewRunning, inputBridgeRunning: previewRunning, logs: previewLogs.slice(-80) };
+      return {
+        streamRunning: previewRunning,
+        inputBridgeRunning: previewRunning,
+        streamStartedAt: previewStartedAt,
+        logs: previewLogs.slice(-80)
+      };
     }
   };
 }
@@ -143,7 +152,10 @@ function cacheElements() {
     streamStatusText: getElement('streamStatusText'),
     sidebarStatusText: getElement('sidebarStatusText'),
     currentQualityText: getElement('currentQualityText'),
-    environmentSummary: getElement('environmentSummary'),
+    streamRuntimeStatus: getElement('streamRuntimeStatus'),
+    streamRuntimeText: getElement('streamRuntimeText'),
+    streamTargetText: getElement('streamTargetText'),
+    streamQualityText: getElement('streamQualityText'),
     deviceSelect: getElement('deviceSelect'),
     manualIpInput: getElement('manualIpInput'),
     qualitySelect: getElement('qualitySelect'),
@@ -156,9 +168,6 @@ function cacheElements() {
     stopButton: getElement('stopButton'),
     actionStatus: getElement('actionStatus'),
     refreshDevicesButton: getElement('refreshDevicesButton'),
-    quickCheckButton: getElement('quickCheckButton'),
-    targetDeviceTitle: getElement('targetDeviceTitle'),
-    targetDeviceMeta: getElement('targetDeviceMeta'),
     deviceList: getElement('deviceList'),
     presetList: getElement('presetList'),
     qualityPresetMirror: getElement('qualityPresetMirror'),
@@ -273,6 +282,51 @@ function getStreamTarget() {
   }
 
   return getSelectedDevice() || getManualDevice();
+}
+
+function isStreamRunning() {
+  return Boolean(state.status && state.status.streamRunning);
+}
+
+function formatDuration(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map(value => String(value).padStart(2, '0')).join(':');
+}
+
+function getStatusStartedAt() {
+  const value = Number(state.status && (state.status.streamStartedAt || state.status.startedAt));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function syncStreamingClock() {
+  if (isStreamRunning()) {
+    if (!state.streamStartedAt) {
+      state.streamStartedAt = getStatusStartedAt() || Date.now();
+    }
+    return;
+  }
+
+  state.streamStartedAt = null;
+}
+
+function renderStreamRuntime() {
+  const running = isStreamRunning();
+  const device = getStreamTarget();
+  const quality = getSelectedQuality();
+  const runtime = running && state.streamStartedAt ? formatDuration(Date.now() - state.streamStartedAt) : '00:00:00';
+
+  setText(elements.streamRuntimeStatus, running ? '正在串流' : '未启动');
+  setText(elements.streamRuntimeText, runtime);
+  setText(elements.streamTargetText, device && device.ip ? `${device.name || '电视或盒子'} · ${device.ip}` : '等待选择');
+  setText(elements.streamQualityText, quality.label);
+
+  const panel = elements.streamRuntimeStatus && elements.streamRuntimeStatus.closest('.stream-runtime-panel');
+  if (panel) {
+    panel.classList.toggle('is-running', running);
+  }
 }
 
 function selectQuality(qualityId) {
@@ -390,17 +444,7 @@ function renderConnectionMode() {
 }
 
 function renderTargetSummary() {
-  const device = getStreamTarget();
-  const quality = getSelectedQuality();
-
-  if (device && device.ip) {
-    setText(elements.targetDeviceTitle, device.name || '电视或盒子');
-    setText(elements.targetDeviceMeta, `${device.ip} · ${quality.label}`);
-    return;
-  }
-
-  setText(elements.targetDeviceTitle, '等待选择');
-  setText(elements.targetDeviceMeta, '请先搜索或输入电视/盒子 IP。');
+  renderStreamRuntime();
 }
 
 function resolveDiagnostic(item) {
@@ -443,13 +487,14 @@ function renderEnvironment() {
     `;
   }).join('');
 
-  setHtml(elements.environmentSummary, cards);
   setHtml(elements.diagnosticGrid, cards);
 }
 
 function renderStatus() {
+  syncStreamingClock();
+
   const label = statusLabel();
-  const running = label === '正在串流';
+  const running = isStreamRunning();
 
   setText(elements.streamStatusText, label);
   if (elements.streamStatusText) {
@@ -466,6 +511,7 @@ function renderStatus() {
   }
 
   setText(elements.currentQualityText, getSelectedQuality().label);
+  renderStreamRuntime();
 
   const logs = asArray(state.status && state.status.logs);
   setText(elements.logView, logs.length > 0 ? logs.join('\n') : '暂无日志');
@@ -590,7 +636,10 @@ async function startStream() {
       firstRunComplete: true
     }));
 
+    state.streamStartedAt = Date.now();
+    state.status = { ...state.status, streamRunning: true };
     setActionStatus('正在串流', 'is-ok');
+    renderStatus();
     await refreshStatus();
   } catch (error) {
     setActionStatus(`启动失败：${error.message}`, 'is-error');
@@ -604,7 +653,10 @@ async function stopStream() {
   setActionStatus('正在停止串流...', 'is-busy');
   try {
     await Promise.resolve(window.tvgame.stopStream());
+    state.streamStartedAt = null;
+    state.status = { ...state.status, streamRunning: false };
     setActionStatus('未启动');
+    renderStatus();
     await refreshStatus();
   } catch (error) {
     setActionStatus(`停止串流失败：${error.message}`, 'is-error');
@@ -673,7 +725,6 @@ function bindEvents() {
   elements.startButton.addEventListener('click', startStream);
   elements.stopButton.addEventListener('click', stopStream);
   elements.refreshDevicesButton.addEventListener('click', refreshDevices);
-  elements.quickCheckButton.addEventListener('click', checkEnvironment);
   elements.checkEnvironmentButton.addEventListener('click', checkEnvironment);
   elements.repairEnvironmentButton.addEventListener('click', repairEnvironment);
 }
@@ -694,6 +745,7 @@ async function init() {
   renderControls();
 
   window.setInterval(refreshStatus, 5000);
+  window.setInterval(renderStreamRuntime, 1000);
   window.setInterval(refreshDevices, 15000);
 }
 
