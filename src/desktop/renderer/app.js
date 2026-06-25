@@ -69,6 +69,11 @@ const state = {
   manualIp: '',
   deviceMode: 'auto',
   streamStartedAt: null,
+  repairProgress: {
+    active: false,
+    summary: '暂无修复任务',
+    items: []
+  },
   busy: false
 };
 
@@ -80,8 +85,15 @@ function ensurePreviewStub() {
   }
 
   const previewLogs = ['开发预览模式：未检测到 Electron preload，已启用本地示例数据。'];
+  const previewRepairListeners = new Set();
   let previewRunning = false;
   let previewStartedAt = null;
+
+  function emitPreviewRepairProgress(event) {
+    for (const listener of previewRepairListeners) {
+      listener(event);
+    }
+  }
 
   window.tvgame = {
     loadConfig() {
@@ -106,12 +118,38 @@ function ensurePreviewStub() {
     },
     repairEnvironment() {
       previewLogs.push('已执行开发预览修复流程。');
+      emitPreviewRepairProgress({ type: 'check', message: '正在检查发送端环境' });
+      emitPreviewRepairProgress({
+        type: 'plan',
+        actions: [{ id: 'preview-repair', title: '开发预览修复项' }],
+        message: '已生成可自动处理的修复计划'
+      });
+      emitPreviewRepairProgress({
+        type: 'action-start',
+        actionId: 'preview-repair',
+        title: '开发预览修复项',
+        message: '正在处理：开发预览修复项'
+      });
+      emitPreviewRepairProgress({
+        type: 'action-complete',
+        actionId: 'preview-repair',
+        title: '开发预览修复项',
+        message: '开发预览修复项 已完成'
+      });
+      emitPreviewRepairProgress({ type: 'complete', message: '环境已全部正常' });
       return {
         gstreamer: { ok: true, message: '运行时可用', detail: '必要插件可用' },
         encoder: { ok: true, message: '硬件编码可用', detail: 'H.264 与 HEVC 可用' },
         inputBridge: { ok: true, message: '输入桥可启动', detail: '键鼠与手柄回传可用' },
         gamepadDriver: { ok: true, message: '驱动已准备', detail: '可注入 Xbox 手柄' }
       };
+    },
+    onRepairProgress(callback) {
+      if (typeof callback !== 'function') {
+        return () => {};
+      }
+      previewRepairListeners.add(callback);
+      return () => previewRepairListeners.delete(callback);
     },
     listDevices() {
       return [
@@ -170,6 +208,9 @@ function cacheElements() {
     checkEnvironmentButton: getElement('checkEnvironmentButton'),
     repairEnvironmentButton: getElement('repairEnvironmentButton'),
     diagnosticGrid: getElement('diagnosticGrid'),
+    repairProgressPanel: getElement('repairProgressPanel'),
+    repairProgressList: getElement('repairProgressList'),
+    repairProgressSummary: getElement('repairProgressSummary'),
     logView: getElement('logView')
   });
 }
@@ -252,6 +293,13 @@ function setBusyState(isBusy, message) {
     elements.startButton.disabled = Boolean(isBusy);
     elements.startButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
     elements.startButton.classList.toggle('is-loading', Boolean(isBusy));
+  }
+
+  for (const button of [elements.checkEnvironmentButton, elements.repairEnvironmentButton]) {
+    if (button) {
+      button.disabled = Boolean(isBusy);
+      button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    }
   }
 
   if (isBusy && message) {
@@ -496,6 +544,107 @@ function renderEnvironment() {
   setHtml(elements.diagnosticGrid, cards);
 }
 
+function isEnvironmentFullyReady() {
+  if (!state.environment || Object.keys(state.environment).length === 0) {
+    return false;
+  }
+
+  return DIAGNOSTIC_ITEMS.every(item => resolveDiagnostic(item).state === 'ok');
+}
+
+function resetRepairProgress(summary) {
+  state.repairProgress = {
+    active: true,
+    summary,
+    items: []
+  };
+  renderRepairProgress();
+}
+
+function updateRepairProgressItem(actionId, title, status, message) {
+  const id = actionId || title || `repair-${state.repairProgress.items.length}`;
+  const existing = state.repairProgress.items.find(item => item.id === id);
+  const next = {
+    id,
+    title: title || existing?.title || '环境修复项',
+    status: status || existing?.status || 'pending',
+    message: message || existing?.message || ''
+  };
+
+  if (existing) {
+    Object.assign(existing, next);
+  } else {
+    state.repairProgress.items.push(next);
+  }
+}
+
+function handleRepairProgress(event = {}) {
+  if (!state.repairProgress.active) {
+    resetRepairProgress('正在准备修复环境');
+  }
+
+  if (event.type === 'check') {
+    state.repairProgress.summary = event.message || '正在检查发送端环境';
+  } else if (event.type === 'start') {
+    state.repairProgress.summary = event.message || '开始修复环境';
+  } else if (event.type === 'plan') {
+    state.repairProgress.summary = event.message || '已生成修复计划';
+    for (const action of asArray(event.actions)) {
+      updateRepairProgressItem(action.id, action.title, 'pending', '待处理');
+    }
+  } else if (event.type === 'action-start') {
+    state.repairProgress.summary = event.message || '正在处理修复项';
+    updateRepairProgressItem(event.actionId, event.title, 'running', event.message);
+  } else if (event.type === 'log') {
+    updateRepairProgressItem(event.actionId, event.title, 'running', event.message);
+  } else if (event.type === 'action-complete') {
+    updateRepairProgressItem(event.actionId, event.title, 'complete', event.message || '已完成');
+  } else if (event.type === 'action-error') {
+    updateRepairProgressItem(event.actionId, event.title, 'error', event.message || '处理失败');
+    state.repairProgress.summary = event.message || '修复失败';
+  } else if (event.type === 'complete') {
+    state.repairProgress.active = false;
+    state.repairProgress.summary = event.message || '修复流程已完成';
+  }
+
+  renderRepairProgress();
+}
+
+function repairStatusLabel(status) {
+  if (status === 'running') return '处理中';
+  if (status === 'complete') return '完成';
+  if (status === 'error') return '失败';
+  return '待处理';
+}
+
+function renderRepairProgress() {
+  if (!elements.repairProgressPanel || !elements.repairProgressList || !elements.repairProgressSummary) {
+    return;
+  }
+
+  const progress = state.repairProgress;
+  elements.repairProgressPanel.classList.toggle('is-active', Boolean(progress.active || progress.items.length > 0));
+  elements.repairProgressSummary.textContent = progress.summary || '暂无修复任务';
+
+  if (progress.items.length === 0) {
+    elements.repairProgressList.innerHTML = '<li class="repair-progress-empty">暂无修复任务</li>';
+    return;
+  }
+
+  elements.repairProgressList.innerHTML = progress.items.map(item => {
+    const badgeClass = item.status === 'complete' ? 'ok' : item.status === 'error' ? 'fail' : item.status === 'running' ? 'warn' : '';
+    return `
+      <li class="repair-progress-item ${escapeHtml(item.status)}">
+        <span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${escapeHtml(item.message || repairStatusLabel(item.status))}</small>
+        </span>
+        <span class="badge ${badgeClass}">${escapeHtml(repairStatusLabel(item.status))}</span>
+      </li>
+    `;
+  }).join('');
+}
+
 function renderStatus() {
   syncStreamingClock();
 
@@ -530,6 +679,7 @@ function renderControls() {
   renderQualityControls();
   renderDevices();
   renderEnvironment();
+  renderRepairProgress();
   renderStatus();
   renderTargetSummary();
 }
@@ -571,20 +721,35 @@ async function checkEnvironment() {
     const result = await Promise.resolve(window.tvgame.checkEnvironment());
     state.environment = normalizeEnvironment(result);
     renderEnvironment();
+    return isEnvironmentFullyReady();
   } catch (error) {
     setActionStatus(`检查环境失败：${error.message}`, 'is-error');
+    return false;
   }
 }
 
-async function repairEnvironment() {
-  setActionStatus('正在检查并修复环境...', 'is-busy');
+async function repairEnvironment(options = {}) {
+  resetRepairProgress(options.summary || '正在检查并修复环境');
+  setBusyState(true, '正在检查并修复环境...');
+
   try {
     const result = await Promise.resolve(window.tvgame.repairEnvironment());
     state.environment = normalizeEnvironment(result);
     renderEnvironment();
-    setActionStatus('环境检查与修复已完成', 'is-ok');
+    const fullyReady = isEnvironmentFullyReady();
+    setActionStatus(fullyReady ? '环境检查与修复已完成' : '修复已完成，仍有项目需要处理', fullyReady ? 'is-ok' : 'is-error');
+    return fullyReady;
   } catch (error) {
+    handleRepairProgress({
+      type: 'action-error',
+      actionId: 'repair-error',
+      title: '环境修复',
+      message: error.message
+    });
     setActionStatus(`检查并修复环境失败：${error.message}`, 'is-error');
+    return false;
+  } finally {
+    setBusyState(false);
   }
 }
 
@@ -598,11 +763,30 @@ async function refreshStatus() {
   }
 }
 
+async function ensureEnvironmentReadyForStart() {
+  const ready = isEnvironmentFullyReady() || await checkEnvironment();
+  if (ready) {
+    return true;
+  }
+
+  switchPage('diagnostics');
+  setActionStatus('环境未全部正常，正在自动修复...', 'is-busy');
+  await repairEnvironment({
+    summary: '开始串流前需要先修复环境'
+  });
+  setActionStatus('环境修复已执行，请确认全部正常后再次点击开始串流', isEnvironmentFullyReady() ? 'is-ok' : 'is-error');
+  return false;
+}
+
 async function startStream() {
   const device = getStreamTarget();
 
   if (!device || !device.ip) {
     setActionStatus('请选择自动发现的电视/盒子，或手动输入 IP。', 'is-error');
+    return;
+  }
+
+  if (!await ensureEnvironmentReadyForStart()) {
     return;
   }
 
@@ -623,6 +807,15 @@ async function startStream() {
     const result = await Promise.resolve(window.tvgame.startStream(payload));
 
     if (result && result.started === false) {
+      if (result.needsRepair) {
+        switchPage('diagnostics');
+        setActionStatus(result.message || '环境未全部正常，正在自动修复...', 'is-busy');
+        await repairEnvironment({
+          summary: '开始串流前需要先修复环境'
+        });
+        await refreshStatus();
+        return;
+      }
       setActionStatus('启动失败', 'is-error');
       await refreshStatus();
       return;
@@ -677,6 +870,10 @@ function bindQualityList(element) {
 }
 
 function bindEvents() {
+  if (typeof window.tvgame.onRepairProgress === 'function') {
+    window.tvgame.onRepairProgress(handleRepairProgress);
+  }
+
   document.querySelectorAll('.nav-item').forEach(button => {
     button.addEventListener('click', () => switchPage(button.dataset.page));
   });

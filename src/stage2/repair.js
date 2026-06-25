@@ -90,6 +90,16 @@ function createStage2RepairPlan(report, options = {}) {
     manualSteps.push('朋友包已包含输入桥运行时，普通验证不需要安装 .NET SDK；只有源码开发输入桥时才需要 .NET SDK。');
   }
 
+  if (options.vigemBusReady === false) {
+    automaticActions.push({
+      id: 'install-vigembus',
+      title: '安装 ViGEmBus 虚拟手柄驱动',
+      command: 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\install-vigembus.ps1',
+      downloadStrategy: '优先通过 winget 安装 ViGEmBus；安装后可能需要重启电脑才能让游戏识别虚拟 Xbox 手柄。',
+      reasons: ['未检测到 ViGEmBus 服务，电视端手柄无法注入为电脑上的 Xbox 手柄。']
+    });
+  }
+
   const ready = Boolean((report.ready || onlyDotnetMissing) && automaticActions.length === 0);
   return {
     ready,
@@ -137,22 +147,53 @@ function hasInputBridgeRuntime(projectRoot) {
   return fs.existsSync(path.join(projectRoot, 'InputBridgeRuntime', 'InputBridge.exe'));
 }
 
+function commandForRepairAction(action, projectRoot) {
+  if (action.id === 'install-gstreamer-devel') {
+    return {
+      command: 'powershell.exe',
+      args: [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(projectRoot, 'scripts', 'install-gstreamer.ps1'),
+        '-InstallDevel'
+      ]
+    };
+  }
+
+  if (action.id === 'install-vigembus') {
+    return {
+      command: 'powershell.exe',
+      args: [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(projectRoot, 'scripts', 'install-vigembus.ps1')
+      ]
+    };
+  }
+
+  return null;
+}
+
+function emitProgress(onProgress, event) {
+  if (typeof onProgress === 'function') {
+    onProgress(event);
+  }
+}
+
 function runStage2RepairActions(plan, options = {}) {
   const spawnSync = options.spawnSync || childProcess.spawnSync;
   const projectRoot = options.projectRoot || process.cwd();
 
   for (const action of plan.automaticActions) {
-    if (action.id !== 'install-gstreamer-devel') continue;
-    const script = path.join(projectRoot, 'scripts', 'install-gstreamer.ps1');
+    const executable = commandForRepairAction(action, projectRoot);
+    if (!executable) continue;
+
     console.log(`正在执行：${action.title}`);
-    const result = spawnSync('powershell.exe', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      script,
-      '-InstallDevel'
-    ], {
+    const result = spawnSync(executable.command, executable.args, {
       stdio: 'inherit',
       windowsHide: false
     });
@@ -166,9 +207,105 @@ function runStage2RepairActions(plan, options = {}) {
   }
 }
 
+function runRepairProcess(action, executable, options) {
+  const spawn = options.spawn || childProcess.spawn;
+  const onProgress = options.onProgress;
+  const projectRoot = options.projectRoot || process.cwd();
+
+  emitProgress(onProgress, {
+    type: 'action-start',
+    actionId: action.id,
+    title: action.title,
+    message: `正在处理：${action.title}`
+  });
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable.command, executable.args, {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    });
+
+    function handleOutput(source, chunk) {
+      const message = String(chunk || '').trim();
+      if (!message) return;
+      emitProgress(onProgress, {
+        type: 'log',
+        actionId: action.id,
+        source,
+        message
+      });
+    }
+
+    if (child.stdout) {
+      child.stdout.on('data', chunk => handleOutput('stdout', chunk));
+    }
+
+    if (child.stderr) {
+      child.stderr.on('data', chunk => handleOutput('stderr', chunk));
+    }
+
+    child.on('error', error => {
+      emitProgress(onProgress, {
+        type: 'action-error',
+        actionId: action.id,
+        title: action.title,
+        message: error.message
+      });
+      reject(new Error(`执行失败：${error.message}`));
+    });
+
+    child.on('close', code => {
+      if (code === 0) {
+        emitProgress(onProgress, {
+          type: 'action-complete',
+          actionId: action.id,
+          title: action.title,
+          message: `${action.title} 已完成`
+        });
+        resolve();
+        return;
+      }
+
+      const message = `执行失败，退出码：${code}`;
+      emitProgress(onProgress, {
+        type: 'action-error',
+        actionId: action.id,
+        title: action.title,
+        message
+      });
+      reject(new Error(message));
+    });
+  });
+}
+
+async function runStage2RepairActionsAsync(plan, options = {}) {
+  const projectRoot = options.projectRoot || process.cwd();
+  const onProgress = options.onProgress;
+  const actions = Array.isArray(plan.automaticActions) ? plan.automaticActions : [];
+
+  emitProgress(onProgress, {
+    type: 'start',
+    total: actions.length,
+    message: actions.length > 0 ? '开始修复环境' : '没有需要自动修复的项目'
+  });
+
+  for (const action of actions) {
+    const executable = commandForRepairAction(action, projectRoot);
+    if (!executable) continue;
+    await runRepairProcess(action, executable, { ...options, projectRoot });
+  }
+
+  emitProgress(onProgress, {
+    type: 'complete',
+    message: '环境修复流程已完成'
+  });
+}
+
 module.exports = {
   createStage2RepairPlan,
   formatStage2RepairPlan,
   hasInputBridgeRuntime,
-  runStage2RepairActions
+  runStage2RepairActions,
+  runStage2RepairActionsAsync
 };

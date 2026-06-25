@@ -102,7 +102,14 @@ function createFakeServices(overrides = {}) {
       save: payload => payload
     },
     environment: {
-      check: () => ({}),
+      check: () => ({
+        cards: {
+          gstreamer: { state: 'ok' },
+          encoder: { state: 'ok' },
+          inputBridge: { state: 'ok' },
+          gamepadDriver: { state: 'ok' }
+        }
+      }),
       repair: () => ({})
     },
     discovery: {
@@ -184,6 +191,7 @@ test('preload exposes only the safe TVGame API through contextBridge', () => {
     'saveConfig',
     'checkEnvironment',
     'repairEnvironment',
+    'onRepairProgress',
     'listDevices',
     'startStream',
     'stopStream',
@@ -202,6 +210,8 @@ test('preload exposes only the safe TVGame API through contextBridge', () => {
   assert.match(source, /ipcRenderer\.invoke\(['"]config:save['"]\s*,\s*payload\)/);
   assert.match(source, /ipcRenderer\.invoke\(['"]environment:check['"]\)/);
   assert.match(source, /ipcRenderer\.invoke\(['"]environment:repair['"]\)/);
+  assert.match(source, /ipcRenderer\.on\(['"]environment:repair-progress['"]/);
+  assert.match(source, /ipcRenderer\.removeListener\(['"]environment:repair-progress['"]/);
   assert.match(source, /ipcRenderer\.invoke\(['"]devices:list['"]\)/);
   assert.match(source, /ipcRenderer\.invoke\(['"]stream:start['"]\s*,\s*payload\)/);
   assert.match(source, /ipcRenderer\.invoke\(['"]stream:stop['"]\)/);
@@ -229,7 +239,8 @@ test('IPC handlers register the desktop channels and delegate to services', () =
   assert.match(source, /services\.config\.load\(\)/);
   assert.match(source, /services\.config\.save\(payload\)/);
   assert.match(source, /services\.environment\.check\(\)/);
-  assert.match(source, /services\.environment\.repair\(services\.projectRoot\)/);
+  assert.match(source, /services\.environment\.repair\(services\.projectRoot/);
+  assert.match(source, /environment:repair-progress/);
   assert.match(source, /services\.discovery\.list\(\)/);
   assert.match(source, /services\.process\.startInputBridge\(\{\s*projectRoot:\s*services\.projectRoot,\s*inputBridgeRuntimePath:\s*services\.inputBridgeRuntimePath\s*\}\)/s);
   assert.match(source, /services\.process\.startStream\(\{\s*projectRoot:\s*services\.projectRoot,\s*nodeRuntimePath:\s*services\.nodeRuntimePath,\s*device:\s*payload\.device,\s*quality:\s*payload\.quality,\s*performanceProtection:\s*payload\.performanceProtection\s*\}\)/s);
@@ -363,6 +374,21 @@ test('renderer home screen shows live streaming runtime information', () => {
   assert.match(appJs, /streamStartedAt/);
   assert.match(appJs, /function formatDuration\(/);
   assert.match(appJs, /function renderStreamRuntime\(/);
+});
+
+test('renderer exposes repair progress and blocks stream start until every environment card is normal', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  assert.match(html, /id="repairProgressPanel"/);
+  assert.match(html, /id="repairProgressList"/);
+  assert.match(html, /id="repairProgressSummary"/);
+  assert.match(appJs, /function isEnvironmentFullyReady\(/);
+  assert.match(appJs, /async function ensureEnvironmentReadyForStart\(/);
+  assert.match(appJs, /await ensureEnvironmentReadyForStart\(\)/);
+  assert.match(appJs, /window\.tvgame\.onRepairProgress/);
+  assert.match(appJs, /handleRepairProgress/);
+  assert.match(appJs, /await repairEnvironment\(/);
 });
 
 test('renderer home screen keeps the guided steps vertical and compact', () => {
@@ -521,6 +547,40 @@ test('stream:start rejects malformed payload before starting input bridge', () =
   registerIpcHandlers(ipcMain, services);
 
   assert.throws(() => ipcMain.handlers.get('stream:start')({}, null), /缺少电视 IP/);
+  assert.deepEqual(services.calls, []);
+});
+
+test('stream:start refuses to launch when environment cards are not all normal', () => {
+  const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
+  const ipcMain = createFakeIpcMain();
+  const services = createFakeServices({
+    environment: {
+      check: () => ({
+        cards: {
+          gstreamer: { state: 'ok' },
+          encoder: { state: 'warning' },
+          inputBridge: { state: 'ok' },
+          gamepadDriver: { state: 'ok' }
+        }
+      }),
+      repair: () => ({})
+    }
+  });
+
+  registerIpcHandlers(ipcMain, services);
+
+  assert.deepEqual(
+    ipcMain.handlers.get('stream:start')({}, {
+      device: { ip: '192.168.1.23' },
+      quality: { profile: 'h264720p30' },
+      performanceProtection: true
+    }),
+    {
+      started: false,
+      needsRepair: true,
+      message: '环境未全部正常，请先修复环境'
+    }
+  );
   assert.deepEqual(services.calls, []);
 });
 

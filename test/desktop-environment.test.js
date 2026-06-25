@@ -136,7 +136,7 @@ test('missing required pieces return error cards and not ready', () => {
   assert.equal(summary.cards.inputBridge.detail, '请安装输入桥运行时或 .NET');
 });
 
-test('environment service check and repair use injected dependencies and map runtime to repair options', () => {
+test('environment service check and repair use injected dependencies and map runtime to repair options', async () => {
   const reports = [createReadyReport(), createReadyReport(), createReadyReport()];
   reports[0].gstreamer.ready = false;
   const repairRuntime = { inputBridgeRuntimeReady: true, vigemBusReady: false };
@@ -150,7 +150,8 @@ test('environment service check and repair use injected dependencies and map run
       calls.push(['createRepairPlan', report.gstreamer.ready, options]);
       return { ready: false, automaticActions: [{ id: 'install-gstreamer-devel' }], manualSteps: [] };
     },
-    runRepairActions: (plan, options) => {
+    runRepairActions: async (plan, options) => {
+      options.onProgress({ type: 'action-start', actionId: plan.automaticActions[0].id });
       calls.push(['runRepairActions', plan.automaticActions[0].id, options.projectRoot]);
     },
     getRuntime: () => {
@@ -160,10 +161,14 @@ test('environment service check and repair use injected dependencies and map run
   });
 
   const first = service.check();
-  const repaired = service.repair('D:/workspace/project');
+  const progress = [];
+  const repaired = await service.repair('D:/workspace/project', {
+    onProgress: event => progress.push(event)
+  });
 
   assert.equal(first.ready, false);
   assert.equal(repaired.ready, true);
+  assert.deepEqual(progress.map(event => event.type), ['check', 'plan', 'action-start', 'complete']);
   assert.deepEqual(calls, [
     'createReport',
     'getRuntime',

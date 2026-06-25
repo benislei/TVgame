@@ -3,8 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
+const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
+const { PassThrough } = require('node:stream');
 
 function createBrokenReport() {
   return {
@@ -75,6 +77,50 @@ test('stage2 repair plan groups missing GStreamer pieces into one confirmed acti
   assert.match(text, /HEVC/);
   assert.match(text, /NVIDIA\/AMD 显卡驱动/);
   assert.doesNotMatch(text, /必须安装 \.NET SDK/);
+});
+
+test('stage2 repair plan includes ViGEmBus when the virtual gamepad driver is missing', () => {
+  const { createStage2RepairPlan } = require('../src/stage2/repair');
+  const report = createBrokenReport();
+  report.gstreamer.ready = true;
+  report.dotnet.ready = true;
+  report.plugins = {
+    d3d11screencapturesrc: true,
+    d3d11download: true,
+    wasapi2src: true,
+    nvh264enc: true,
+    amfh264enc: false,
+    mfh264enc: false
+  };
+  report.optionalPlugins = {
+    nvh265enc: true,
+    amfh265enc: false,
+    mfh265enc: false,
+    h265parse: true,
+    rtph265pay: true
+  };
+  report.codecs.h264 = {
+    ready: true,
+    encoder: 'nvh264enc',
+    availableEncoders: ['nvh264enc'],
+    missing: []
+  };
+  report.codecs.hevc = {
+    ready: true,
+    encoder: 'nvh265enc',
+    availableEncoders: ['nvh265enc'],
+    missing: []
+  };
+  report.missing = { executables: [], plugins: [], pythonModules: [] };
+
+  const plan = createStage2RepairPlan(report, {
+    hasInputBridgeRuntime: true,
+    vigemBusReady: false
+  });
+
+  assert.equal(plan.ready, false);
+  assert.deepEqual(plan.automaticActions.map(action => action.id), ['install-vigembus']);
+  assert.match(plan.automaticActions[0].title, /ViGEmBus/);
 });
 
 test('stage2 repair plan explains dotnet only when the packaged input bridge runtime is missing', () => {
@@ -191,4 +237,47 @@ test('GStreamer installer prefers aria2 multi-connection download and can instal
   assert.match(source, /aria2\.aria2/);
   assert.match(source, /-x 16 -s 16/);
   assert.match(source, /curl\.exe/);
+});
+
+test('async stage2 repair hides PowerShell windows and reports action progress', async () => {
+  const { runStage2RepairActionsAsync } = require('../src/stage2/repair');
+  const spawnCalls = [];
+  const progress = [];
+
+  function spawn(command, args, options) {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    spawnCalls.push({ command, args, options });
+
+    process.nextTick(() => {
+      child.stdout.write('正在下载 GStreamer runtime...\n');
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+
+    return child;
+  }
+
+  await runStage2RepairActionsAsync({
+    automaticActions: [{
+      id: 'install-gstreamer-devel',
+      title: '安装/更新 GStreamer runtime + devel'
+    }]
+  }, {
+    projectRoot: 'D:/project',
+    spawn,
+    onProgress: event => progress.push(event)
+  });
+
+  assert.equal(spawnCalls.length, 1);
+  assert.equal(spawnCalls[0].command, 'powershell.exe');
+  assert.equal(spawnCalls[0].options.windowsHide, true);
+  assert.deepEqual(spawnCalls[0].options.stdio, ['ignore', 'pipe', 'pipe']);
+  assert.deepEqual(
+    progress.map(event => event.type),
+    ['start', 'action-start', 'log', 'action-complete', 'complete']
+  );
+  assert.match(progress.find(event => event.type === 'log').message, /GStreamer runtime/);
 });

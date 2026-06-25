@@ -1,5 +1,7 @@
 'use strict';
 
+const { environmentCardsAllOk } = require('./environment-service');
+
 function validateStreamPayload(payload) {
   if (!payload || !payload.device || !payload.device.ip) {
     throw new Error('缺少电视 IP');
@@ -10,6 +12,12 @@ function validateStreamPayload(payload) {
   }
 }
 
+function sendRepairProgress(event, payload) {
+  if (event && event.sender && typeof event.sender.send === 'function') {
+    event.sender.send('environment:repair-progress', payload);
+  }
+}
+
 function registerIpcHandlers(ipcMain, services) {
   ipcMain.handle('config:load', () => services.config.load());
 
@@ -17,12 +25,23 @@ function registerIpcHandlers(ipcMain, services) {
 
   ipcMain.handle('environment:check', () => services.environment.check());
 
-  ipcMain.handle('environment:repair', () => services.environment.repair(services.projectRoot));
+  ipcMain.handle('environment:repair', event => services.environment.repair(services.projectRoot, {
+    onProgress: progress => sendRepairProgress(event, progress)
+  }));
 
   ipcMain.handle('devices:list', () => services.discovery.list());
 
   ipcMain.handle('stream:start', (_event, payload) => {
     validateStreamPayload(payload);
+
+    const environment = services.environment.check();
+    if (!environmentCardsAllOk(environment)) {
+      return {
+        started: false,
+        needsRepair: true,
+        message: '环境未全部正常，请先修复环境'
+      };
+    }
 
     services.process.startInputBridge({
       projectRoot: services.projectRoot,

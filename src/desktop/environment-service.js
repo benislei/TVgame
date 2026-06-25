@@ -1,9 +1,12 @@
 'use strict';
 
+const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const { createStage2Report } = require('../stage2/tooling');
 const {
   createStage2RepairPlan,
-  runStage2RepairActions
+  runStage2RepairActionsAsync
 } = require('../stage2/repair');
 
 function isReady(value) {
@@ -60,17 +63,68 @@ function summarizeEnvironment(report, runtime = {}) {
   };
 }
 
+function environmentCardsAllOk(summary) {
+  const cards = summary && summary.cards;
+  if (!cards || typeof cards !== 'object') return false;
+  return Object.values(cards).every(card => card && card.state === 'ok');
+}
+
+function executableExists(filePath) {
+  try {
+    return Boolean(filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile());
+  } catch {
+    return false;
+  }
+}
+
+function detectVigemBus(spawnSync = childProcess.spawnSync) {
+  try {
+    const result = spawnSync('sc.exe', ['query', 'ViGEmBus'], {
+      encoding: 'utf8',
+      windowsHide: true
+    });
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+    return result.status === 0 && /SERVICE_NAME:\s*ViGEmBus/i.test(output);
+  } catch {
+    return false;
+  }
+}
+
+function createDesktopRuntimeDetector(options = {}) {
+  const projectRoot = options.projectRoot || process.cwd();
+  const inputBridgeRuntimePath = options.inputBridgeRuntimePath
+    || path.join(projectRoot, 'InputBridgeRuntime', 'InputBridge.exe');
+  const spawnSync = options.spawnSync || childProcess.spawnSync;
+
+  return () => ({
+    inputBridgeRuntimeReady: executableExists(inputBridgeRuntimePath),
+    vigemBusReady: detectVigemBus(spawnSync)
+  });
+}
+
+function emitProgress(onProgress, event) {
+  if (typeof onProgress === 'function') {
+    onProgress(event);
+  }
+}
+
 function createEnvironmentService(options = {}) {
   const createReport = options.createReport || createStage2Report;
   const createRepairPlan = options.createRepairPlan || createStage2RepairPlan;
-  const runRepairActions = options.runRepairActions || runStage2RepairActions;
+  const runRepairActions = options.runRepairActions || runStage2RepairActionsAsync;
   const getRuntime = options.getRuntime || (() => ({}));
 
   function check() {
     return summarizeEnvironment(createReport(), getRuntime());
   }
 
-  function repair(projectRoot) {
+  async function repair(projectRoot, options = {}) {
+    const onProgress = options.onProgress;
+    emitProgress(onProgress, {
+      type: 'check',
+      message: '正在检查发送端环境'
+    });
+
     const report = createReport();
     const runtime = getRuntime();
     const repairOptions = {
@@ -78,8 +132,27 @@ function createEnvironmentService(options = {}) {
       hasInputBridgeRuntime: runtime.inputBridgeRuntimeReady === true
     };
     const plan = createRepairPlan(report, repairOptions);
-    runRepairActions(plan, { projectRoot });
-    return check();
+
+    emitProgress(onProgress, {
+      type: 'plan',
+      actions: plan.automaticActions,
+      manualSteps: plan.manualSteps,
+      message: plan.automaticActions.length > 0 ? '已生成可自动处理的修复计划' : '没有需要自动修复的项目'
+    });
+
+    await runRepairActions(plan, { projectRoot, onProgress });
+
+    const summary = check();
+    emitProgress(onProgress, {
+      type: 'complete',
+      summary,
+      message: environmentCardsAllOk(summary) ? '环境已全部正常' : '环境修复完成，但仍有项目需要处理'
+    });
+
+    return {
+      ...summary,
+      repair: { plan }
+    };
   }
 
   return {
@@ -90,5 +163,8 @@ function createEnvironmentService(options = {}) {
 
 module.exports = {
   summarizeEnvironment,
+  environmentCardsAllOk,
+  detectVigemBus,
+  createDesktopRuntimeDetector,
   createEnvironmentService
 };

@@ -3,7 +3,10 @@
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { createConfigStore } = require('./config-store');
-const { createEnvironmentService } = require('./environment-service');
+const {
+  createDesktopRuntimeDetector,
+  createEnvironmentService
+} = require('./environment-service');
 const { createProcessService } = require('./process-service');
 const { createDeviceDiscovery } = require('./device-discovery');
 const { registerIpcHandlers } = require('./ipc-handlers');
@@ -48,13 +51,19 @@ function createWindow() {
 
 function createServices(electronApp = app, options = {}) {
   const serviceProjectRoot = resolveProjectRoot(options.desktopDir || __dirname);
+  const inputBridgeRuntimePath = path.join(serviceProjectRoot, 'InputBridgeRuntime', 'InputBridge.exe');
 
   return {
     projectRoot: serviceProjectRoot,
-    inputBridgeRuntimePath: path.join(serviceProjectRoot, 'InputBridgeRuntime', 'InputBridge.exe'),
+    inputBridgeRuntimePath,
     nodeRuntimePath: process.execPath,
     config: createConfigStore({ appDataDir: electronApp.getPath('userData') }),
-    environment: createEnvironmentService(),
+    environment: createEnvironmentService({
+      getRuntime: createDesktopRuntimeDetector({
+        projectRoot: serviceProjectRoot,
+        inputBridgeRuntimePath
+      })
+    }),
     process: createProcessService(),
     discovery: createDeviceDiscovery()
   };

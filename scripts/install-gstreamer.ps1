@@ -4,6 +4,8 @@
 )
 
 $ErrorActionPreference = "Stop"
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $OutputEncoding
 
 function Test-Command($Name) {
   $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)

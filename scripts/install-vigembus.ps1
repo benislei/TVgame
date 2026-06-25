@@ -1,4 +1,6 @@
 $ErrorActionPreference = "Stop"
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $OutputEncoding
 
 function Test-ViGEmBusInstalled {
   $service = Get-Service -Name "ViGEmBus" -ErrorAction SilentlyContinue

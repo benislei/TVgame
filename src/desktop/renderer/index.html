@@ -264,6 +264,17 @@
                 <button class="primary-button" type="button" id="repairEnvironmentButton">检查并修复环境</button>
               </div>
             </div>
+            <section class="repair-progress-panel" id="repairProgressPanel" aria-live="polite">
+              <div class="repair-progress-heading">
+                <div>
+                  <p class="section-label">修复进度</p>
+                  <strong id="repairProgressSummary">暂无修复任务</strong>
+                </div>
+              </div>
+              <ol class="repair-progress-list" id="repairProgressList">
+                <li class="repair-progress-empty">暂无修复任务</li>
+              </ol>
+            </section>
             <div class="diagnostic-grid" id="diagnosticGrid"></div>
           </article>
         </section>

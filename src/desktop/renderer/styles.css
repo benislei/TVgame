@@ -837,6 +837,77 @@ button:disabled {
   align-items: center;
 }
 
+.repair-progress-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.repair-progress-panel.is-active {
+  border-color: rgba(24, 160, 88, 0.42);
+  background: #102019;
+}
+
+.repair-progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.repair-progress-heading strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 15px;
+}
+
+.repair-progress-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repair-progress-item,
+.repair-progress-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--ink-900);
+}
+
+.repair-progress-item strong {
+  display: block;
+  color: var(--text-strong);
+}
+
+.repair-progress-item small,
+.repair-progress-empty {
+  color: var(--muted);
+}
+
+.repair-progress-item.running {
+  border-color: rgba(217, 154, 38, 0.4);
+}
+
+.repair-progress-item.complete {
+  border-color: rgba(24, 160, 88, 0.4);
+}
+
+.repair-progress-item.error {
+  border-color: rgba(229, 72, 77, 0.44);
+}
+
 .connection-panel {
   display: grid;
   gap: 4px;
