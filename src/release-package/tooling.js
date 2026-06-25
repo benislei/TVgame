@@ -330,6 +330,7 @@ function createReadme() {
     '## 文件说明',
     '',
     '- `TVGameReceiver.apk`：安装到电视或电视盒子的接收端 App。',
+    '- `00-打开TVGame图形界面.bat`：电脑发送端的图形界面入口。解压后优先双击这个文件；它会打开 `desktop\\TVGame Sender.exe`。',
     '- `安装Node.js运行环境.bat`：安装发送端基础运行时 Node.js/npm。Node.js/npm 是发送端基础运行时依赖，没有它无法运行检查环境和发送端脚本。',
     '- `安装npm依赖.bat`：在电脑端安装项目 npm 依赖；如果没有 Node.js/npm，会先自动尝试安装 Node.js LTS。',
     '- `安装GStreamer依赖.bat`：尝试安装 GStreamer 依赖。',
@@ -343,7 +344,7 @@ function createReadme() {
     '## 快速验证步骤',
     '',
     '1. 把 `TVGameReceiver.apk` 安装到 Android 11+ 电视或电视盒子上，然后打开“电视游戏接收端”。接收端 App 打开期间会保持屏幕常亮，避免电视自动休眠后黑屏。',
-    '2. 在电脑上运行 `检查环境.bat`。如果发现缺 Node.js/npm、npm 依赖、GStreamer 或编码器插件，脚本会先列出缺失项和处理方案，再询问是否一键处理；输入 Y 后自动安装/更新对应依赖。',
+    '2. 在电脑上优先双击 `00-打开TVGame图形界面.bat` 打开图形界面；如果只是想走命令行验证，再运行 `检查环境.bat`。如果发现缺 Node.js/npm、npm 依赖、GStreamer 或编码器插件，脚本会先列出缺失项和处理方案，再询问是否一键处理；输入 Y 后自动安装/更新对应依赖。',
     '3. 一键处理完成后，关闭当前窗口，重新运行 `检查环境.bat`。如果仍缺硬件编码器，请优先更新 NVIDIA/AMD 显卡驱动，并确认 GStreamer runtime + devel 都已安装。',
     '   如果环境检查缺 `nvh264enc` 但电脑是 AMD 显卡，这是正常的；新版发送端会自动尝试 `amfh264enc`。如果 `amfh264enc` 也缺，优先通过 `检查环境.bat` 的一键处理安装 devel 包，并更新 AMD 显卡驱动。',
     '   N 卡优先使用 `nvh264enc`；A 卡优先使用 `amfh264enc`；两者都没有时会尝试 Windows Media Foundation 的 `mfh264enc` 兜底。',
@@ -559,6 +560,10 @@ function createFriendPreviewPackage(options = {}) {
   writeText(readmePath, createReadme());
   const launcherPaths = writeLaunchers(packageDir);
   if (desktopPackagePath) {
+    const primaryDesktopLauncherPath = path.join(packageDir, '00-打开TVGame图形界面.bat');
+    writeText(primaryDesktopLauncherPath, createDesktopSenderBatch());
+    launcherPaths.push(primaryDesktopLauncherPath);
+
     const desktopLauncherPath = path.join(packageDir, '启动TVGame发送端.bat');
     writeText(desktopLauncherPath, createDesktopSenderBatch());
     launcherPaths.push(desktopLauncherPath);

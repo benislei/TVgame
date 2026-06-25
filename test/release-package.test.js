@@ -105,16 +105,19 @@ test('friend preview package includes packaged Electron desktop sender when avai
 
   const desktopExe = path.join(report.packageDir, 'desktop', 'TVGame Sender.exe');
   const desktopAsar = path.join(report.packageDir, 'desktop', 'resources', 'app.asar');
+  const primaryDesktopLauncher = path.join(report.packageDir, '00-打开TVGame图形界面.bat');
   const desktopLauncher = path.join(report.packageDir, '启动TVGame发送端.bat');
   assert.equal(fs.existsSync(desktopExe), true);
   assert.equal(fs.readFileSync(desktopExe, 'utf8'), 'desktop exe');
   assert.equal(fs.existsSync(desktopAsar), true);
+  assert.equal(fs.existsSync(primaryDesktopLauncher), true);
   assert.equal(fs.existsSync(desktopLauncher), true);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'node_modules')), false);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'dist')), false);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'dist-desktop')), false);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'InputBridge', 'bin')), false);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop', 'InputBridge', 'obj')), false);
+  assert.match(fs.readFileSync(primaryDesktopLauncher, 'utf8'), /start "" "TVGame Sender\.exe"/);
   assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /cd \/d "%~dp0desktop"/);
   assert.match(fs.readFileSync(desktopLauncher, 'utf8'), /start "" "TVGame Sender\.exe"/);
 });
@@ -160,6 +163,7 @@ test('friend preview package skips desktop sender files and launcher when deskto
 
   assert.equal(report.desktopPackagePath, null);
   assert.equal(fs.existsSync(path.join(report.packageDir, 'desktop')), false);
+  assert.equal(fs.existsSync(path.join(report.packageDir, '00-打开TVGame图形界面.bat')), false);
   assert.equal(fs.existsSync(path.join(report.packageDir, '启动TVGame发送端.bat')), false);
 });
 
@@ -346,6 +350,8 @@ test('friend preview README explains Chinese validation steps and overlay hiding
   const readme = fs.readFileSync(path.join(report.packageDir, 'README-朋友试用.md'), 'utf8');
   assert.match(readme, /Android 11\+/);
   assert.match(readme, /TVGameReceiver\.apk/);
+  assert.match(readme, /00-打开TVGame图形界面\.bat/);
+  assert.match(readme, /desktop\\TVGame Sender\.exe/);
   assert.match(readme, /安装Node\.js运行环境\.bat/);
   assert.match(readme, /检查环境\.bat/);
   assert.match(readme, /先说明处理方案，确认后再一键处理/);
