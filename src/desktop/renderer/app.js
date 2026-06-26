@@ -188,8 +188,14 @@ function cacheElements() {
   Object.assign(elements, {
     pageTitle: getElement('pageTitle'),
     sidebarStatusText: getElement('sidebarStatusText'),
+    topbarQualityPill: getElement('topbarQualityPill'),
     streamRuntimeStatus: getElement('streamRuntimeStatus'),
     streamRuntimeText: getElement('streamRuntimeText'),
+    targetMetricText: getElement('targetMetricText'),
+    gamepadMetricText: getElement('gamepadMetricText'),
+    receiverSummaryText: getElement('receiverSummaryText'),
+    homeHealthGrid: getElement('homeHealthGrid'),
+    recentStatusText: getElement('recentStatusText'),
     deviceSelect: getElement('deviceSelect'),
     manualIpInput: getElement('manualIpInput'),
     qualitySelect: getElement('qualitySelect'),
@@ -274,7 +280,7 @@ function statusLabel() {
     return '正在串流';
   }
 
-  return '未启动';
+  return '准备就绪';
 }
 
 function setActionStatus(text, tone) {
@@ -360,10 +366,10 @@ function renderStreamRuntime() {
   const running = isStreamRunning();
   const runtime = running && state.streamStartedAt ? formatDuration(Date.now() - state.streamStartedAt) : '00:00:00';
 
-  setText(elements.streamRuntimeStatus, running ? '正在串流' : '未启动');
+  setText(elements.streamRuntimeStatus, running ? '正在串流' : '准备就绪');
   setText(elements.streamRuntimeText, runtime);
 
-  const panel = elements.streamRuntimeStatus && elements.streamRuntimeStatus.closest('.stream-runtime-panel');
+  const panel = elements.streamRuntimeStatus && elements.streamRuntimeStatus.closest('.status-card');
   if (panel) {
     panel.classList.toggle('is-running', running);
   }
@@ -418,12 +424,16 @@ function renderSelectedQualityDetails() {
 }
 
 function renderQualityControls() {
+  const selectedPreset = getSelectedQuality();
+
   if (elements.qualitySelect) {
     elements.qualitySelect.innerHTML = QUALITY_PRESETS.map(preset => (
       `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.label)}</option>`
     )).join('');
     elements.qualitySelect.value = state.selectedQuality;
   }
+
+  setText(elements.topbarQualityPill, selectedPreset.label);
 
   const mirrorCards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, true)).join('');
   setHtml(elements.qualityPresetMirror, mirrorCards);
@@ -498,6 +508,20 @@ function renderConnectionMode() {
 }
 
 function renderTargetSummary() {
+  const quality = getSelectedQuality();
+  const target = getStreamTarget();
+  const hasTarget = Boolean(target && target.ip);
+  const targetName = hasTarget ? (target.name || '手动输入 IP') : '未选择';
+  const targetText = hasTarget ? `${targetName} · ${target.ip}` : '未选择';
+
+  setText(elements.topbarQualityPill, quality.label);
+  setText(elements.targetMetricText, targetText);
+  setText(
+    elements.receiverSummaryText,
+    hasTarget
+      ? `${targetName} 已准备接收 ${quality.label}，画面会按原比例显示。`
+      : '电视端在线后，画面会按原比例显示。'
+  );
   renderStreamRuntime();
 }
 
@@ -524,11 +548,27 @@ function resolveDiagnostic(item) {
   };
 }
 
+function diagnosticBadgeClass(diagnostic) {
+  if (diagnostic.ok) {
+    return 'ok';
+  }
+
+  return diagnostic.state === 'error' ? 'fail' : 'warn';
+}
+
+function diagnosticBadgeText(diagnostic) {
+  if (diagnostic.ok) {
+    return '正常';
+  }
+
+  return diagnostic.state === 'warning' ? '警告' : '待处理';
+}
+
 function renderEnvironment() {
   const cards = DIAGNOSTIC_ITEMS.map(item => {
     const diagnostic = resolveDiagnostic(item);
-    const badgeClass = diagnostic.ok ? 'ok' : diagnostic.state === 'error' ? 'fail' : 'warn';
-    const badgeText = diagnostic.ok ? '正常' : diagnostic.state === 'warning' ? '警告' : '待处理';
+    const badgeClass = diagnosticBadgeClass(diagnostic);
+    const badgeText = diagnosticBadgeText(diagnostic);
     const detail = diagnostic.detail ? ` · ${diagnostic.detail}` : '';
     return `
       <div class="diagnostic-card">
@@ -542,6 +582,28 @@ function renderEnvironment() {
   }).join('');
 
   setHtml(elements.diagnosticGrid, cards);
+
+  const homeRows = DIAGNOSTIC_ITEMS.map(item => {
+    const diagnostic = resolveDiagnostic(item);
+    const badgeClass = diagnosticBadgeClass(diagnostic);
+    const badgeText = diagnosticBadgeText(diagnostic);
+    return `
+      <div class="health-row">
+        <span>
+          <span class="status-name">${escapeHtml(item.label)}</span>
+          <span class="item-meta">${escapeHtml(diagnostic.message)}</span>
+        </span>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+    `;
+  }).join('');
+  setHtml(elements.homeHealthGrid, homeRows);
+
+  const gamepadDiagnostic = resolveDiagnostic({ key: 'gamepadDriver', label: '手柄驱动' });
+  setText(
+    elements.gamepadMetricText,
+    gamepadDiagnostic.ok ? '可用' : gamepadDiagnostic.state === 'error' ? '不可用' : '建议安装'
+  );
 }
 
 function isEnvironmentFullyReady() {
@@ -663,6 +725,10 @@ function renderStatus() {
   renderStreamRuntime();
 
   const logs = asArray(state.status && state.status.logs);
+  const recentStatus = logs.length > 0
+    ? logs[logs.length - 1]
+    : running ? '正在向电视发送画面' : '等待串流准备';
+  setText(elements.recentStatusText, recentStatus);
   setText(elements.logView, logs.length > 0 ? logs.join('\n') : '暂无日志');
 }
 
@@ -880,12 +946,23 @@ function bindEvents() {
 
   elements.deviceSelect.addEventListener('change', event => {
     state.selectedDevice = event.target.value;
+    if (state.selectedDevice) {
+      state.deviceMode = 'auto';
+      renderConnectionMode();
+    }
     renderTargetSummary();
     renderDevices();
   });
 
   elements.manualIpInput.addEventListener('input', event => {
     state.manualIp = event.target.value;
+    if (state.manualIp.trim()) {
+      state.deviceMode = 'manual';
+      renderConnectionMode();
+    } else if (state.selectedDevice) {
+      state.deviceMode = 'auto';
+      renderConnectionMode();
+    }
     renderTargetSummary();
   });
 
@@ -906,17 +983,21 @@ function bindEvents() {
     state.performanceProtection = event.target.checked;
   });
 
-  elements.modeAuto.addEventListener('change', () => {
-    state.deviceMode = 'auto';
-    renderConnectionMode();
-    renderTargetSummary();
-  });
+  if (elements.modeAuto) {
+    elements.modeAuto.addEventListener('change', () => {
+      state.deviceMode = 'auto';
+      renderConnectionMode();
+      renderTargetSummary();
+    });
+  }
 
-  elements.modeManual.addEventListener('change', () => {
-    state.deviceMode = 'manual';
-    renderConnectionMode();
-    renderTargetSummary();
-  });
+  if (elements.modeManual) {
+    elements.modeManual.addEventListener('change', () => {
+      state.deviceMode = 'manual';
+      renderConnectionMode();
+      renderTargetSummary();
+    });
+  }
 
   elements.startButton.addEventListener('click', startStream);
   elements.stopButton.addEventListener('click', stopStream);

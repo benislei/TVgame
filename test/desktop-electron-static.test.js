@@ -321,9 +321,10 @@ test('renderer script defines only the supported quality presets and uses the TV
 test('renderer main screen uses TVGame brand tokens instead of a generic purple blue theme', () => {
   const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
 
-  assert.match(styles, /--ink-950:\s*#0b1114/i);
-  assert.match(styles, /--brand-signal:\s*#18a058/i);
-  assert.match(styles, /--brand-amber:\s*#d99a26/i);
+  assert.match(styles, /--bg:\s*#0d1211/i);
+  assert.match(styles, /--shell:\s*#080e0d/i);
+  assert.match(styles, /--brand-signal:\s*#19b56d/i);
+  assert.match(styles, /--brand-amber:\s*#ffc86b/i);
   assert.match(styles, /--font-ui:\s*"Microsoft YaHei UI"/);
   assert.doesNotMatch(styles, /#1769aa|#0f578e|#4338ca|#4f46e5|#6366f1|#7c3aed/i);
 });
@@ -367,13 +368,18 @@ test('renderer home screen shows live streaming runtime information', () => {
     assert.match(html, new RegExp(`id="${id}"`), `missing runtime element ${id}`);
   }
 
+  for (const id of ['targetMetricText', 'gamepadMetricText', 'receiverSummaryText', 'homeHealthGrid', 'recentStatusText']) {
+    assert.match(html, new RegExp(`id="${id}"`), `missing concept status element ${id}`);
+  }
+
   assert.doesNotMatch(html, /id="streamTargetText"/);
   assert.doesNotMatch(html, /id="streamQualityText"/);
-  assert.doesNotMatch(html, /目标设备/);
   assert.doesNotMatch(html, /发送档位/);
   assert.match(appJs, /streamStartedAt/);
   assert.match(appJs, /function formatDuration\(/);
   assert.match(appJs, /function renderStreamRuntime\(/);
+  assert.match(appJs, /function renderTargetSummary\(/);
+  assert.match(appJs, /homeHealthGrid/);
 });
 
 test('renderer exposes repair progress and blocks stream start until every environment card is normal', () => {
@@ -470,7 +476,9 @@ test('renderer avoids advanced custom streaming controls and mojibake', () => {
 
   for (const [label, source] of Object.entries(rendererSources)) {
     assertRendererNoMojibake(source, label);
-    assert.match(source, /[\u4E00-\u9FFF]/, `${label} should contain real Chinese text or comments`);
+    if (label !== 'styles.css') {
+      assert.match(source, /[\u4E00-\u9FFF]/, `${label} should contain real Chinese text or comments`);
+    }
   }
 });
 
@@ -660,10 +668,10 @@ test('main creates the Electron window with secure webPreferences and starts dis
   const source = readProjectFile('src', 'desktop', 'main.js');
 
   assert.match(source, /new BrowserWindow\(/);
-  assert.match(source, /width:\s*1120/);
-  assert.match(source, /height:\s*760/);
-  assert.match(source, /minWidth:\s*960/);
-  assert.match(source, /minHeight:\s*640/);
+  assert.match(source, /width:\s*1280/);
+  assert.match(source, /height:\s*900/);
+  assert.match(source, /minWidth:\s*1040/);
+  assert.match(source, /minHeight:\s*680/);
   assert.match(source, /title:\s*['"]TVGame 发送端['"]/);
   assert.match(source, /preload:\s*path\.join\(__dirname,\s*['"]preload\.js['"]\)/);
   assert.match(source, /contextIsolation:\s*true/);

@@ -32,10 +32,10 @@ const projectRoot = resolveProjectRoot();
 
 function createWindow() {
   const window = new BrowserWindow({
-    width: 1120,
-    height: 760,
-    minWidth: 960,
-    minHeight: 640,
+    width: 1280,
+    height: 900,
+    minWidth: 1040,
+    minHeight: 680,
     title: 'TVGame 发送端',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
