@@ -477,7 +477,6 @@ dd {
   pointer-events: none;
 }
 
-.segment-option.is-active,
 .segment-option.is-selected {
   color: #06110d;
   background: var(--brand);
@@ -553,19 +552,37 @@ select option {
   margin-top: 14px;
 }
 
+.custom-select {
+  position: relative;
+}
+
 .select-display-shell {
   position: relative;
   min-height: 70px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   padding: 0 18px 0 20px;
-  overflow: hidden;
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--field);
   color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.select-display-shell:hover,
+.select-display-shell:focus-visible,
+.custom-select.is-open .select-display-shell {
+  border-color: rgba(38, 211, 132, 0.58);
+  background: #071812;
+  box-shadow: 0 0 0 4px rgba(38, 211, 132, 0.08);
 }
 
 .select-display-shell strong {
@@ -575,7 +592,7 @@ select option {
   font-weight: 900;
 }
 
-.select-display-shell span:not(.select-display-button) {
+.select-display-shell > span:first-child span {
   display: block;
   margin-top: 6px;
   color: var(--muted);
@@ -583,13 +600,16 @@ select option {
   line-height: 1.35;
 }
 
-.select-display-shell select {
+.select-display-shell[aria-expanded="true"] .select-display-button svg {
+  transform: rotate(180deg);
+}
+
+.custom-select > select {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 .select-display-button {
@@ -606,6 +626,113 @@ select option {
 .select-display-button svg {
   width: 18px;
   height: 18px;
+  transition: transform 160ms ease;
+}
+
+.quality-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 10px);
+  z-index: 20;
+  max-height: 278px;
+  padding: 8px;
+  overflow-y: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(135, 178, 158, 0.3);
+  background: #06110f;
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 245, 182, 0.5) rgba(255, 255, 255, 0.06);
+}
+
+.quality-menu[hidden] {
+  display: none;
+}
+
+.quality-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.quality-menu::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quality-menu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(126, 245, 182, 0.5);
+}
+
+.quality-option {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.quality-option + .quality-option {
+  margin-top: 3px;
+}
+
+.quality-option:hover,
+.quality-option:focus-visible {
+  background: rgba(38, 211, 132, 0.12);
+  outline: none;
+}
+
+.quality-option.is-selected {
+  color: #06110d;
+  background: var(--brand);
+}
+
+.quality-option-main {
+  display: grid;
+  gap: 2px;
+}
+
+.quality-option-label {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.quality-option-note {
+  color: inherit;
+  opacity: 0.72;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.quality-option-tag {
+  flex: 0 0 auto;
+  min-width: 42px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.quality-option.is-selected .quality-option-tag {
+  color: #06110d;
+  background: rgba(6, 17, 13, 0.14);
 }
 
 .performance-row {

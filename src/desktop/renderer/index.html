@@ -122,7 +122,7 @@
 
                   <fieldset class="segmented-row">
                     <legend class="sr-only">连接方式</legend>
-                    <label class="segment-option is-active" id="modeAutoOption">
+                    <label class="segment-option" id="modeAutoOption">
                       <input type="radio" name="connectMode" value="auto" id="modeAuto" checked />
                       <span>自动搜索电视</span>
                     </label>
@@ -153,21 +153,24 @@
                 <div class="step-index">2</div>
                 <div class="step-content">
                   <h3>画质选择</h3>
-                  <label class="quality-field quality-display-field">
+                  <div class="quality-field quality-display-field">
                     <span class="sr-only">画质档位</span>
-                    <div class="select-display-shell">
-                      <div>
+                    <div class="custom-select" id="qualityDropdown">
+                      <button class="select-display-shell" id="qualityDropdownButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="qualityMenu">
+                        <span>
                         <strong id="qualityDisplayLabel">HEVC 1080P30</strong>
                         <span id="qualityDisplayNote">下拉选择预设档位，推荐从当前设备最稳定的档位开始。</span>
-                      </div>
+                        </span>
                       <span class="select-display-button" aria-hidden="true">
                         <svg viewBox="0 0 24 24" role="img" focusable="false">
                           <path d="m7 10 5 5 5-5" />
                         </svg>
                       </span>
-                      <select id="qualitySelect" aria-label="画质档位"></select>
+                      </button>
+                      <div class="quality-menu" id="qualityMenu" role="listbox" aria-label="画质档位" hidden></div>
+                      <select id="qualitySelect" aria-label="画质档位" tabindex="-1"></select>
                     </div>
-                  </label>
+                  </div>
                 </div>
                   </div>
 

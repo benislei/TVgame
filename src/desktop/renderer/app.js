@@ -77,6 +77,15 @@ const state = {
   busy: false
 };
 
+const PAGE_TITLES = {
+  home: '日常主屏',
+  setup: '首次配置',
+  devices: '电视设备',
+  quality: '画质档位',
+  diagnostics: '环境诊断',
+  logs: '日志'
+};
+
 const elements = {};
 
 function ensurePreviewStub() {
@@ -198,6 +207,9 @@ function cacheElements() {
     recentStatusText: getElement('recentStatusText'),
     deviceSelect: getElement('deviceSelect'),
     manualIpInput: getElement('manualIpInput'),
+    qualityDropdown: getElement('qualityDropdown'),
+    qualityDropdownButton: getElement('qualityDropdownButton'),
+    qualityMenu: getElement('qualityMenu'),
     qualitySelect: getElement('qualitySelect'),
     qualityDisplayLabel: getElement('qualityDisplayLabel'),
     qualityDisplayNote: getElement('qualityDisplayNote'),
@@ -390,6 +402,7 @@ function selectQuality(qualityId) {
 
   renderQualityControls();
   renderTargetSummary();
+  closeQualityDropdown();
 }
 
 function renderQualityCard(preset, mirror) {
@@ -425,6 +438,57 @@ function renderSelectedQualityDetails() {
   `);
 }
 
+function renderQualityMenu() {
+  if (!elements.qualityMenu) {
+    return;
+  }
+
+  const selected = getSelectedQuality();
+  elements.qualityMenu.innerHTML = QUALITY_PRESETS.map(preset => {
+    const isSelected = preset.id === selected.id;
+    const tag = preset.id === 'hevc1080p30' ? '推荐' : preset.id === selected.id ? '当前' : preset.tag;
+    return `
+      <button class="quality-option${isSelected ? ' is-selected' : ''}" type="button" role="option" aria-selected="${isSelected ? 'true' : 'false'}" data-quality-id="${escapeHtml(preset.id)}">
+        <span class="quality-option-main">
+          <span class="quality-option-label">${escapeHtml(preset.label)}</span>
+          <span class="quality-option-note">${escapeHtml(preset.note)}</span>
+        </span>
+        <span class="quality-option-tag">${escapeHtml(tag)}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function isQualityDropdownOpen() {
+  return Boolean(elements.qualityDropdown && elements.qualityDropdown.classList.contains('is-open'));
+}
+
+function setQualityDropdownOpen(isOpen) {
+  if (!elements.qualityDropdown || !elements.qualityDropdownButton || !elements.qualityMenu) {
+    return;
+  }
+
+  elements.qualityDropdown.classList.toggle('is-open', Boolean(isOpen));
+  elements.qualityDropdownButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  elements.qualityMenu.hidden = !isOpen;
+
+  if (isOpen) {
+    elements.qualityMenu.scrollTop = 0;
+  }
+}
+
+function openQualityDropdown() {
+  setQualityDropdownOpen(true);
+}
+
+function closeQualityDropdown() {
+  setQualityDropdownOpen(false);
+}
+
+function toggleQualityDropdown() {
+  setQualityDropdownOpen(!isQualityDropdownOpen());
+}
+
 function renderQualityControls() {
   const selectedPreset = getSelectedQuality();
 
@@ -438,6 +502,7 @@ function renderQualityControls() {
   setText(elements.topbarQualityPill, selectedPreset.label);
   setText(elements.qualityDisplayLabel, selectedPreset.label);
   setText(elements.qualityDisplayNote, selectedPreset.note);
+  renderQualityMenu();
 
   const mirrorCards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, true)).join('');
   setHtml(elements.qualityPresetMirror, mirrorCards);
@@ -755,15 +820,17 @@ function renderControls() {
 }
 
 function switchPage(pageName) {
+  const nextPage = PAGE_TITLES[pageName] ? pageName : 'home';
+
   document.querySelectorAll('.nav-item').forEach(button => {
-    button.classList.toggle('is-active', button.dataset.page === pageName);
+    const active = button.dataset.page === nextPage;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-current', active ? 'page' : 'false');
   });
   document.querySelectorAll('.page').forEach(page => {
-    page.classList.toggle('is-active', page.id === `page-${pageName}`);
+    page.classList.toggle('is-active', page.dataset.pagePanel === nextPage);
   });
-
-  const active = document.querySelector(`.nav-item[data-page="${pageName}"] span:last-child`);
-  setText(elements.pageTitle, active ? active.textContent : '日常主屏');
+  setText(elements.pageTitle, PAGE_TITLES[nextPage]);
 }
 
 async function loadConfig() {
@@ -972,6 +1039,55 @@ function bindEvents() {
 
   elements.qualitySelect.addEventListener('change', event => {
     selectQuality(event.target.value);
+  });
+
+  if (elements.qualityDropdownButton) {
+    elements.qualityDropdownButton.addEventListener('click', toggleQualityDropdown);
+    elements.qualityDropdownButton.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openQualityDropdown();
+      }
+    });
+  }
+
+  if (elements.qualityMenu) {
+    elements.qualityMenu.addEventListener('click', event => {
+      const option = event.target.closest('[data-quality-id]');
+      if (option) {
+        selectQuality(option.dataset.qualityId);
+        elements.qualityDropdownButton?.focus();
+      }
+    });
+    elements.qualityMenu.addEventListener('keydown', event => {
+      const options = Array.from(elements.qualityMenu.querySelectorAll('.quality-option'));
+      const currentIndex = options.indexOf(document.activeElement);
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeQualityDropdown();
+        elements.qualityDropdownButton?.focus();
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex = currentIndex < 0
+          ? 0
+          : (currentIndex + direction + options.length) % options.length;
+        options[nextIndex]?.focus();
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const option = document.activeElement?.closest?.('[data-quality-id]');
+        if (option) {
+          selectQuality(option.dataset.qualityId);
+          elements.qualityDropdownButton?.focus();
+        }
+      }
+    });
+  }
+
+  document.addEventListener('click', event => {
+    if (elements.qualityDropdown && !elements.qualityDropdown.contains(event.target)) {
+      closeQualityDropdown();
+    }
   });
 
   bindQualityList(elements.qualityPresetMirror);

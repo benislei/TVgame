@@ -405,6 +405,7 @@ test('renderer home screen keeps the guided steps vertical and compact', () => {
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
   const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
 
+  assert.doesNotMatch(html, /segment-option is-active/);
   assert.doesNotMatch(html, /stage-block stage-inline/);
   assert.doesNotMatch(html, /stage-block stage-action/);
   assert.doesNotMatch(html, /<span class="stage-index">4<\/span>/);
@@ -412,6 +413,21 @@ test('renderer home screen keeps the guided steps vertical and compact', () => {
   assert.doesNotMatch(styles, /\.stage-block\.stage-inline/);
   assert.doesNotMatch(styles, /\.stage-block\.stage-action/);
   assert.doesNotMatch(styles, /\.control-stage\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+});
+
+test('renderer navigation switches pages by data-page-panel', () => {
+  const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  for (const page of ['home', 'setup', 'devices', 'quality', 'diagnostics', 'logs']) {
+    assert.match(html, new RegExp(`data-page="${page}"`), `missing nav item ${page}`);
+    assert.match(html, new RegExp(`data-page-panel="${page}"`), `missing page panel ${page}`);
+  }
+
+  assert.match(appJs, /PAGE_TITLES/);
+  assert.match(appJs, /const nextPage = PAGE_TITLES\[pageName\] \? pageName : 'home'/);
+  assert.match(appJs, /page\.dataset\.pagePanel === nextPage/);
+  assert.doesNotMatch(appJs, /page\.id === `page-\$\{pageName\}`/);
 });
 
 test('renderer home screen places stream actions in the top right instead of duplicate status cards', () => {
@@ -430,8 +446,14 @@ test('renderer home quality choice is a compact dropdown without duplicate prese
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
 
-  assert.match(html, /<select id="qualitySelect" aria-label="画质档位"><\/select>/);
-  assert.match(html, /class="select-display-shell"[\s\S]*id="qualityDisplayLabel"[\s\S]*<select id="qualitySelect" aria-label="画质档位"><\/select>/);
+  assert.match(html, /id="qualityDropdown"/);
+  assert.match(html, /id="qualityDropdownButton"[\s\S]*aria-haspopup="listbox"[\s\S]*aria-expanded="false"/);
+  assert.match(html, /id="qualityMenu"[\s\S]*role="listbox"[\s\S]*hidden/);
+  assert.match(html, /<select id="qualitySelect" aria-label="画质档位" tabindex="-1"><\/select>/);
+  assert.match(html, /class="select-display-shell"[\s\S]*id="qualityDisplayLabel"[\s\S]*id="qualityMenu"/);
+  assert.match(appJs, /function renderQualityMenu\(/);
+  assert.match(appJs, /function toggleQualityDropdown\(/);
+  assert.match(appJs, /role="option"/);
   assert.doesNotMatch(html, /id="selectedQualityDetails"/);
   assert.doesNotMatch(html, /class="selected-quality-details/);
   assert.doesNotMatch(html, /id="presetList"/);
