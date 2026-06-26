@@ -29,6 +29,7 @@ function resolveProjectRoot(desktopDir = __dirname) {
 }
 
 const projectRoot = resolveProjectRoot();
+let mainWindow = null;
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -45,6 +46,11 @@ function createWindow() {
   });
 
   window.setMenuBarVisibility(false);
+  window.on('closed', () => {
+    if (mainWindow === window) {
+      mainWindow = null;
+    }
+  });
   window.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   return window;
 }
@@ -100,7 +106,7 @@ function registerApp() {
     services = createServices(app);
     registerIpcHandlers(ipcMain, services);
     services.discovery.start();
-    createWindow();
+    mainWindow = createWindow();
   });
 
   app.on('before-quit', () => {
@@ -113,7 +119,7 @@ function registerApp() {
   });
 }
 
-if (require.main === module) {
+if ((process.versions && process.versions.electron && process.type === 'browser') || require.main === module) {
   registerApp();
 }
 

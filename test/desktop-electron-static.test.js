@@ -677,6 +677,11 @@ test('main creates the Electron window with secure webPreferences and starts dis
   assert.match(source, /contextIsolation:\s*true/);
   assert.match(source, /nodeIntegration:\s*false/);
   assert.match(source, /setMenuBarVisibility\(false\)/);
+  assert.match(source, /let\s+mainWindow\s*=\s*null/);
+  assert.match(source, /mainWindow\s*=\s*createWindow\(\)/);
+  assert.match(source, /window\.on\(['"]closed['"]/);
+  assert.match(source, /process\.versions\.electron/);
+  assert.match(source, /process\.type\s*===\s*['"]browser['"]/);
   assert.match(source, /createDeviceDiscovery\(/);
   assert.match(source, /services\.discovery\.start\(\)/);
   assert.match(source, /loadFile\(path\.join\(__dirname,\s*['"]renderer['"],\s*['"]index\.html['"]\)\)/);
