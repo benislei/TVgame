@@ -199,6 +199,8 @@ function cacheElements() {
     deviceSelect: getElement('deviceSelect'),
     manualIpInput: getElement('manualIpInput'),
     qualitySelect: getElement('qualitySelect'),
+    qualityDisplayLabel: getElement('qualityDisplayLabel'),
+    qualityDisplayNote: getElement('qualityDisplayNote'),
     selectedQualityDetails: getElement('selectedQualityDetails'),
     performanceProtectionInput: getElement('performanceProtectionInput'),
     modeAuto: getElement('modeAuto'),
@@ -434,6 +436,8 @@ function renderQualityControls() {
   }
 
   setText(elements.topbarQualityPill, selectedPreset.label);
+  setText(elements.qualityDisplayLabel, selectedPreset.label);
+  setText(elements.qualityDisplayNote, selectedPreset.note);
 
   const mirrorCards = QUALITY_PRESETS.map(preset => renderQualityCard(preset, true)).join('');
   setHtml(elements.qualityPresetMirror, mirrorCards);

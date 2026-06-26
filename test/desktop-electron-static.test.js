@@ -273,7 +273,7 @@ test('renderer files exist and expose the Chinese sender UI shell', () => {
     '手动输入 IP',
     '开始串流',
     '停止串流',
-    '检查并修复环境'
+    '检查运行环境'
   ];
 
   for (const text of requiredChineseText) {
@@ -321,11 +321,11 @@ test('renderer script defines only the supported quality presets and uses the TV
 test('renderer main screen uses TVGame brand tokens instead of a generic purple blue theme', () => {
   const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
 
-  assert.match(styles, /--bg:\s*#0d1211/i);
-  assert.match(styles, /--shell:\s*#080e0d/i);
-  assert.match(styles, /--brand-signal:\s*#19b56d/i);
-  assert.match(styles, /--brand-amber:\s*#ffc86b/i);
-  assert.match(styles, /--font-ui:\s*"Microsoft YaHei UI"/);
+  assert.match(styles, /--bg:\s*#08100e/i);
+  assert.match(styles, /--shell:\s*#0b1210/i);
+  assert.match(styles, /--brand:\s*#1ac878/i);
+  assert.match(styles, /--amber:\s*#efbf62/i);
+  assert.match(styles, /font-family:\s*"Microsoft YaHei UI"/);
   assert.doesNotMatch(styles, /#1769aa|#0f578e|#4338ca|#4f46e5|#6366f1|#7c3aed/i);
 });
 
@@ -336,9 +336,9 @@ test('renderer shell uses unified vector icons and no emoji functional icons', (
     readProjectFile('src', 'desktop', 'renderer', 'app.js')
   ].join('\n');
 
-  assert.match(html, /<svg[^>]+class="brand-glyph"/);
-  assert.match(html, /class="icon icon-home"/);
-  assert.match(html, /class="icon icon-device"/);
+  assert.match(html, /class="brand-mark"[\s\S]*<svg/);
+  assert.match(html, /class="nav-item is-active"[\s\S]*aria-label="日常主屏"[\s\S]*<svg/);
+  assert.match(html, /aria-label="电视设备"[\s\S]*<svg/);
   assert.doesNotMatch(html, /class="brand-mark">TV<\/span>/);
   assert.doesNotMatch(combined, /[\u{1F300}-\u{1FAFF}]/u);
 });
@@ -350,8 +350,8 @@ test('renderer home screen presents the approved guided streaming workflow', () 
     assert.match(html, new RegExp(text), `missing workflow label ${text}`);
   }
 
-  assert.match(html, /class="workflow-panel"/);
-  assert.match(html, /class="control-stage"/);
+  assert.match(html, /class="workflow-card"/);
+  assert.match(html, /class="step-card"/);
   assert.doesNotMatch(html, /class="quick-status-panel"/);
   assert.doesNotMatch(html, /环境摘要/);
 });
@@ -368,8 +368,12 @@ test('renderer home screen shows live streaming runtime information', () => {
     assert.match(html, new RegExp(`id="${id}"`), `missing runtime element ${id}`);
   }
 
-  for (const id of ['targetMetricText', 'gamepadMetricText', 'receiverSummaryText', 'homeHealthGrid', 'recentStatusText']) {
+  for (const id of ['homeHealthGrid', 'recentStatusText']) {
     assert.match(html, new RegExp(`id="${id}"`), `missing concept status element ${id}`);
+  }
+
+  for (const id of ['targetMetricText', 'gamepadMetricText', 'receiverSummaryText']) {
+    assert.doesNotMatch(html, new RegExp(`id="${id}"`), `duplicated concept status element should be removed: ${id}`);
   }
 
   assert.doesNotMatch(html, /id="streamTargetText"/);
@@ -422,13 +426,14 @@ test('renderer home screen places stream actions in the top right instead of dup
   assert.doesNotMatch(appJs, /streamStatusText/);
 });
 
-test('renderer home quality choice is a dropdown with selected preset details only', () => {
+test('renderer home quality choice is a compact dropdown without duplicate preset details', () => {
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
 
-  assert.match(html, /<select id="qualitySelect"><\/select>/);
-  assert.match(html, /id="selectedQualityDetails"/);
-  assert.match(html, /class="selected-quality-details is-compact"/);
+  assert.match(html, /<select id="qualitySelect" aria-label="画质档位"><\/select>/);
+  assert.match(html, /class="select-display-shell"[\s\S]*id="qualityDisplayLabel"[\s\S]*<select id="qualitySelect" aria-label="画质档位"><\/select>/);
+  assert.doesNotMatch(html, /id="selectedQualityDetails"/);
+  assert.doesNotMatch(html, /class="selected-quality-details/);
   assert.doesNotMatch(html, /id="presetList"/);
   assert.doesNotMatch(appJs, /bindQualityList\(elements\.presetList\)/);
   assert.match(appJs, /function renderSelectedQualityDetails\(/);
