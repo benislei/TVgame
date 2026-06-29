@@ -80,6 +80,8 @@ test('desktop config store loads defaults when no config file exists', () => {
   assert.deepEqual(DEFAULT_CONFIG, {
     firstRunComplete: false,
     selectedDevice: null,
+    deviceMode: 'manual',
+    manualIp: '',
     selectedQuality: 'hevc1080p30',
     performanceProtection: true
   });
@@ -102,6 +104,8 @@ test('desktop config store merges loaded partial config with defaults', () => {
   assert.deepEqual(store.load(), {
     firstRunComplete: true,
     selectedDevice: null,
+    deviceMode: 'manual',
+    manualIp: '',
     selectedQuality: 'hevc1080p30',
     performanceProtection: true
   });
@@ -118,6 +122,8 @@ test('desktop config store normalizes missing selectedDevice to null when loadin
   assert.deepEqual(store.load(), {
     firstRunComplete: false,
     selectedDevice: null,
+    deviceMode: 'manual',
+    manualIp: '',
     selectedQuality: 'h264720p30',
     performanceProtection: false
   });
@@ -143,6 +149,8 @@ test('desktop config store saves and loads selected device and quality', () => {
   assert.deepEqual(saved, {
     firstRunComplete: false,
     selectedDevice: '小米盒子 5 Max',
+    deviceMode: 'manual',
+    manualIp: '',
     selectedQuality: 'h2641080p60',
     performanceProtection: true
   });

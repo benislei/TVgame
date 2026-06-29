@@ -118,17 +118,17 @@
                 <div class="step-index">1</div>
                 <div class="step-content">
                   <h3>设备连接</h3>
-                  <p>默认自动搜索电视或盒子，也可以手动输入 IP。</p>
+                  <p>建议直接输入电视或盒子的 IP；自动搜索受路由器和系统权限影响，仅作为辅助。</p>
 
                   <fieldset class="segmented-row">
                     <legend class="sr-only">连接方式</legend>
-                    <label class="segment-option" id="modeAutoOption">
-                      <input type="radio" name="connectMode" value="auto" id="modeAuto" checked />
-                      <span>自动搜索电视</span>
-                    </label>
                     <label class="segment-option" id="modeManualOption">
-                      <input type="radio" name="connectMode" value="manual" id="modeManual" />
+                      <input type="radio" name="connectMode" value="manual" id="modeManual" checked />
                       <span>手动输入 IP</span>
+                    </label>
+                    <label class="segment-option" id="modeAutoOption">
+                      <input type="radio" name="connectMode" value="auto" id="modeAuto" />
+                      <span>自动搜索电视</span>
                     </label>
                   </fieldset>
 

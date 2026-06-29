@@ -4,8 +4,7 @@ const path = require('node:path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { createConfigStore } = require('./config-store');
 const {
-  createDesktopRuntimeDetector,
-  createEnvironmentService
+  createWorkerEnvironmentService
 } = require('./environment-service');
 const { createProcessService } = require('./process-service');
 const { createDeviceDiscovery } = require('./device-discovery');
@@ -64,11 +63,9 @@ function createServices(electronApp = app, options = {}) {
     inputBridgeRuntimePath,
     nodeRuntimePath: process.execPath,
     config: createConfigStore({ appDataDir: electronApp.getPath('userData') }),
-    environment: createEnvironmentService({
-      getRuntime: createDesktopRuntimeDetector({
-        projectRoot: serviceProjectRoot,
-        inputBridgeRuntimePath
-      })
+    environment: createWorkerEnvironmentService({
+      projectRoot: serviceProjectRoot,
+      inputBridgeRuntimePath
     }),
     process: createProcessService(),
     discovery: createDeviceDiscovery()

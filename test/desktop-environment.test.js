@@ -7,7 +7,8 @@ const path = require('node:path');
 
 const {
   summarizeEnvironment,
-  createEnvironmentService
+  createEnvironmentService,
+  createWorkerEnvironmentService
 } = require('../src/desktop/environment-service');
 
 function createReadyReport() {
@@ -182,6 +183,35 @@ test('environment service check and repair use injected dependencies and map run
     ['runRepairActions', 'install-gstreamer-devel', 'D:/workspace/project'],
     'createReport',
     'getRuntime'
+  ]);
+});
+
+test('worker environment service delegates check and repair to a background worker runner', async () => {
+  const calls = [];
+  const service = createWorkerEnvironmentService({
+    projectRoot: 'D:/project',
+    inputBridgeRuntimePath: 'D:/project/InputBridgeRuntime/InputBridge.exe',
+    runWorker: async (action, options) => {
+      calls.push([action, options.projectRoot, options.inputBridgeRuntimePath, typeof options.onProgress]);
+      if (action === 'repair' && typeof options.onProgress === 'function') {
+        options.onProgress({ type: 'check', message: 'checking' });
+      }
+      return { cards: {}, action };
+    }
+  });
+
+  const progress = [];
+  const checked = await service.check();
+  const repaired = await service.repair('D:/project', {
+    onProgress: event => progress.push(event)
+  });
+
+  assert.equal(checked.action, 'check');
+  assert.equal(repaired.action, 'repair');
+  assert.deepEqual(progress, [{ type: 'check', message: 'checking' }]);
+  assert.deepEqual(calls, [
+    ['check', 'D:/project', 'D:/project/InputBridgeRuntime/InputBridge.exe', 'undefined'],
+    ['repair', 'D:/project', 'D:/project/InputBridgeRuntime/InputBridge.exe', 'function']
   ]);
 });
 

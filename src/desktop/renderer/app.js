@@ -67,7 +67,7 @@ const state = {
   selectedQuality: 'hevc1080p30',
   performanceProtection: true,
   manualIp: '',
-  deviceMode: 'auto',
+  deviceMode: 'manual',
   streamStartedAt: null,
   repairProgress: {
     active: false,
@@ -109,8 +109,9 @@ function ensurePreviewStub() {
       return {
         selectedQuality: 'hevc1080p30',
         performanceProtection: true,
-        selectedDevice: 'preview-living-room',
-        manualIp: ''
+        selectedDevice: '',
+        manualIp: '192.168.50.80',
+        deviceMode: 'manual'
       };
     },
     saveConfig(payload) {
@@ -524,26 +525,34 @@ function renderDevices() {
 
   if (state.devices.length === 0) {
     elements.deviceSelect.innerHTML = '<option value="">还没有发现电视或盒子</option>';
-    elements.deviceList.textContent = '还没有发现电视或盒子';
+    elements.deviceList.textContent = '自动搜索暂未发现设备，可以继续使用手动 IP。';
     renderTargetSummary();
     return;
   }
 
-  elements.deviceSelect.innerHTML = state.devices.map(device => {
+  const placeholder = state.deviceMode === 'auto'
+    ? '<option value="">请选择自动发现的电视或盒子</option>'
+    : '<option value="">手动 IP 优先，自动发现仅作为辅助</option>';
+  const deviceOptions = state.devices.map(device => {
     const key = escapeHtml(deviceKey(device));
     const name = escapeHtml(device.name || device.model || '电视或盒子');
     const ip = device.ip ? `（${escapeHtml(device.ip)}）` : '';
     return `<option value="${key}">${name}${ip}</option>`;
   }).join('');
 
-  if (!state.selectedDevice || !state.devices.some(device => deviceKey(device) === state.selectedDevice)) {
+  elements.deviceSelect.innerHTML = `${placeholder}${deviceOptions}`;
+
+  if (
+    state.deviceMode === 'auto'
+    && (!state.selectedDevice || !state.devices.some(device => deviceKey(device) === state.selectedDevice))
+  ) {
     state.selectedDevice = deviceKey(state.devices[0]);
   }
 
-  elements.deviceSelect.value = state.selectedDevice;
+  elements.deviceSelect.value = state.deviceMode === 'auto' ? state.selectedDevice : '';
   elements.deviceList.innerHTML = state.devices.map(device => {
     const key = escapeHtml(deviceKey(device));
-    const selected = deviceKey(device) === state.selectedDevice;
+    const selected = state.deviceMode === 'auto' && deviceKey(device) === state.selectedDevice;
     const name = escapeHtml(device.name || '电视或盒子');
     const model = escapeHtml(device.model || '接收端');
     const ip = escapeHtml(device.ip || '未知 IP');
@@ -840,7 +849,7 @@ async function loadConfig() {
   state.performanceProtection = state.config.performanceProtection !== false;
   state.selectedDevice = state.config.selectedDevice || '';
   state.manualIp = state.config.manualIp || state.config.manualIpAddress || '';
-  state.deviceMode = state.manualIp && !state.selectedDevice ? 'manual' : 'auto';
+  state.deviceMode = state.config.deviceMode === 'auto' ? 'auto' : 'manual';
 }
 
 async function refreshDevices() {
@@ -853,15 +862,27 @@ async function refreshDevices() {
   }
 }
 
-async function checkEnvironment() {
+async function checkEnvironment(options = {}) {
+  if (options.showBusy) {
+    setBusyState(true, options.busyMessage || '正在检查运行环境...');
+  }
+
   try {
     const result = await Promise.resolve(window.tvgame.checkEnvironment());
     state.environment = normalizeEnvironment(result);
     renderEnvironment();
-    return isEnvironmentFullyReady();
+    const ready = isEnvironmentFullyReady();
+    if (options.showResult) {
+      setActionStatus(ready ? '环境检查完成' : '环境仍有项目需要处理', ready ? 'is-ok' : 'is-error');
+    }
+    return ready;
   } catch (error) {
     setActionStatus(`检查环境失败：${error.message}`, 'is-error');
     return false;
+  } finally {
+    if (options.showBusy) {
+      setBusyState(false);
+    }
   }
 }
 
@@ -901,7 +922,10 @@ async function refreshStatus() {
 }
 
 async function ensureEnvironmentReadyForStart() {
-  const ready = isEnvironmentFullyReady() || await checkEnvironment();
+  const ready = isEnvironmentFullyReady() || await checkEnvironment({
+    showBusy: true,
+    busyMessage: '正在检查运行环境...'
+  });
   if (ready) {
     return true;
   }
@@ -919,7 +943,7 @@ async function startStream() {
   const device = getStreamTarget();
 
   if (!device || !device.ip) {
-    setActionStatus('请选择自动发现的电视/盒子，或手动输入 IP。', 'is-error');
+    setActionStatus('请输入电视或盒子的 IP，自动搜索可作为辅助。', 'is-error');
     return;
   }
 
@@ -960,6 +984,7 @@ async function startStream() {
 
     await Promise.resolve(window.tvgame.saveConfig({
       selectedDevice: state.deviceMode === 'auto' ? state.selectedDevice : '',
+      deviceMode: state.deviceMode,
       selectedQuality: state.selectedQuality,
       performanceProtection: Boolean(state.performanceProtection),
       manualIp: state.manualIp,
@@ -1030,8 +1055,8 @@ function bindEvents() {
     if (state.manualIp.trim()) {
       state.deviceMode = 'manual';
       renderConnectionMode();
-    } else if (state.selectedDevice) {
-      state.deviceMode = 'auto';
+    } else {
+      state.deviceMode = 'manual';
       renderConnectionMode();
     }
     renderTargetSummary();
@@ -1108,6 +1133,7 @@ function bindEvents() {
       state.deviceMode = 'auto';
       renderConnectionMode();
       renderTargetSummary();
+      refreshDevices();
     });
   }
 
@@ -1122,7 +1148,10 @@ function bindEvents() {
   elements.startButton.addEventListener('click', startStream);
   elements.stopButton.addEventListener('click', stopStream);
   elements.refreshDevicesButton.addEventListener('click', refreshDevices);
-  elements.checkEnvironmentButton.addEventListener('click', checkEnvironment);
+  elements.checkEnvironmentButton.addEventListener('click', () => checkEnvironment({
+    showBusy: true,
+    showResult: true
+  }));
   elements.repairEnvironmentButton.addEventListener('click', repairEnvironment);
 }
 
@@ -1134,16 +1163,19 @@ async function init() {
 
   await loadConfig();
   renderControls();
-  await Promise.allSettled([
-    refreshDevices(),
-    checkEnvironment(),
-    refreshStatus()
-  ]);
+  refreshStatus();
+  if (state.deviceMode === 'auto') {
+    refreshDevices();
+  }
   renderControls();
 
   window.setInterval(refreshStatus, 5000);
   window.setInterval(renderStreamRuntime, 1000);
-  window.setInterval(refreshDevices, 15000);
+  window.setInterval(() => {
+    if (state.deviceMode === 'auto') {
+      refreshDevices();
+    }
+  }, 15000);
 }
 
 document.addEventListener('DOMContentLoaded', init);

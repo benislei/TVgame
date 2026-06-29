@@ -3,6 +3,7 @@
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Worker } = require('node:worker_threads');
 const { createStage2Report } = require('../stage2/tooling');
 const {
   createStage2RepairPlan,
@@ -161,10 +162,94 @@ function createEnvironmentService(options = {}) {
   };
 }
 
+function runEnvironmentWorker(action, options = {}) {
+  const workerScriptPath = options.workerScriptPath || path.join(__dirname, 'environment-worker.js');
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerScriptPath, {
+      workerData: {
+        action,
+        projectRoot: options.projectRoot,
+        inputBridgeRuntimePath: options.inputBridgeRuntimePath
+      }
+    });
+    let settled = false;
+
+    worker.on('message', message => {
+      if (!message || typeof message !== 'object') {
+        return;
+      }
+
+      if (message.type === 'progress') {
+        emitProgress(options.onProgress, message.progress);
+        return;
+      }
+
+      if (message.type === 'result') {
+        settled = true;
+        resolve(message.result);
+        return;
+      }
+
+      if (message.type === 'error') {
+        settled = true;
+        const error = new Error((message.error && message.error.message) || '环境后台任务失败');
+        if (message.error && message.error.stack) {
+          error.stack = message.error.stack;
+        }
+        reject(error);
+      }
+    });
+
+    worker.on('error', error => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
+
+    worker.on('exit', code => {
+      if (!settled && code !== 0) {
+        settled = true;
+        reject(new Error(`环境后台任务退出码：${code}`));
+      }
+    });
+  });
+}
+
+function createWorkerEnvironmentService(options = {}) {
+  const projectRoot = options.projectRoot || process.cwd();
+  const inputBridgeRuntimePath = options.inputBridgeRuntimePath
+    || path.join(projectRoot, 'InputBridgeRuntime', 'InputBridge.exe');
+  const runWorker = options.runWorker || runEnvironmentWorker;
+
+  function check() {
+    return runWorker('check', {
+      projectRoot,
+      inputBridgeRuntimePath
+    });
+  }
+
+  function repair(repairProjectRoot = projectRoot, repairOptions = {}) {
+    return runWorker('repair', {
+      projectRoot: repairProjectRoot,
+      inputBridgeRuntimePath,
+      onProgress: repairOptions.onProgress
+    });
+  }
+
+  return {
+    check,
+    repair
+  };
+}
+
 module.exports = {
   summarizeEnvironment,
   environmentCardsAllOk,
   detectVigemBus,
   createDesktopRuntimeDetector,
-  createEnvironmentService
+  createEnvironmentService,
+  createWorkerEnvironmentService,
+  runEnvironmentWorker
 };

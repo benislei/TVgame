@@ -31,10 +31,10 @@ function registerIpcHandlers(ipcMain, services) {
 
   ipcMain.handle('devices:list', () => services.discovery.list());
 
-  ipcMain.handle('stream:start', (_event, payload) => {
+  ipcMain.handle('stream:start', async (_event, payload) => {
     validateStreamPayload(payload);
 
-    const environment = services.environment.check();
+    const environment = await services.environment.check();
     if (!environmentCardsAllOk(environment)) {
       return {
         started: false,

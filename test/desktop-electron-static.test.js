@@ -280,6 +280,9 @@ test('renderer files exist and expose the Chinese sender UI shell', () => {
     assert.match(html, new RegExp(text), `missing Chinese UI text: ${text}`);
   }
 
+  assert.match(html, /id="modeManual"\s+checked/);
+  assert.doesNotMatch(html, /id="modeAuto"\s+checked/);
+
   const senderCodepoints = Array.from('发送端').map(char => char.codePointAt(0).toString(16));
   assert.deepEqual(senderCodepoints, ['53d1', '9001', '7aef']);
 });
@@ -315,7 +318,16 @@ test('renderer script defines only the supported quality presets and uses the TV
 
   assert.match(appJs, /selectedQuality/);
   assert.match(appJs, /performanceProtection/);
+  assert.match(appJs, /deviceMode:\s*['"]manual['"]/);
   assert.match(appJs, /firstRunComplete/);
+});
+
+test('renderer starts quickly by deferring optional discovery and environment checks', () => {
+  const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+
+  assert.doesNotMatch(appJs, /Promise\.allSettled\(\[\s*refreshDevices\(\),\s*checkEnvironment\(\)/s);
+  assert.match(appJs, /if\s*\(\s*state\.deviceMode\s*===\s*['"]auto['"]\s*\)\s*\{\s*refreshDevices\(\);/s);
+  assert.match(appJs, /checkEnvironment\(\{\s*showBusy:\s*true,\s*showResult:\s*true\s*\}\)/s);
 });
 
 test('renderer main screen uses TVGame brand tokens instead of a generic purple blue theme', () => {
@@ -574,18 +586,18 @@ test('renderer escapes untrusted device discovery fields before using innerHTML'
   assert.match(rendered.list, /192\.168\.1\.5&quot;&gt;&lt;script&gt;alert\(3\)&lt;\/script&gt;/);
 });
 
-test('stream:start rejects malformed payload before starting input bridge', () => {
+test('stream:start rejects malformed payload before starting input bridge', async () => {
   const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
   const ipcMain = createFakeIpcMain();
   const services = createFakeServices();
 
   registerIpcHandlers(ipcMain, services);
 
-  assert.throws(() => ipcMain.handlers.get('stream:start')({}, null), /缺少电视 IP/);
+  await assert.rejects(() => ipcMain.handlers.get('stream:start')({}, null), /缺少电视 IP/);
   assert.deepEqual(services.calls, []);
 });
 
-test('stream:start refuses to launch when environment cards are not all normal', () => {
+test('stream:start refuses to launch when environment cards are not all normal', async () => {
   const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
   const ipcMain = createFakeIpcMain();
   const services = createFakeServices({
@@ -605,7 +617,7 @@ test('stream:start refuses to launch when environment cards are not all normal',
   registerIpcHandlers(ipcMain, services);
 
   assert.deepEqual(
-    ipcMain.handlers.get('stream:start')({}, {
+    await ipcMain.handlers.get('stream:start')({}, {
       device: { ip: '192.168.1.23' },
       quality: { profile: 'h264720p30' },
       performanceProtection: true
@@ -619,7 +631,7 @@ test('stream:start refuses to launch when environment cards are not all normal',
   assert.deepEqual(services.calls, []);
 });
 
-test('stream:start rolls back input bridge when stream start throws', () => {
+test('stream:start rolls back input bridge when stream start throws', async () => {
   const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
   const ipcMain = createFakeIpcMain();
   const services = createFakeServices({
@@ -633,7 +645,7 @@ test('stream:start rolls back input bridge when stream start throws', () => {
 
   registerIpcHandlers(ipcMain, services);
 
-  assert.throws(
+  await assert.rejects(
     () => ipcMain.handlers.get('stream:start')({}, {
       device: { ip: '192.168.1.23' },
       quality: { profile: 'h264720p30' },
@@ -648,7 +660,7 @@ test('stream:start rolls back input bridge when stream start throws', () => {
   ]);
 });
 
-test('stream:start rolls back input bridge when stream start reports failure', () => {
+test('stream:start rolls back input bridge when stream start reports failure', async () => {
   const { registerIpcHandlers } = require('../src/desktop/ipc-handlers');
   const ipcMain = createFakeIpcMain();
   const services = createFakeServices({
@@ -663,7 +675,7 @@ test('stream:start rolls back input bridge when stream start reports failure', (
   registerIpcHandlers(ipcMain, services);
 
   assert.deepEqual(
-    ipcMain.handlers.get('stream:start')({}, {
+    await ipcMain.handlers.get('stream:start')({}, {
       device: { ip: '192.168.1.23' },
       quality: { profile: 'h264720p30' },
       performanceProtection: true
@@ -710,6 +722,7 @@ test('main creates the Electron window with secure webPreferences and starts dis
   assert.match(source, /process\.versions\.electron/);
   assert.match(source, /process\.type\s*===\s*['"]browser['"]/);
   assert.match(source, /createDeviceDiscovery\(/);
+  assert.match(source, /createWorkerEnvironmentService\(/);
   assert.match(source, /services\.discovery\.start\(\)/);
   assert.match(source, /loadFile\(path\.join\(__dirname,\s*['"]renderer['"],\s*['"]index\.html['"]\)\)/);
   assert.match(source, /app\.on\(['"]window-all-closed['"]/);

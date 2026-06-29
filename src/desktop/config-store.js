@@ -7,6 +7,8 @@ const path = require('node:path');
 const DEFAULT_CONFIG = Object.freeze({
   firstRunComplete: false,
   selectedDevice: null,
+  deviceMode: 'manual',
+  manualIp: '',
   selectedQuality: 'hevc1080p30',
   performanceProtection: true
 });
@@ -22,6 +24,14 @@ function normalizeConfig(config) {
 
   if (merged.selectedDevice === undefined) {
     merged.selectedDevice = null;
+  }
+
+  if (merged.deviceMode !== 'auto') {
+    merged.deviceMode = 'manual';
+  }
+
+  if (typeof merged.manualIp !== 'string') {
+    merged.manualIp = '';
   }
 
   return merged;
