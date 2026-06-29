@@ -72,7 +72,8 @@ const state = {
   repairProgress: {
     active: false,
     summary: '暂无修复任务',
-    items: []
+    items: [],
+    percent: 0
   },
   busy: false
 };
@@ -228,10 +229,18 @@ function cacheElements() {
     qualityPresetMirror: getElement('qualityPresetMirror'),
     checkEnvironmentButton: getElement('checkEnvironmentButton'),
     repairEnvironmentButton: getElement('repairEnvironmentButton'),
+    homeRepairProgressPanel: getElement('homeRepairProgressPanel'),
+    homeRepairProgressSummary: getElement('homeRepairProgressSummary'),
+    homeRepairProgressPercent: getElement('homeRepairProgressPercent'),
+    homeRepairProgressBar: getElement('homeRepairProgressBar'),
+    homeRepairCurrentStep: getElement('homeRepairCurrentStep'),
     diagnosticGrid: getElement('diagnosticGrid'),
     repairProgressPanel: getElement('repairProgressPanel'),
     repairProgressList: getElement('repairProgressList'),
     repairProgressSummary: getElement('repairProgressSummary'),
+    repairProgressPercent: getElement('repairProgressPercent'),
+    repairProgressBar: getElement('repairProgressBar'),
+    repairCurrentStep: getElement('repairCurrentStep'),
     logView: getElement('logView')
   });
 }
@@ -696,7 +705,8 @@ function resetRepairProgress(summary) {
   state.repairProgress = {
     active: true,
     summary,
-    items: []
+    items: [],
+    percent: 8
   };
   renderRepairProgress();
 }
@@ -718,6 +728,79 @@ function updateRepairProgressItem(actionId, title, status, message) {
   }
 }
 
+function clampPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function calculateRepairPercent(progress) {
+  const items = asArray(progress.items);
+  if (items.length === 0) {
+    return progress.active ? clampPercent(progress.percent || 8) : clampPercent(progress.percent || 0);
+  }
+
+  const completeCount = items.filter(item => item.status === 'complete').length;
+  const runningCount = items.filter(item => item.status === 'running').length;
+  const errorCount = items.filter(item => item.status === 'error').length;
+  const perItem = 74 / items.length;
+  let percent = 18 + completeCount * perItem + runningCount * perItem * 0.55 + errorCount * perItem;
+
+  if (!progress.active && errorCount === 0) {
+    percent = 100;
+  }
+
+  return clampPercent(percent);
+}
+
+function currentRepairStep(progress) {
+  const running = progress.items.find(item => item.status === 'running');
+  if (running) {
+    return running.message || running.title || '正在处理修复项';
+  }
+
+  const error = progress.items.find(item => item.status === 'error');
+  if (error) {
+    return error.message || `${error.title} 处理失败`;
+  }
+
+  const pending = progress.items.find(item => item.status === 'pending');
+  if (pending && progress.active) {
+    return pending.message || `${pending.title} 等待处理`;
+  }
+
+  if (progress.items.length > 0 && !progress.active) {
+    return '修复流程已完成，请重新检查环境状态';
+  }
+
+  return progress.summary || '等待修复任务';
+}
+
+function setRepairProgressPanel(panel, summaryElement, percentElement, barElement, stepElement, visible, progress, compact) {
+  if (!panel) {
+    return;
+  }
+
+  panel.hidden = !visible;
+  panel.classList.toggle('is-active', visible);
+
+  if (!visible) {
+    return;
+  }
+
+  const percent = calculateRepairPercent(progress);
+  const step = currentRepairStep(progress);
+  setText(summaryElement, progress.summary || '暂无修复任务');
+  setText(percentElement, `${percent}%`);
+  setText(stepElement, compact && step.length > 48 ? `${step.slice(0, 48)}...` : step);
+
+  if (barElement) {
+    barElement.style.width = `${percent}%`;
+  }
+}
+
 function handleRepairProgress(event = {}) {
   if (!state.repairProgress.active) {
     resetRepairProgress('正在准备修复环境');
@@ -725,10 +808,13 @@ function handleRepairProgress(event = {}) {
 
   if (event.type === 'check') {
     state.repairProgress.summary = event.message || '正在检查发送端环境';
+    state.repairProgress.percent = Math.max(state.repairProgress.percent || 0, 12);
   } else if (event.type === 'start') {
     state.repairProgress.summary = event.message || '开始修复环境';
+    state.repairProgress.percent = Math.max(state.repairProgress.percent || 0, 18);
   } else if (event.type === 'plan') {
     state.repairProgress.summary = event.message || '已生成修复计划';
+    state.repairProgress.percent = Math.max(state.repairProgress.percent || 0, event.actions && event.actions.length > 0 ? 22 : 84);
     for (const action of asArray(event.actions)) {
       updateRepairProgressItem(action.id, action.title, 'pending', '待处理');
     }
@@ -745,6 +831,7 @@ function handleRepairProgress(event = {}) {
   } else if (event.type === 'complete') {
     state.repairProgress.active = false;
     state.repairProgress.summary = event.message || '修复流程已完成';
+    state.repairProgress.percent = 100;
   }
 
   renderRepairProgress();
@@ -758,13 +845,32 @@ function repairStatusLabel(status) {
 }
 
 function renderRepairProgress() {
-  if (!elements.repairProgressPanel || !elements.repairProgressList || !elements.repairProgressSummary) {
+  const progress = state.repairProgress;
+  const visible = Boolean(progress.active || progress.items.length > 0);
+  setRepairProgressPanel(
+    elements.homeRepairProgressPanel,
+    elements.homeRepairProgressSummary,
+    elements.homeRepairProgressPercent,
+    elements.homeRepairProgressBar,
+    elements.homeRepairCurrentStep,
+    visible,
+    progress,
+    true
+  );
+  setRepairProgressPanel(
+    elements.repairProgressPanel,
+    elements.repairProgressSummary,
+    elements.repairProgressPercent,
+    elements.repairProgressBar,
+    elements.repairCurrentStep,
+    visible,
+    progress,
+    false
+  );
+
+  if (!elements.repairProgressList) {
     return;
   }
-
-  const progress = state.repairProgress;
-  elements.repairProgressPanel.classList.toggle('is-active', Boolean(progress.active || progress.items.length > 0));
-  elements.repairProgressSummary.textContent = progress.summary || '暂无修复任务';
 
   if (progress.items.length === 0) {
     elements.repairProgressList.innerHTML = '<li class="repair-progress-empty">暂无修复任务</li>';

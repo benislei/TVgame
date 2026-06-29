@@ -401,16 +401,34 @@ test('renderer home screen shows live streaming runtime information', () => {
 test('renderer exposes repair progress and blocks stream start until every environment card is normal', () => {
   const html = readProjectFile('src', 'desktop', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'desktop', 'renderer', 'app.js');
+  const styles = readProjectFile('src', 'desktop', 'renderer', 'styles.css');
 
+  assert.match(html, /id="homeRepairProgressPanel"/);
+  assert.match(html, /id="homeRepairProgressSummary"/);
+  assert.match(html, /id="homeRepairProgressPercent"/);
+  assert.match(html, /id="homeRepairProgressBar"/);
+  assert.match(html, /id="homeRepairCurrentStep"/);
   assert.match(html, /id="repairProgressPanel"/);
   assert.match(html, /id="repairProgressList"/);
   assert.match(html, /id="repairProgressSummary"/);
+  assert.match(html, /id="repairProgressPercent"/);
+  assert.match(html, /id="repairProgressBar"/);
+  assert.match(html, /id="repairCurrentStep"/);
+  assert.match(html, /环境处理进度/);
+  assert.match(html, /修复进度/);
   assert.match(appJs, /function isEnvironmentFullyReady\(/);
   assert.match(appJs, /async function ensureEnvironmentReadyForStart\(/);
   assert.match(appJs, /await ensureEnvironmentReadyForStart\(\)/);
   assert.match(appJs, /window\.tvgame\.onRepairProgress/);
   assert.match(appJs, /handleRepairProgress/);
   assert.match(appJs, /await repairEnvironment\(/);
+  assert.match(appJs, /function calculateRepairPercent\(/);
+  assert.match(appJs, /function setRepairProgressPanel\(/);
+  assert.match(appJs, /panel\.hidden = !visible/);
+  assert.match(appJs, /barElement\.style\.width = `\$\{percent\}%`/);
+  assert.match(styles, /\.repair-progress-panel--home/);
+  assert.match(styles, /\.repair-progress-percent/);
+  assert.match(styles, /\.repair-current-step/);
 });
 
 test('renderer home screen keeps the guided steps vertical and compact', () => {

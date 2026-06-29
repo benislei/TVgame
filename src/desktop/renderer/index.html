@@ -114,6 +114,20 @@
                 </div>
               </div>
 
+              <div class="repair-progress-panel repair-progress-panel--home" id="homeRepairProgressPanel" hidden>
+                <div class="repair-progress-header">
+                  <div>
+                    <strong>环境处理进度</strong>
+                    <span id="homeRepairProgressSummary">准备中</span>
+                  </div>
+                  <span class="repair-progress-percent" id="homeRepairProgressPercent">0%</span>
+                </div>
+                <div class="repair-progress-track" aria-hidden="true">
+                  <div class="repair-progress-bar" id="homeRepairProgressBar"></div>
+                </div>
+                <div class="repair-current-step" id="homeRepairCurrentStep">等待修复任务</div>
+              </div>
+
               <div class="step-card">
                 <div class="step-index">1</div>
                 <div class="step-content">
@@ -243,9 +257,16 @@
             <div class="diagnostic-grid" id="diagnosticGrid"></div>
             <div class="repair-progress-panel" id="repairProgressPanel" hidden>
               <div class="repair-progress-header">
-                <strong>修复进度</strong>
-                <span id="repairProgressSummary">准备中</span>
+                <div>
+                  <strong>修复进度</strong>
+                  <span id="repairProgressSummary">准备中</span>
+                </div>
+                <span class="repair-progress-percent" id="repairProgressPercent">0%</span>
               </div>
+              <div class="repair-progress-track" aria-hidden="true">
+                <div class="repair-progress-bar" id="repairProgressBar"></div>
+              </div>
+              <div class="repair-current-step" id="repairCurrentStep">等待修复任务</div>
               <div class="repair-progress-list" id="repairProgressList"></div>
             </div>
           </section>
