@@ -1096,13 +1096,12 @@ select option {
   line-height: 1.4;
 }
 
-.repair-progress-header .repair-progress-percent {
-  min-width: 54px;
-  margin: 0;
-  padding: 7px 10px;
+.repair-progress-percent {
+  min-width: 58px;
+  padding: 7px 12px;
   border-radius: 999px;
   color: var(--brand-soft);
-  background: rgba(26, 200, 120, 0.14);
+  background: rgba(26, 200, 120, 0.16);
   font-size: 14px;
   font-weight: 900;
   text-align: center;
@@ -1156,7 +1155,13 @@ select option {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand), var(--brand-soft));
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.15) 0 8px,
+      transparent 8px 16px
+    ),
+    linear-gradient(90deg, var(--brand), var(--brand-soft));
   transition: width 180ms ease;
 }
 
@@ -1174,6 +1179,196 @@ select option {
 
 .repair-progress-item.error {
   border-color: rgba(242, 123, 104, 0.3);
+}
+
+.page-diagnostics .diagnostics-layout {
+  grid-template-columns: minmax(0, 1fr) 276px;
+}
+
+.diagnostics-flow {
+  grid-template-rows: auto auto auto;
+  gap: 18px;
+}
+
+.repair-progress-panel--diagnostics {
+  margin-top: 0;
+  padding: 24px;
+  border-radius: 30px;
+  display: grid;
+  gap: 24px;
+  background:
+    linear-gradient(105deg, rgba(26, 200, 120, 0.13), rgba(26, 200, 120, 0.05) 48%, rgba(7, 16, 14, 0.74)),
+    rgba(18, 35, 30, 0.94);
+  border-color: rgba(95, 231, 157, 0.2);
+}
+
+.repair-progress-panel--diagnostics.is-active {
+  border-color: rgba(95, 231, 157, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(26, 200, 120, 0.05);
+}
+
+.repair-progress-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 22px;
+  align-items: center;
+  padding-bottom: 22px;
+  border-bottom: 1px solid rgba(166, 205, 186, 0.12);
+}
+
+.repair-progress-hero h2 {
+  margin-top: 6px;
+  font-size: 30px;
+  line-height: 1.18;
+}
+
+.repair-progress-hero p:last-child {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.repair-elapsed-card,
+.repair-current-card,
+.repair-metric-card,
+.repair-stage-card {
+  background: rgba(7, 16, 14, 0.62);
+  border: 1px solid var(--line);
+}
+
+.repair-elapsed-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+}
+
+.repair-elapsed-card span,
+.repair-metric-card span,
+.metric-label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.repair-elapsed-card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.repair-progress-body,
+.repair-stage-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.repair-progress-body .step-content h3,
+.repair-stage-card h3 {
+  font-size: 23px;
+  line-height: 1.2;
+}
+
+.repair-progress-body .step-content > p,
+.repair-stage-card p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.repair-current-card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.repair-current-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.repair-current-head strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.18;
+}
+
+.repair-current-card .repair-progress-track {
+  margin-top: 16px;
+}
+
+.repair-metric-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.repair-metric-card {
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 18px;
+}
+
+.repair-metric-card strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.repair-stage-card {
+  padding: 22px 24px;
+  border-radius: 26px;
+  background: rgba(18, 35, 30, 0.9);
+}
+
+.repair-stage-card.is-active {
+  border-color: rgba(95, 231, 157, 0.22);
+}
+
+.repair-progress-note {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  background: rgba(7, 16, 14, 0.48);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.repair-progress-note span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f5d778;
+  box-shadow: 0 0 18px rgba(245, 215, 120, 0.4);
+}
+
+.receiver-panel .diagnostic-grid {
+  margin-top: 0;
+  grid-template-columns: 1fr;
+}
+
+.receiver-panel .diagnostic-card {
+  min-height: 58px;
+  padding: 0 14px 0 16px;
+  border-radius: 18px;
+  align-items: center;
+  background: rgba(7, 16, 14, 0.62);
 }
 
 .badge.fail {

@@ -73,7 +73,11 @@ const state = {
     active: false,
     summary: '暂无修复任务',
     items: [],
-    percent: 0
+    percent: 0,
+    startedAt: null,
+    lastActivityAt: null,
+    lastMessage: '',
+    activeActionId: ''
   },
   busy: false
 };
@@ -198,6 +202,7 @@ function getElement(id) {
 function cacheElements() {
   Object.assign(elements, {
     pageTitle: getElement('pageTitle'),
+    topbarCopy: getElement('topbarCopy'),
     sidebarStatusText: getElement('sidebarStatusText'),
     topbarQualityPill: getElement('topbarQualityPill'),
     streamRuntimeStatus: getElement('streamRuntimeStatus'),
@@ -238,9 +243,18 @@ function cacheElements() {
     repairProgressPanel: getElement('repairProgressPanel'),
     repairProgressList: getElement('repairProgressList'),
     repairProgressSummary: getElement('repairProgressSummary'),
+    repairProgressIntro: getElement('repairProgressIntro'),
+    repairElapsedText: getElement('repairElapsedText'),
+    repairCurrentTitle: getElement('repairCurrentTitle'),
     repairProgressPercent: getElement('repairProgressPercent'),
     repairProgressBar: getElement('repairProgressBar'),
     repairCurrentStep: getElement('repairCurrentStep'),
+    repairDownloadSpeed: getElement('repairDownloadSpeed'),
+    repairEta: getElement('repairEta'),
+    repairFileSize: getElement('repairFileSize'),
+    repairDownloader: getElement('repairDownloader'),
+    repairStageFeedback: getElement('repairStageFeedback'),
+    diagnosticRecentStatusText: getElement('diagnosticRecentStatusText'),
     logView: getElement('logView')
   });
 }
@@ -702,11 +716,16 @@ function isEnvironmentFullyReady() {
 }
 
 function resetRepairProgress(summary) {
+  const now = Date.now();
   state.repairProgress = {
     active: true,
     summary,
     items: [],
-    percent: 8
+    percent: 8,
+    startedAt: now,
+    lastActivityAt: now,
+    lastMessage: summary || '',
+    activeActionId: ''
   };
   renderRepairProgress();
 }
@@ -726,6 +745,14 @@ function updateRepairProgressItem(actionId, title, status, message) {
   } else {
     state.repairProgress.items.push(next);
   }
+}
+
+function normalizeRepairMessage(message) {
+  return String(message || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .pop() || '';
 }
 
 function clampPercent(value) {
@@ -778,6 +805,95 @@ function currentRepairStep(progress) {
   return progress.summary || '等待修复任务';
 }
 
+function currentRepairItem(progress) {
+  return progress.items.find(item => item.id === progress.activeActionId)
+    || progress.items.find(item => item.status === 'running')
+    || progress.items.find(item => item.status === 'error')
+    || progress.items.find(item => item.status === 'pending')
+    || progress.items[progress.items.length - 1]
+    || null;
+}
+
+function currentRepairTitle(progress) {
+  const item = currentRepairItem(progress);
+  if (item && item.status === 'running') {
+    return item.title || '正在处理修复项';
+  }
+  if (item && item.status === 'error') {
+    return `${item.title || '环境修复'} 失败`;
+  }
+  if (item && item.status === 'complete' && !progress.active) {
+    return progress.summary || '修复流程已完成';
+  }
+  if (item && progress.active) {
+    return item.title || progress.summary || '正在处理修复项';
+  }
+  return progress.active ? (progress.summary || '正在检查并修复环境') : '等待环境检查';
+}
+
+function repairElapsed(progress) {
+  return progress.startedAt ? formatDuration(Date.now() - progress.startedAt) : '00:00:00';
+}
+
+function extractRepairMetric(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match.slice(1).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    }
+  }
+  return '';
+}
+
+function inferRepairMetadata(progress) {
+  const item = currentRepairItem(progress);
+  const text = [
+    progress.summary,
+    progress.lastMessage,
+    item?.title,
+    item?.message
+  ].filter(Boolean).join(' ');
+
+  let downloader = '自动选择';
+  if (/aria2/i.test(text)) {
+    downloader = 'aria2 多线程';
+  } else if (/curl/i.test(text)) {
+    downloader = 'curl 断点续传';
+  } else if (/winget/i.test(text)) {
+    downloader = 'winget';
+  } else if (/GStreamer|gstreamer/i.test(text)) {
+    downloader = 'aria2 / curl 自动选择';
+  }
+
+  let fileSize = extractRepairMetric(text, [
+    /(\d+(?:\.\d+)?)\s*(KB|MB|GB|KiB|MiB|GiB)\s*\/\s*(\d+(?:\.\d+)?)\s*(KB|MB|GB|KiB|MiB|GiB)/i
+  ]);
+  if (fileSize) {
+    const parts = fileSize.split(' ');
+    fileSize = `${parts[0]} ${parts[1]} / ${parts[2]} ${parts[3]}`;
+  } else if (/devel/i.test(text) && /GStreamer|gstreamer/i.test(text)) {
+    fileSize = 'gstreamer-devel.msi';
+  } else if (/runtime/i.test(text) && /GStreamer|gstreamer/i.test(text)) {
+    fileSize = 'gstreamer-runtime.msi';
+  } else if (/ViGEmBus/i.test(text)) {
+    fileSize = 'ViGEmBus 安装包';
+  } else {
+    fileSize = '等待文件信息';
+  }
+
+  const downloadSpeed = extractRepairMetric(text, [
+    /(\d+(?:\.\d+)?)\s*(KB|MB|GB|KiB|MiB|GiB)\/s/i,
+    /速度[:：]\s*([^\s，,]+)/i
+  ]) || '等待下载信息';
+
+  const eta = extractRepairMetric(text, [
+    /ETA[:=\s]+([0-9:]+)/i,
+    /剩余[:：]\s*([^，,]+)/i
+  ]) || '等待下载信息';
+
+  return { downloader, fileSize, downloadSpeed, eta };
+}
+
 function setRepairProgressPanel(panel, summaryElement, percentElement, barElement, stepElement, visible, progress, compact) {
   if (!panel) {
     return;
@@ -801,9 +917,53 @@ function setRepairProgressPanel(panel, summaryElement, percentElement, barElemen
   }
 }
 
+function renderDiagnosticRepairProgress(progress) {
+  if (!elements.repairProgressPanel) {
+    return;
+  }
+
+  const visible = Boolean(progress.active || progress.items.length > 0);
+  const percent = visible ? calculateRepairPercent(progress) : 0;
+  const title = currentRepairTitle(progress);
+  const step = visible ? currentRepairStep(progress) : '等待检查结果';
+  const metadata = inferRepairMetadata(progress);
+
+  elements.repairProgressPanel.hidden = false;
+  elements.repairProgressPanel.classList.toggle('is-active', visible);
+  if (elements.repairStageFeedback) {
+    elements.repairStageFeedback.classList.toggle('is-active', visible);
+  }
+
+  setText(elements.repairProgressSummary, title);
+  setText(
+    elements.repairProgressIntro,
+    visible ? '下载、校验、安装分阶段显示；长时间任务会持续刷新最近活动。' : '开始修复后会显示下载、校验和安装阶段的实时进展。'
+  );
+  setText(elements.repairElapsedText, repairElapsed(progress));
+  setText(elements.repairCurrentTitle, title);
+  setText(elements.repairProgressPercent, `${percent}%`);
+  setText(elements.repairCurrentStep, `最近活动：${visible ? step : '等待检查结果'}`);
+  setText(elements.repairDownloadSpeed, metadata.downloadSpeed);
+  setText(elements.repairEta, metadata.eta);
+  setText(elements.repairFileSize, metadata.fileSize);
+  setText(elements.repairDownloader, metadata.downloader);
+  setText(elements.diagnosticRecentStatusText, visible ? (progress.lastMessage || step) : '等待串流准备');
+
+  if (elements.repairProgressBar) {
+    elements.repairProgressBar.style.width = `${percent}%`;
+  }
+}
+
 function handleRepairProgress(event = {}) {
   if (!state.repairProgress.active) {
     resetRepairProgress('正在准备修复环境');
+  }
+
+  const now = Date.now();
+  const message = normalizeRepairMessage(event.message);
+  state.repairProgress.lastActivityAt = now;
+  if (message) {
+    state.repairProgress.lastMessage = message;
   }
 
   if (event.type === 'check') {
@@ -819,12 +979,16 @@ function handleRepairProgress(event = {}) {
       updateRepairProgressItem(action.id, action.title, 'pending', '待处理');
     }
   } else if (event.type === 'action-start') {
+    state.repairProgress.activeActionId = event.actionId || event.title || '';
     state.repairProgress.summary = event.message || '正在处理修复项';
     updateRepairProgressItem(event.actionId, event.title, 'running', event.message);
   } else if (event.type === 'log') {
     updateRepairProgressItem(event.actionId, event.title, 'running', event.message);
   } else if (event.type === 'action-complete') {
     updateRepairProgressItem(event.actionId, event.title, 'complete', event.message || '已完成');
+    if (state.repairProgress.activeActionId === event.actionId) {
+      state.repairProgress.activeActionId = '';
+    }
   } else if (event.type === 'action-error') {
     updateRepairProgressItem(event.actionId, event.title, 'error', event.message || '处理失败');
     state.repairProgress.summary = event.message || '修复失败';
@@ -832,6 +996,7 @@ function handleRepairProgress(event = {}) {
     state.repairProgress.active = false;
     state.repairProgress.summary = event.message || '修复流程已完成';
     state.repairProgress.percent = 100;
+    state.repairProgress.activeActionId = '';
   }
 
   renderRepairProgress();
@@ -857,16 +1022,7 @@ function renderRepairProgress() {
     progress,
     true
   );
-  setRepairProgressPanel(
-    elements.repairProgressPanel,
-    elements.repairProgressSummary,
-    elements.repairProgressPercent,
-    elements.repairProgressBar,
-    elements.repairCurrentStep,
-    visible,
-    progress,
-    false
-  );
+  renderDiagnosticRepairProgress(progress);
 
   if (!elements.repairProgressList) {
     return;
@@ -946,6 +1102,9 @@ function switchPage(pageName) {
     page.classList.toggle('is-active', page.dataset.pagePanel === nextPage);
   });
   setText(elements.pageTitle, PAGE_TITLES[nextPage]);
+  if (elements.topbarCopy) {
+    elements.topbarCopy.hidden = nextPage === 'diagnostics';
+  }
 }
 
 async function loadConfig() {
@@ -1276,7 +1435,12 @@ async function init() {
   renderControls();
 
   window.setInterval(refreshStatus, 5000);
-  window.setInterval(renderStreamRuntime, 1000);
+  window.setInterval(() => {
+    renderStreamRuntime();
+    if (state.repairProgress.active) {
+      renderDiagnosticRepairProgress(state.repairProgress);
+    }
+  }, 1000);
   window.setInterval(() => {
     if (state.deviceMode === 'auto') {
       refreshDevices();

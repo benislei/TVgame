@@ -74,7 +74,7 @@
           <div>
             <p class="eyebrow">发送端状态</p>
             <h1 id="pageTitle">日常主屏</h1>
-            <p class="topbar-copy">把电脑游戏低延迟投到电视，保留手柄、键鼠和声音回传。</p>
+            <p class="topbar-copy" id="topbarCopy">把电脑游戏低延迟投到电视，保留手柄、键鼠和声音回传。</p>
           </div>
           <div class="topbar-actions">
             <button class="primary-action" type="button" id="startButton">
@@ -249,27 +249,92 @@
           </section>
         </section>
 
-        <section class="page" data-page-panel="diagnostics">
-          <section class="panel">
-            <p class="eyebrow">依赖与修复</p>
-            <h2>环境诊断</h2>
-            <p>检查发送端依赖，并在可行时自动修复。修复过程中请保持程序打开。</p>
-            <div class="diagnostic-grid" id="diagnosticGrid"></div>
-            <div class="repair-progress-panel" id="repairProgressPanel" hidden>
-              <div class="repair-progress-header">
-                <div>
-                  <strong>修复进度</strong>
-                  <span id="repairProgressSummary">准备中</span>
+        <section class="page page-diagnostics" data-page-panel="diagnostics">
+          <div class="home-layout diagnostics-layout">
+            <section class="workflow-card diagnostics-flow" aria-labelledby="diagnosticsHeading">
+              <div class="repair-progress-panel repair-progress-panel--diagnostics" id="repairProgressPanel">
+                <div class="repair-progress-hero">
+                  <div>
+                    <p class="eyebrow">修复信息</p>
+                    <h2 id="diagnosticsHeading">
+                      <span id="repairProgressSummary">等待环境检查</span>
+                    </h2>
+                    <p id="repairProgressIntro">开始修复后会显示下载、校验和安装阶段的实时进展。</p>
+                  </div>
+                  <div class="repair-elapsed-card">
+                    <span>已用时间</span>
+                    <strong id="repairElapsedText">00:00:00</strong>
+                  </div>
                 </div>
-                <span class="repair-progress-percent" id="repairProgressPercent">0%</span>
+
+                <div class="repair-progress-body">
+                  <div class="step-index">1</div>
+                  <div class="step-content">
+                    <h3>修复进度</h3>
+                    <p>展示当前阶段、最近活动和可识别的下载信息。</p>
+
+                    <div class="repair-current-card">
+                      <div class="repair-current-head">
+                        <div>
+                          <span class="metric-label">当前处理</span>
+                          <strong id="repairCurrentTitle">等待修复任务</strong>
+                        </div>
+                        <span class="repair-progress-percent" id="repairProgressPercent">0%</span>
+                      </div>
+                      <div class="repair-progress-track" aria-hidden="true">
+                        <div class="repair-progress-bar" id="repairProgressBar"></div>
+                      </div>
+                      <div class="repair-current-step" id="repairCurrentStep">最近活动：等待检查结果</div>
+                    </div>
+
+                    <div class="repair-metric-grid">
+                      <div class="repair-metric-card">
+                        <span>下载速度</span>
+                        <strong id="repairDownloadSpeed">等待下载信息</strong>
+                      </div>
+                      <div class="repair-metric-card">
+                        <span>预计剩余</span>
+                        <strong id="repairEta">等待下载信息</strong>
+                      </div>
+                      <div class="repair-metric-card">
+                        <span>文件大小</span>
+                        <strong id="repairFileSize">等待文件信息</strong>
+                      </div>
+                      <div class="repair-metric-card">
+                        <span>下载方式</span>
+                        <strong id="repairDownloader">自动选择</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="repair-progress-track" aria-hidden="true">
-                <div class="repair-progress-bar" id="repairProgressBar"></div>
+
+              <div class="repair-stage-card" id="repairStageFeedback">
+                <div class="step-index">2</div>
+                <div class="step-content">
+                  <h3>安装阶段反馈</h3>
+                  <p>进入安装器后无法精确百分比时，会持续刷新已用时间、最近活动和当前安装项，避免误以为程序卡死。</p>
+                </div>
               </div>
-              <div class="repair-current-step" id="repairCurrentStep">等待修复任务</div>
-              <div class="repair-progress-list" id="repairProgressList"></div>
-            </div>
-          </section>
+
+              <div class="repair-progress-note">
+                <span aria-hidden="true"></span>
+                <p>如果超过 3 分钟没有任何活动更新，按钮会变为“重试修复”，并提示检查网络。</p>
+              </div>
+            </section>
+
+            <aside class="receiver-panel" aria-label="运行检查">
+              <div class="panel-heading">
+                <h2>运行检查</h2>
+                <p>这里只保留影响串流启动的状态。</p>
+              </div>
+              <div class="home-health-grid diagnostic-grid" id="diagnosticGrid"></div>
+              <div class="recent-status">
+                <span>最近状态</span>
+                <strong id="diagnosticRecentStatusText">等待串流准备</strong>
+              </div>
+            </aside>
+          </div>
         </section>
 
         <section class="page" data-page-panel="logs">

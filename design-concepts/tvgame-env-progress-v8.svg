@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <radialGradient id="bg" cx="18%" cy="12%" r="82%">
+      <stop offset="0%" stop-color="#0d3a29"/>
+      <stop offset="46%" stop-color="#07140f"/>
+      <stop offset="100%" stop-color="#050806"/>
+    </radialGradient>
+    <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#091611"/>
+      <stop offset="100%" stop-color="#050806"/>
+    </linearGradient>
+    <linearGradient id="mergedCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#123725"/>
+      <stop offset="42%" stop-color="#10251d"/>
+      <stop offset="100%" stop-color="#0d1f18"/>
+    </linearGradient>
+    <linearGradient id="progressFill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#23c978"/>
+      <stop offset="100%" stop-color="#72e8ad"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#000" flood-opacity="0.36"/>
+    </filter>
+    <filter id="ctaShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#20c978" flood-opacity="0.22"/>
+    </filter>
+    <pattern id="stripe" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <rect width="8" height="18" fill="#ffffff" opacity="0.14"/>
+    </pattern>
+    <style>
+      .font { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", Arial, sans-serif; }
+      .white { fill:#f5fff9; }
+      .green { fill:#56e7a4; }
+      .muted { fill:#93b4a9; }
+      .soft { fill:#c1dad1; }
+      .tiny { font-size:12px; font-weight:600; }
+      .small { font-size:14px; font-weight:600; }
+      .body { font-size:15px; font-weight:600; }
+      .label { font-size:15px; font-weight:800; }
+      .title { font-size:34px; font-weight:900; letter-spacing:0; }
+      .section { font-size:22px; font-weight:900; letter-spacing:0; }
+      .value { font-size:20px; font-weight:900; letter-spacing:0; }
+      .metric { font-size:17px; font-weight:900; letter-spacing:0; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <rect x="28" y="30" width="1384" height="840" rx="42" fill="url(#shell)" stroke="#1a2d26" stroke-width="2" filter="url(#softShadow)"/>
+
+  <g class="font">
+    <!-- side rail -->
+    <rect x="58" y="66" width="112" height="766" rx="30" fill="#0d1f18" stroke="#263d34"/>
+    <rect x="84" y="94" width="60" height="60" rx="19" fill="#123d2b" stroke="#21744f"/>
+    <path d="M114 112 L128 120 L128 136 L114 144 L100 136 L100 120 Z" fill="none" stroke="#72f1ad" stroke-width="3"/>
+    <path d="M106 122 L114 118 L122 122 L114 127 Z M106 130 L114 135 L122 130" fill="none" stroke="#72f1ad" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="84" y="214" width="60" height="60" rx="19" fill="#12452f" stroke="#1ca467"/>
+    <path d="M104 246 L114 237 L124 246 V258 H118 V250 H110 V258 H104 Z" fill="none" stroke="#f4fff9" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M114 352 V320 M105 330 H123 M105 342 H123" stroke="#95b8ac" stroke-width="4" stroke-linecap="round"/>
+    <path d="M101 420 H127 V434 H101 Z M108 438 H120" fill="none" stroke="#95b8ac" stroke-width="3" stroke-linecap="round"/>
+    <path d="M102 516 H126 M106 507 H122 M106 526 H122" stroke="#95b8ac" stroke-width="3" stroke-linecap="round"/>
+    <path d="M114 598 L126 592 V606 C126 616 120 622 114 626 C108 622 102 616 102 606 V592 Z" fill="none" stroke="#95b8ac" stroke-width="3"/>
+    <path d="M108 605 L113 610 L121 600" fill="none" stroke="#95b8ac" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="106" y="684" width="16" height="30" rx="2" fill="none" stroke="#95b8ac" stroke-width="3"/>
+    <path d="M111 694 H117 M111 702 H117" stroke="#95b8ac" stroke-width="2" stroke-linecap="round"/>
+    <rect x="84" y="782" width="60" height="60" rx="19" fill="#0f211a" stroke="#284338"/>
+    <circle cx="114" cy="812" r="7" fill="#27d987"/>
+
+    <!-- header -->
+    <text x="208" y="82" class="green label">发送端状态</text>
+    <text x="208" y="124" class="white title">环境诊断</text>
+
+    <rect x="1044" y="82" width="176" height="60" rx="22" fill="#20c978" filter="url(#ctaShadow)"/>
+    <path d="M1085 103 L1085 122 L1100 113 Z" fill="none" stroke="#06110d" stroke-width="3" stroke-linejoin="round"/>
+    <text x="1115" y="119" fill="#06110d" font-size="20" font-weight="900">开始串流</text>
+    <rect x="1238" y="82" width="160" height="60" rx="22" fill="#0c1511" stroke="#2b4439"/>
+    <rect x="1274" y="108" width="9" height="9" fill="none" stroke="#f5fff9" stroke-width="2"/>
+    <text x="1302" y="119" class="white" font-size="20" font-weight="900">停止串流</text>
+
+    <!-- merged repair card -->
+    <rect x="208" y="168" width="810" height="454" rx="30" fill="url(#mergedCard)" stroke="#2c654a"/>
+    <text x="236" y="204" class="green label">修复信息</text>
+    <text x="236" y="238" class="white" font-size="28" font-weight="900">正在安装 GStreamer 依赖</text>
+    <text x="236" y="262" class="soft small">下载、校验、安装分阶段显示；长任务持续刷新最近活动。</text>
+
+    <rect x="852" y="206" width="140" height="56" rx="18" fill="#0d1b15" stroke="#263d34"/>
+    <text x="876" y="230" class="muted tiny">已用时间</text>
+    <text x="876" y="254" class="white value">00:04:18</text>
+
+    <line x1="236" y1="292" x2="990" y2="292" stroke="#284338" stroke-width="1"/>
+
+    <circle cx="246" cy="334" r="18" fill="#113f2c" stroke="#1aa467"/>
+    <text x="241" y="342" class="green" font-size="21" font-weight="900">1</text>
+    <text x="280" y="342" class="white section">修复进度</text>
+    <text x="280" y="368" class="muted small">展示当前阶段、速度、预计剩余时间和正在处理的文件。</text>
+
+    <rect x="236" y="398" width="754" height="122" rx="22" fill="#07120e" stroke="#243b32"/>
+    <text x="260" y="426" class="soft small">当前处理</text>
+    <text x="260" y="458" class="white" font-size="25" font-weight="900">下载 GStreamer devel 安装包</text>
+    <rect x="856" y="422" width="108" height="42" rx="21" fill="#123f2c"/>
+    <text x="886" y="450" class="green value">59%</text>
+    <rect x="260" y="482" width="704" height="11" rx="6" fill="#20362d"/>
+    <rect x="260" y="482" width="416" height="11" rx="6" fill="url(#progressFill)"/>
+    <rect x="260" y="482" width="416" height="11" rx="6" fill="url(#stripe)"/>
+    <text x="260" y="508" class="muted tiny">最近活动：正在写入临时文件，下载仍在进行</text>
+
+    <rect x="236" y="548" width="172" height="58" rx="18" fill="#0d1b15" stroke="#243b32"/>
+    <text x="258" y="571" class="muted tiny">下载速度</text>
+    <text x="258" y="595" class="white metric">18.6 MB/s</text>
+    <rect x="426" y="548" width="172" height="58" rx="18" fill="#0d1b15" stroke="#243b32"/>
+    <text x="448" y="571" class="muted tiny">预计剩余</text>
+    <text x="448" y="595" class="white metric">约 1 分 22 秒</text>
+    <rect x="616" y="548" width="172" height="58" rx="18" fill="#0d1b15" stroke="#243b32"/>
+    <text x="638" y="571" class="muted tiny">文件大小</text>
+    <text x="638" y="595" class="white metric">724MB / 1.2GB</text>
+    <rect x="806" y="548" width="184" height="58" rx="18" fill="#0d1b15" stroke="#243b32"/>
+    <text x="828" y="571" class="muted tiny">下载方式</text>
+    <text x="828" y="595" class="green metric">aria2 多线程</text>
+
+    <!-- install feedback -->
+    <rect x="208" y="648" width="810" height="118" rx="28" fill="#10251d" stroke="#314e3f"/>
+    <circle cx="246" cy="690" r="18" fill="#113f2c" stroke="#1aa467"/>
+    <text x="241" y="698" class="green" font-size="21" font-weight="900">2</text>
+    <text x="280" y="690" class="white section">安装阶段反馈</text>
+    <text x="280" y="718" class="muted small">进入安装器后无法精确百分比时，显示“正在安装，请勿关闭”。</text>
+    <text x="280" y="744" class="soft small">仍会持续刷新已用时间、最近活动和当前安装项，避免误以为程序卡死。</text>
+
+    <rect x="208" y="790" width="810" height="48" rx="18" fill="#07120e" stroke="#263d34"/>
+    <circle cx="236" cy="814" r="5" fill="#ffd978"/>
+    <text x="252" y="820" class="soft small">如果超过 3 分钟没有任何活动更新，按钮会变为“重试修复”，并提示用户检查网络。</text>
+
+    <!-- right status panel -->
+    <rect x="1050" y="168" width="314" height="670" rx="30" fill="#12271e" stroke="#294537"/>
+    <text x="1080" y="214" class="white section">运行检查</text>
+    <text x="1080" y="242" class="muted small">这里只保留影响串流启动的状态。</text>
+
+    <rect x="1080" y="288" width="254" height="66" rx="18" fill="#07120e"/>
+    <text x="1100" y="316" class="white" font-size="19" font-weight="900">GStreamer</text>
+    <text x="1100" y="339" class="soft small">安装中</text>
+    <rect x="1258" y="308" width="58" height="27" rx="14" fill="#3f3411"/>
+    <text x="1271" y="327" fill="#ffd978" font-size="13" font-weight="900">处理中</text>
+
+    <rect x="1080" y="372" width="254" height="66" rx="18" fill="#07120e"/>
+    <text x="1100" y="400" class="white" font-size="19" font-weight="900">编码器</text>
+    <text x="1100" y="423" class="soft small">等待复检</text>
+    <rect x="1258" y="392" width="58" height="27" rx="14" fill="#3f3411"/>
+    <text x="1271" y="411" fill="#ffd978" font-size="13" font-weight="900">待处理</text>
+
+    <rect x="1080" y="456" width="254" height="66" rx="18" fill="#07120e"/>
+    <text x="1100" y="484" class="white" font-size="19" font-weight="900">输入桥</text>
+    <text x="1100" y="507" class="soft small">正常</text>
+    <rect x="1266" y="476" width="50" height="27" rx="14" fill="#0e4a31"/>
+    <text x="1279" y="495" class="green" font-size="13" font-weight="900">正常</text>
+
+    <rect x="1080" y="540" width="254" height="66" rx="18" fill="#07120e"/>
+    <text x="1100" y="568" class="white" font-size="19" font-weight="900">手柄驱动</text>
+    <text x="1100" y="591" class="soft small">ViGEmBus 已安装</text>
+    <rect x="1266" y="560" width="50" height="27" rx="14" fill="#0e4a31"/>
+    <text x="1279" y="579" class="green" font-size="13" font-weight="900">正常</text>
+
+    <rect x="1080" y="744" width="254" height="62" rx="18" fill="#07120e"/>
+    <text x="1100" y="769" class="soft tiny">最近状态</text>
+    <text x="1100" y="793" class="white" font-size="18" font-weight="900">正在下载</text>
+  </g>
+</svg>
