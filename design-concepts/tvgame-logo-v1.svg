@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">TVGame 标志概念</title>
+  <desc id="desc">由电视屏幕、低延迟信号和游戏方向符号组合而成的绿色品牌标志。</desc>
+  <defs>
+    <linearGradient id="mark" x1="96" y1="80" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7CF7BE"/>
+      <stop offset="0.52" stop-color="#20D47D"/>
+      <stop offset="1" stop-color="#0C8E56"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#18C878" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="#07110F"/>
+  <rect x="55" y="55" width="402" height="402" rx="94" fill="#10241E" stroke="rgba(124,247,190,0.22)" stroke-width="8"/>
+  <g filter="url(#glow)">
+    <path d="M136 158C136 139.222 151.222 124 170 124H342C360.778 124 376 139.222 376 158V276C376 294.778 360.778 310 342 310H170C151.222 310 136 294.778 136 276V158Z" fill="none" stroke="url(#mark)" stroke-width="24" stroke-linejoin="round"/>
+    <path d="M208 366H304" stroke="url(#mark)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M256 310V366" stroke="url(#mark)" stroke-width="24" stroke-linecap="round"/>
+    <path d="M222 188L302 217L222 246V188Z" fill="url(#mark)"/>
+    <path d="M177 343C187 325 204 313 226 308" stroke="#7CF7BE" stroke-width="14" stroke-linecap="round"/>
+    <path d="M335 343C325 325 308 313 286 308" stroke="#7CF7BE" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>
