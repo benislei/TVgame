@@ -1,12 +1,20 @@
 package com.tvgame.receiver;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -17,14 +25,31 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import java.net.Inet4Address;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 
 public final class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TITLE = "电视游戏接收端";
     private static final String RECEIVER_MODE = "接收端档位：Android 11+ 极致模式";
     private static final String INPUT_RELAY_HOST_METADATA = "com.tvgame.receiver.INPUT_RELAY_HOST";
     private static final String INPUT_RELAY_AUTO_TEXT = "自动识别中";
+    private static final int VIDEO_PORT = 5004;
+    private static final int AUDIO_PORT = 5006;
     private static final int INPUT_RELAY_PORT = 8789;
+    private static final int COLOR_BG = 0xFF06100D;
+    private static final int COLOR_PANEL = 0xEA10241E;
+    private static final int COLOR_PANEL_SOFT = 0xD9122A22;
+    private static final int COLOR_FIELD = 0xF207120F;
+    private static final int COLOR_TEXT = 0xFFF5FFF8;
+    private static final int COLOR_MUTED = 0xFF9FC4B5;
+    private static final int COLOR_ACCENT = 0xFF20D47D;
+    private static final int COLOR_ACCENT_SOFT = 0x5532E88E;
+    private static final int COLOR_AMBER = 0xFFE8BD65;
+    private static final int COLOR_BORDER = 0x443EE49A;
     private static final long STOP_JOIN_MS = 400;
     private static final long VIDEO_HEALTH_SAMPLE_MS = 500;
     private static final long VIDEO_STALL_RESTART_MS = 1200;
@@ -55,6 +80,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         @Override
         public void run() {
             monitorVideoHealth();
+            updateWaitingLayer(System.currentTimeMillis());
             overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n" + stats.renderCompact());
             handler.postDelayed(this, VIDEO_HEALTH_SAMPLE_MS);
         }
@@ -62,6 +88,18 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     private SurfaceView surfaceView;
     private TextView overlay;
+    private FrameLayout waitingLayer;
+    private TextView waitingHeadline;
+    private TextView waitingSubline;
+    private TextView localIpValue;
+    private TextView videoPortValue;
+    private TextView audioPortValue;
+    private TextView inputPortValue;
+    private TextView topStatusChip;
+    private TextView streamPreviewFps;
+    private TextView streamPreviewLoss;
+    private TextView streamPreviewAudio;
+    private String localIp = "未识别";
     private H264VideoReceiver videoReceiver;
     private L16AudioReceiver audioReceiver;
     private InputClient inputClient;
@@ -81,7 +119,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private float gamepadLt;
     private float gamepadRt;
     private int gamepadButtons;
-    private boolean overlayVisible = true;
+    private boolean overlayVisible;
     private final View.OnKeyListener gamepadKeyListener = new View.OnKeyListener() {
         @Override
         public boolean onKey(View view, int keyCode, KeyEvent event) {
@@ -101,6 +139,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         stats.deviceLabel = buildDeviceLabel();
         stats.receiverAdvice = buildReceiverAdvice();
+        localIp = resolveLocalIpv4Address();
         discoveryBroadcaster = new DiscoveryBroadcaster(stats);
         discoveryBroadcaster.start();
         String configuredInputRelayHost = resolveInputRelayHost();
@@ -118,15 +157,17 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         surfaceView.getHolder().addCallback(this);
 
         overlay = new TextView(this);
-        overlay.setTextColor(0xFFFFFFFF);
-        overlay.setTextSize(12);
-        overlay.setBackgroundColor(0x77000000);
-        overlay.setPadding(8, 6, 8, 6);
+        overlay.setTextColor(COLOR_TEXT);
+        overlay.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        overlay.setTypeface(Typeface.MONOSPACE);
+        overlay.setBackground(rounded(0xB8000000, 0x6643D988, 1, 10));
+        overlay.setPadding(dp(10), dp(8), dp(10), dp(8));
         overlay.setText(TITLE + " | Android 11+（API " + Build.VERSION.SDK_INT + "）\n等待视频和音频");
+        overlay.setVisibility(View.GONE);
 
         FrameLayout root = new FrameLayout(this);
         rootView = root;
-        root.setBackgroundColor(0xFF000000);
+        root.setBackgroundColor(COLOR_BG);
         root.setFocusable(true);
         root.setFocusableInTouchMode(true);
         root.setOnKeyListener(gamepadKeyListener);
@@ -148,12 +189,18 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             }
         });
         root.addView(surfaceView);
+        waitingLayer = buildWaitingLayer();
+        root.addView(waitingLayer, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
 
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP | Gravity.START
         );
+        overlayParams.setMargins(dp(14), dp(14), dp(14), dp(14));
         root.addView(overlay, overlayParams);
 
         setContentView(root);
@@ -277,6 +324,407 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (overlay != null) {
             overlay.setVisibility(overlayVisible ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private FrameLayout buildWaitingLayer() {
+        FrameLayout layer = new FrameLayout(this);
+        layer.setBackgroundColor(COLOR_BG);
+        layer.addView(new ReceiverBackdropView(this), new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        brandRow.setOrientation(LinearLayout.HORIZONTAL);
+        BrandMarkView brandMark = new BrandMarkView(this);
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(56), dp(56));
+        brandRow.addView(brandMark, markParams);
+
+        LinearLayout brandCopy = new LinearLayout(this);
+        brandCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams brandCopyParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        brandCopyParams.setMargins(dp(14), 0, 0, 0);
+        TextView title = text("TVGame 接收端", 24, COLOR_TEXT, Typeface.BOLD);
+        TextView subtitle = text("局域网游戏串流", 13, COLOR_MUTED, Typeface.NORMAL);
+        subtitle.setPadding(0, dp(5), 0, 0);
+        brandCopy.addView(title);
+        brandCopy.addView(subtitle);
+        brandRow.addView(brandCopy, brandCopyParams);
+
+        FrameLayout.LayoutParams brandParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP | Gravity.START
+        );
+        brandParams.setMargins(dp(48), dp(42), 0, 0);
+        layer.addView(brandRow, brandParams);
+
+        LinearLayout chipRow = new LinearLayout(this);
+        chipRow.setOrientation(LinearLayout.HORIZONTAL);
+        chipRow.setGravity(Gravity.CENTER_VERTICAL);
+        topStatusChip = chip("监听中", COLOR_ACCENT, COLOR_ACCENT_SOFT);
+        chipRow.addView(topStatusChip);
+        chipRow.addView(chip("Android 11+", COLOR_TEXT, 0x2214A96F), marginLeft(dp(10)));
+        chipRow.addView(chip("按比例显示", COLOR_TEXT, 0x2214A96F), marginLeft(dp(10)));
+        FrameLayout.LayoutParams chipsParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP | Gravity.END
+        );
+        chipsParams.setMargins(0, dp(46), dp(54), 0);
+        layer.addView(chipRow, chipsParams);
+
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER_HORIZONTAL);
+        BrandMarkView heroMark = new BrandMarkView(this);
+        center.addView(heroMark, new LinearLayout.LayoutParams(dp(78), dp(78)));
+
+        waitingHeadline = text("等待电脑发送画面", 30, COLOR_TEXT, Typeface.BOLD);
+        waitingHeadline.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams headlineParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        headlineParams.setMargins(0, dp(24), 0, 0);
+        center.addView(waitingHeadline, headlineParams);
+
+        waitingSubline = text("在发送端输入这台电视的 IP。连接成功后自动进入全屏，复杂诊断默认隐藏。", 15, COLOR_MUTED, Typeface.NORMAL);
+        waitingSubline.setGravity(Gravity.CENTER);
+        waitingSubline.setMaxWidth(dp(720));
+        waitingSubline.setPadding(0, dp(14), 0, 0);
+        center.addView(waitingSubline);
+
+        LinearLayout metricStrip = new LinearLayout(this);
+        metricStrip.setGravity(Gravity.CENTER);
+        metricStrip.setOrientation(LinearLayout.HORIZONTAL);
+        metricStrip.setPadding(dp(12), dp(12), dp(12), dp(12));
+        metricStrip.setBackground(rounded(0x8A08120F, 0x333EE49A, 1, 26));
+        localIpValue = metricValue("本机 IP", localIp);
+        videoPortValue = metricValue("视频端口", String.valueOf(VIDEO_PORT));
+        audioPortValue = metricValue("音频端口", String.valueOf(AUDIO_PORT));
+        inputPortValue = metricValue("输入端口", String.valueOf(INPUT_RELAY_PORT));
+        metricStrip.addView(localIpValue, metricItemParams(250));
+        metricStrip.addView(videoPortValue, metricItemParams(170));
+        metricStrip.addView(audioPortValue, metricItemParams(170));
+        metricStrip.addView(inputPortValue, metricItemParams(170));
+        LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        stripParams.setMargins(0, dp(48), 0, 0);
+        center.addView(metricStrip, stripParams);
+
+        FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER
+        );
+        centerParams.setMargins(0, 0, 0, dp(18));
+        layer.addView(center, centerParams);
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER);
+        bottom.addView(infoCard("推荐操作", "发送端手动输入 IP", "手动输入更稳定，自动搜索仅作为辅助入口。"), weightedCardParams());
+        bottom.addView(infoCard("输入回传", "手柄与键鼠", "识别到输入设备后回传到电脑端输入桥。"), weightedCardParams());
+        bottom.addView(streamPreviewCard(), weightedCardParams());
+        FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM
+        );
+        bottomParams.setMargins(dp(48), 0, dp(48), dp(44));
+        layer.addView(bottom, bottomParams);
+
+        return layer;
+    }
+
+    private void updateWaitingLayer(long nowMs) {
+        boolean videoActive = hasFreshVideo(nowMs);
+        if (waitingLayer != null) {
+            waitingLayer.setVisibility(videoActive ? View.GONE : View.VISIBLE);
+        }
+        if (topStatusChip != null) {
+            topStatusChip.setText(videoActive ? "接收中" : "监听中");
+        }
+        if (waitingHeadline != null) {
+            waitingHeadline.setText(stats.videoFrames > 0 ? "等待电脑继续发送画面" : "等待电脑发送画面");
+        }
+        if (localIpValue != null) {
+            localIpValue.setText("本机 IP\n" + localIp);
+        }
+        if (videoPortValue != null) {
+            videoPortValue.setText("视频端口\n" + VIDEO_PORT);
+        }
+        if (audioPortValue != null) {
+            audioPortValue.setText("音频端口\n" + AUDIO_PORT);
+        }
+        if (inputPortValue != null) {
+            inputPortValue.setText("输入端口\n" + INPUT_RELAY_PORT);
+        }
+        if (streamPreviewFps != null) {
+            streamPreviewFps.setText("画面\n" + (stats.videoFrames > 0 ? "已收到" : "--"));
+        }
+        if (streamPreviewLoss != null) {
+            streamPreviewLoss.setText("丢包\n" + (stats.videoRtpLossPackets > 0 ? String.valueOf(stats.videoRtpLossPackets) : "--"));
+        }
+        if (streamPreviewAudio != null) {
+            streamPreviewAudio.setText("声音\n" + (stats.audioPackets > 0 ? "正常" : "--"));
+        }
+    }
+
+    private boolean hasFreshVideo(long nowMs) {
+        return stats.videoFrames > 0 && stats.lastVideoAtMs > 0 && nowMs - stats.lastVideoAtMs <= VIDEO_FRESH_MS;
+    }
+
+    private TextView text(String value, int sp, int color, int style) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextColor(color);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        view.setTypeface(Typeface.DEFAULT, style);
+        view.setIncludeFontPadding(false);
+        return view;
+    }
+
+    private TextView chip(String value, int color, int fillColor) {
+        TextView view = text(value, 14, color, Typeface.BOLD);
+        view.setGravity(Gravity.CENTER);
+        view.setPadding(dp(18), dp(9), dp(18), dp(9));
+        view.setBackground(rounded(fillColor, 0x554EE89F, 1, 24));
+        return view;
+    }
+
+    private TextView metricValue(String label, String value) {
+        TextView view = text(label + "\n" + value, 20, COLOR_TEXT, Typeface.BOLD);
+        view.setPadding(dp(18), dp(12), dp(18), dp(12));
+        view.setBackground(rounded(COLOR_FIELD, 0x0020D47D, 0, 16));
+        return view;
+    }
+
+    private LinearLayout infoCard(String label, String title, String body) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(20), dp(18), dp(20), dp(18));
+        card.setBackground(rounded(COLOR_PANEL_SOFT, 0x6632E88E, 1, 22));
+        card.addView(text(label, 13, COLOR_ACCENT, Typeface.BOLD));
+        TextView titleView = text(title, 20, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, dp(10), 0, 0);
+        card.addView(titleView);
+        TextView bodyView = text(body, 13, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setPadding(0, dp(8), 0, 0);
+        card.addView(bodyView);
+        return card;
+    }
+
+    private LinearLayout streamPreviewCard() {
+        LinearLayout card = infoCard("串流浮层预览", "诊断默认隐藏", "按菜单键或 F1 可切换诊断浮层。");
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(14), 0, 0);
+        streamPreviewFps = smallMetric("画面", "--");
+        streamPreviewLoss = smallMetric("丢包", "--");
+        streamPreviewAudio = smallMetric("声音", "--");
+        row.addView(streamPreviewFps, equalSmallMetricParams());
+        row.addView(streamPreviewLoss, equalSmallMetricParams());
+        row.addView(streamPreviewAudio, equalSmallMetricParams());
+        card.addView(row);
+        return card;
+    }
+
+    private TextView smallMetric(String label, String value) {
+        TextView view = text(label + "\n" + value, 14, COLOR_TEXT, Typeface.BOLD);
+        view.setPadding(dp(12), dp(10), dp(12), dp(10));
+        view.setBackground(rounded(0xB20A1713, 0, 0, 14));
+        return view;
+    }
+
+    private GradientDrawable rounded(int color, int strokeColor, int strokeDp, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        if (strokeDp > 0) {
+            drawable.setStroke(dp(strokeDp), strokeColor);
+        }
+        return drawable;
+    }
+
+    private LinearLayout.LayoutParams marginLeft(int leftDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(leftDp, 0, 0, 0);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams metricItemParams(int widthDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(widthDp), LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(dp(6), 0, dp(6), 0);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams weightedCardParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        params.setMargins(dp(10), 0, dp(10), 0);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams equalSmallMetricParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        params.setMargins(dp(4), 0, dp(4), 0);
+        return params;
+    }
+
+    private int dp(float value) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics()));
+    }
+
+    private static String resolveLocalIpv4Address() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface item = interfaces.nextElement();
+                if (!item.isUp() || item.isLoopback() || item.isVirtual()) {
+                    continue;
+                }
+                Enumeration<java.net.InetAddress> addresses = item.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                        String hostAddress = address.getHostAddress();
+                        if (hostAddress != null && !hostAddress.startsWith("169.254.")) {
+                            return hostAddress;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            return "未识别";
+        }
+        return "未识别";
+    }
+
+    private static final class ReceiverBackdropView extends View {
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+
+        ReceiverBackdropView(Context context) {
+            super(context);
+            setWillNotDraw(false);
+            fillPaint.setStyle(Paint.Style.FILL);
+            strokePaint.setStyle(Paint.Style.STROKE);
+            strokePaint.setStrokeWidth(dpFor(context, 1.2f));
+            gridPaint.setStyle(Paint.Style.STROKE);
+            gridPaint.setStrokeWidth(dpFor(context, 1));
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            int width = getWidth();
+            int height = getHeight();
+            fillPaint.setColor(COLOR_BG);
+            canvas.drawRect(0, 0, width, height, fillPaint);
+
+            fillPaint.setColor(0x4810A767);
+            canvas.drawCircle(width * 0.18f, height * 0.18f, width * 0.22f, fillPaint);
+            fillPaint.setColor(0x321EDB88);
+            canvas.drawCircle(width * 0.74f, height * 0.38f, width * 0.18f, fillPaint);
+            fillPaint.setColor(0x221C6B4A);
+            canvas.drawCircle(width * 0.52f, height * 0.84f, width * 0.24f, fillPaint);
+
+            rect.set(width * 0.10f, height * 0.12f, width * 0.90f, height * 0.88f);
+            fillPaint.setColor(0xB907110F);
+            canvas.drawRoundRect(rect, dpFor(getContext(), 38), dpFor(getContext(), 38), fillPaint);
+            strokePaint.setColor(0x333EE49A);
+            canvas.drawRoundRect(rect, dpFor(getContext(), 38), dpFor(getContext(), 38), strokePaint);
+
+            gridPaint.setColor(0x123EE49A);
+            float step = dpFor(getContext(), 42);
+            for (float x = rect.left + step; x < rect.right; x += step) {
+                canvas.drawLine(x, rect.top + dpFor(getContext(), 18), x, rect.bottom - dpFor(getContext(), 18), gridPaint);
+            }
+            for (float y = rect.top + step; y < rect.bottom; y += step) {
+                canvas.drawLine(rect.left + dpFor(getContext(), 18), y, rect.right - dpFor(getContext(), 18), y, gridPaint);
+            }
+        }
+    }
+
+    private static final class BrandMarkView extends View {
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path playPath = new Path();
+        private final RectF rect = new RectF();
+
+        BrandMarkView(Context context) {
+            super(context);
+            setWillNotDraw(false);
+            fillPaint.setStyle(Paint.Style.FILL);
+            strokePaint.setStyle(Paint.Style.STROKE);
+            strokePaint.setStrokeCap(Paint.Cap.ROUND);
+            strokePaint.setStrokeJoin(Paint.Join.ROUND);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            float unit = Math.min(w, h);
+            float pad = unit * 0.08f;
+            float radius = unit * 0.22f;
+
+            rect.set(pad, pad, w - pad, h - pad);
+            fillPaint.setColor(0xD80C241D);
+            canvas.drawRoundRect(rect, radius, radius, fillPaint);
+            strokePaint.setStrokeWidth(unit * 0.018f);
+            strokePaint.setColor(0x7732E88E);
+            canvas.drawRoundRect(rect, radius, radius, strokePaint);
+
+            float left = w * 0.30f;
+            float top = h * 0.34f;
+            float right = w * 0.70f;
+            float bottom = h * 0.60f;
+            rect.set(left, top, right, bottom);
+            strokePaint.setStrokeWidth(unit * 0.055f);
+            strokePaint.setColor(0xFF73F2B0);
+            canvas.drawRoundRect(rect, unit * 0.045f, unit * 0.045f, strokePaint);
+
+            playPath.reset();
+            playPath.moveTo(w * 0.47f, h * 0.40f);
+            playPath.lineTo(w * 0.47f, h * 0.55f);
+            playPath.lineTo(w * 0.61f, h * 0.475f);
+            playPath.close();
+            fillPaint.setColor(COLOR_ACCENT);
+            canvas.drawPath(playPath, fillPaint);
+
+            strokePaint.setStrokeWidth(unit * 0.045f);
+            strokePaint.setColor(0xFF73F2B0);
+            canvas.drawLine(w * 0.45f, h * 0.70f, w * 0.55f, h * 0.70f, strokePaint);
+            canvas.drawLine(w * 0.50f, h * 0.60f, w * 0.50f, h * 0.70f, strokePaint);
+
+            strokePaint.setStrokeWidth(unit * 0.035f);
+            strokePaint.setColor(0xAA73F2B0);
+            canvas.drawArc(w * 0.22f, h * 0.18f, w * 0.78f, h * 0.78f, -140, 34, false, strokePaint);
+            canvas.drawArc(w * 0.22f, h * 0.18f, w * 0.78f, h * 0.78f, -74, 34, false, strokePaint);
+        }
+    }
+
+    private static float dpFor(Context context, float value) {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            value,
+            context.getResources().getDisplayMetrics()
+        );
     }
 
     @Override

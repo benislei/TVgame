@@ -4,6 +4,7 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
+        android:icon="@drawable/ic_tvgame"
         android:label="电视游戏接收端"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">

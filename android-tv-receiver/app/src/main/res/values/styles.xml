@@ -4,6 +4,8 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#3B82F6</item>
+        <item name="android:windowBackground">#06100D</item>
+        <item name="android:navigationBarColor">#06100D</item>
+        <item name="android:colorAccent">#20D47D</item>
     </style>
 </resources>
