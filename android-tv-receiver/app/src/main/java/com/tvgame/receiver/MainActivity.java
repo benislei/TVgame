@@ -837,6 +837,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path playPath = new Path();
+        private final Path gripPath = new Path();
         private final RectF rect = new RectF();
 
         BrandMarkView(Context context) {
@@ -854,42 +855,53 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             float w = getWidth();
             float h = getHeight();
             float unit = Math.min(w, h);
-            float pad = unit * 0.08f;
-            float radius = unit * 0.22f;
+            float pad = unit * 0.04f;
+            float radius = unit * 0.23f;
 
             rect.set(pad, pad, w - pad, h - pad);
-            fillPaint.setColor(0xD80C241D);
+            fillPaint.setColor(0xF006100D);
             canvas.drawRoundRect(rect, radius, radius, fillPaint);
+
+            float innerPad = unit * 0.12f;
+            rect.set(innerPad, innerPad, w - innerPad, h - innerPad);
+            fillPaint.setColor(0xD810241E);
+            canvas.drawRoundRect(rect, radius * 0.78f, radius * 0.78f, fillPaint);
             strokePaint.setStrokeWidth(unit * 0.018f);
-            strokePaint.setColor(0x7732E88E);
+            strokePaint.setColor(0x667CF7BE);
             canvas.drawRoundRect(rect, radius, radius, strokePaint);
 
-            float left = w * 0.30f;
-            float top = h * 0.34f;
-            float right = w * 0.70f;
+            float left = w * 0.27f;
+            float top = h * 0.31f;
+            float right = w * 0.73f;
             float bottom = h * 0.60f;
             rect.set(left, top, right, bottom);
-            strokePaint.setStrokeWidth(unit * 0.055f);
-            strokePaint.setColor(0xFF73F2B0);
-            canvas.drawRoundRect(rect, unit * 0.045f, unit * 0.045f, strokePaint);
+            strokePaint.setStrokeWidth(unit * 0.06f);
+            strokePaint.setColor(COLOR_ACCENT);
+            canvas.drawRoundRect(rect, unit * 0.06f, unit * 0.06f, strokePaint);
 
             playPath.reset();
-            playPath.moveTo(w * 0.47f, h * 0.40f);
-            playPath.lineTo(w * 0.47f, h * 0.55f);
-            playPath.lineTo(w * 0.61f, h * 0.475f);
+            playPath.moveTo(w * 0.45f, h * 0.40f);
+            playPath.lineTo(w * 0.45f, h * 0.55f);
+            playPath.lineTo(w * 0.60f, h * 0.475f);
             playPath.close();
             fillPaint.setColor(COLOR_ACCENT);
             canvas.drawPath(playPath, fillPaint);
 
-            strokePaint.setStrokeWidth(unit * 0.045f);
-            strokePaint.setColor(0xFF73F2B0);
-            canvas.drawLine(w * 0.45f, h * 0.70f, w * 0.55f, h * 0.70f, strokePaint);
-            canvas.drawLine(w * 0.50f, h * 0.60f, w * 0.50f, h * 0.70f, strokePaint);
+            strokePaint.setStrokeWidth(unit * 0.055f);
+            strokePaint.setColor(COLOR_ACCENT);
+            canvas.drawLine(w * 0.50f, h * 0.60f, w * 0.50f, h * 0.73f, strokePaint);
+            canvas.drawLine(w * 0.41f, h * 0.73f, w * 0.59f, h * 0.73f, strokePaint);
 
-            strokePaint.setStrokeWidth(unit * 0.035f);
-            strokePaint.setColor(0xAA73F2B0);
-            canvas.drawArc(w * 0.22f, h * 0.18f, w * 0.78f, h * 0.78f, -140, 34, false, strokePaint);
-            canvas.drawArc(w * 0.22f, h * 0.18f, w * 0.78f, h * 0.78f, -74, 34, false, strokePaint);
+            strokePaint.setStrokeWidth(unit * 0.048f);
+            strokePaint.setColor(0xFF7CF7BE);
+            gripPath.reset();
+            gripPath.moveTo(w * 0.34f, h * 0.68f);
+            gripPath.cubicTo(w * 0.39f, h * 0.61f, w * 0.45f, h * 0.58f, w * 0.50f, h * 0.58f);
+            canvas.drawPath(gripPath, strokePaint);
+            gripPath.reset();
+            gripPath.moveTo(w * 0.66f, h * 0.68f);
+            gripPath.cubicTo(w * 0.61f, h * 0.61f, w * 0.55f, h * 0.58f, w * 0.50f, h * 0.58f);
+            canvas.drawPath(gripPath, strokePaint);
         }
     }
 

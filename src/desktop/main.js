@@ -36,6 +36,7 @@ function createWindow() {
     height: 900,
     minWidth: 1040,
     minHeight: 680,
+    icon: path.join(__dirname, 'assets', 'tvgame.ico'),
     title: 'TVGame 发送端',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

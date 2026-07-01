@@ -29,6 +29,7 @@
     "!InputBridge/obj/**"
   ],
   "win": {
+    "icon": "src/desktop/assets/tvgame.ico",
     "target": [
       "portable"
     ]

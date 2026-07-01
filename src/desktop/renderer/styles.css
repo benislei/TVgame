@@ -133,6 +133,13 @@ dd {
   border: 1px solid var(--line-strong);
 }
 
+.brand-mark svg {
+  width: 44px;
+  height: 44px;
+  stroke: none;
+  fill: none;
+}
+
 .rail-nav {
   display: flex;
   flex-direction: column;

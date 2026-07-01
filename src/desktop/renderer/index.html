@@ -10,10 +10,27 @@
     <div class="app-shell">
       <aside class="app-rail" aria-label="主导航">
         <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img" focusable="false">
-            <path d="M4.5 7.8 12 3.5l7.5 4.3v8.4L12 20.5l-7.5-4.3V7.8Z" />
-            <path d="m8 11 4-2.3 4 2.3-4 2.3L8 11Z" />
-            <path d="M8 14.4 12 16.7l4-2.3" />
+          <svg viewBox="0 0 512 512" role="img" focusable="false">
+            <defs>
+              <linearGradient id="brandMarkGradient" x1="146" y1="118" x2="364" y2="390" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#7CF7BE" />
+                <stop offset="0.52" stop-color="#20D47D" />
+                <stop offset="1" stop-color="#0C8E56" />
+              </linearGradient>
+              <filter id="brandMarkGlow" x="-28%" y="-28%" width="156%" height="156%" color-interpolation-filters="sRGB">
+                <feDropShadow dx="0" dy="0" stdDeviation="13" flood-color="#20D47D" flood-opacity="0.45" />
+              </filter>
+            </defs>
+            <rect width="512" height="512" rx="118" fill="#06100D" />
+            <rect x="55" y="55" width="402" height="402" rx="94" fill="#10241E" stroke="#7CF7BE" stroke-opacity="0.22" stroke-width="8" />
+            <g filter="url(#brandMarkGlow)">
+              <rect x="136" y="158" width="240" height="150" rx="31" fill="none" stroke="url(#brandMarkGradient)" stroke-width="24" />
+              <path d="M222 188L302 217L222 246V188Z" fill="url(#brandMarkGradient)" />
+              <path d="M256 308V366" fill="none" stroke="url(#brandMarkGradient)" stroke-width="24" stroke-linecap="round" />
+              <path d="M208 366H304" fill="none" stroke="url(#brandMarkGradient)" stroke-width="24" stroke-linecap="round" />
+              <path d="M177 343C187 325 204 313 226 308" fill="none" stroke="#7CF7BE" stroke-width="20" stroke-linecap="round" />
+              <path d="M335 343C325 325 308 313 286 308" fill="none" stroke="#7CF7BE" stroke-width="20" stroke-linecap="round" />
+            </g>
           </svg>
         </div>
 
