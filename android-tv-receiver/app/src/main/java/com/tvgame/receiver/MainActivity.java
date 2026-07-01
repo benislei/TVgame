@@ -403,19 +403,19 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             layer,
             designInfoCard("推荐操作", "发送端手动输入 IP", "手动输入更稳定，自动搜索仅作为辅助入口。"),
             92,
-            852,
+            816,
             510,
-            148
+            156
         );
         placeDesign(
             layer,
             designInfoCard("输入回传", "手柄与键鼠", "识别到输入设备后回传到电脑端输入桥。"),
             705,
-            852,
+            816,
             510,
-            148
+            156
         );
-        placeDesign(layer, designStreamPreviewCard(), 1310, 842, 520, 166);
+        placeDesign(layer, designStreamPreviewCard(), 1304, 810, 528, 176);
 
         return layer;
     }
@@ -512,19 +512,19 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private LinearLayout designInfoCard(String label, String title, String body) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(p(28), p(22), p(28), p(18));
-        card.setBackground(designRounded(0x7017533D, 0xA873F2B0, 2, 28));
+        card.setPadding(p(28), p(20), p(28), p(16));
+        card.setBackground(designRounded(0x6417533D, 0x9A73F2B0, 2, 28));
 
-        TextView labelView = designText(label, 16, COLOR_ACCENT, Typeface.BOLD);
+        TextView labelView = designText(label, 15, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
 
-        TextView titleView = designText(title, 26, COLOR_TEXT, Typeface.BOLD);
-        titleView.setPadding(0, p(10), 0, 0);
+        TextView titleView = designText(title, 24, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(9), 0, 0);
         titleView.setMaxLines(2);
         card.addView(titleView);
 
-        TextView bodyView = designText(body, 16, COLOR_MUTED, Typeface.NORMAL);
-        bodyView.setPadding(0, p(10), 0, 0);
+        TextView bodyView = designText(body, 15, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setPadding(0, p(9), 0, 0);
         bodyView.setMaxLines(2);
         card.addView(bodyView);
         return card;
@@ -533,30 +533,30 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private LinearLayout designStreamPreviewCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(p(28), p(22), p(28), p(18));
-        card.setBackground(designRounded(0x7017533D, 0xA873F2B0, 2, 28));
+        card.setPadding(p(28), p(18), p(28), p(14));
+        card.setBackground(designRounded(0x6417533D, 0x9A73F2B0, 2, 28));
 
-        TextView labelView = designText("串流浮层预览", 16, COLOR_ACCENT, Typeface.BOLD);
+        TextView labelView = designText("串流浮层预览", 14, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
 
-        TextView titleView = designText("诊断默认隐藏", 25, COLOR_TEXT, Typeface.BOLD);
-        titleView.setPadding(0, p(10), 0, 0);
+        TextView titleView = designText("诊断默认隐藏", 22, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(8), 0, 0);
         card.addView(titleView);
 
-        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 16, COLOR_TEXT, Typeface.BOLD);
-        bodyView.setPadding(0, p(10), 0, 0);
+        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 14, COLOR_TEXT, Typeface.BOLD);
+        bodyView.setPadding(0, p(8), 0, 0);
         card.addView(bodyView);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, p(14), 0, 0);
-        streamPreviewFps = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewLoss = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewAudio = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
-        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 58, 18));
-        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 58, 18));
-        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 58, 0));
+        row.setPadding(0, p(10), 0, 0);
+        streamPreviewFps = designText("--", 18, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewLoss = designText("--", 18, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewAudio = designText("--", 18, COLOR_TEXT, Typeface.BOLD);
+        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(134, 46, 16));
+        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(134, 46, 16));
+        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(134, 46, 0));
         card.addView(row);
         return card;
     }
@@ -568,8 +568,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         item.setPadding(p(16), 0, p(16), 0);
         item.setBackground(designRounded(0xB20A1713, 0, 0, 18));
 
-        TextView labelView = designText(label, 14, COLOR_MUTED, Typeface.NORMAL);
-        labelView.setPadding(0, 0, 0, p(5));
+        TextView labelView = designText(label, 12, COLOR_MUTED, Typeface.NORMAL);
+        labelView.setPadding(0, 0, 0, p(3));
         item.addView(labelView);
         item.addView(valueView);
         return item;
