@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.InputDevice;
@@ -338,7 +339,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         BrandMarkView brandMark = new BrandMarkView(this);
-        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(56), dp(56));
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(wdp(48), wdp(48));
         brandRow.addView(brandMark, markParams);
 
         LinearLayout brandCopy = new LinearLayout(this);
@@ -347,10 +348,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        brandCopyParams.setMargins(dp(14), 0, 0, 0);
-        TextView title = text("TVGame 接收端", 24, COLOR_TEXT, Typeface.BOLD);
-        TextView subtitle = text("局域网游戏串流", 13, COLOR_MUTED, Typeface.NORMAL);
-        subtitle.setPadding(0, dp(5), 0, 0);
+        brandCopyParams.setMargins(wdp(12), 0, 0, 0);
+        TextView title = text("TVGame 接收端", 22, COLOR_TEXT, Typeface.BOLD);
+        TextView subtitle = text("局域网游戏串流", 12, COLOR_MUTED, Typeface.NORMAL);
+        subtitle.setPadding(0, wdp(5), 0, 0);
         brandCopy.addView(title);
         brandCopy.addView(subtitle);
         brandRow.addView(brandCopy, brandCopyParams);
@@ -360,7 +361,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP | Gravity.START
         );
-        brandParams.setMargins(dp(48), dp(42), 0, 0);
+        brandParams.setMargins(wdp(48), wdp(38), 0, 0);
         layer.addView(brandRow, brandParams);
 
         LinearLayout chipRow = new LinearLayout(this);
@@ -368,55 +369,55 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         chipRow.setGravity(Gravity.CENTER_VERTICAL);
         topStatusChip = chip("监听中", COLOR_ACCENT, COLOR_ACCENT_SOFT);
         chipRow.addView(topStatusChip);
-        chipRow.addView(chip("Android 11+", COLOR_TEXT, 0x2214A96F), marginLeft(dp(10)));
-        chipRow.addView(chip("按比例显示", COLOR_TEXT, 0x2214A96F), marginLeft(dp(10)));
+        chipRow.addView(chip("Android 11+", COLOR_TEXT, 0x2214A96F), marginLeft(wdp(9)));
+        chipRow.addView(chip("按比例显示", COLOR_TEXT, 0x2214A96F), marginLeft(wdp(9)));
         FrameLayout.LayoutParams chipsParams = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.TOP | Gravity.END
         );
-        chipsParams.setMargins(0, dp(46), dp(54), 0);
+        chipsParams.setMargins(0, wdp(42), wdp(52), 0);
         layer.addView(chipRow, chipsParams);
 
         LinearLayout center = new LinearLayout(this);
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER_HORIZONTAL);
         BrandMarkView heroMark = new BrandMarkView(this);
-        center.addView(heroMark, new LinearLayout.LayoutParams(dp(78), dp(78)));
+        center.addView(heroMark, new LinearLayout.LayoutParams(wdp(68), wdp(68)));
 
-        waitingHeadline = text("等待电脑发送画面", 30, COLOR_TEXT, Typeface.BOLD);
+        waitingHeadline = text("等待电脑发送画面", 26, COLOR_TEXT, Typeface.BOLD);
         waitingHeadline.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams headlineParams = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        headlineParams.setMargins(0, dp(24), 0, 0);
+        headlineParams.setMargins(0, wdp(18), 0, 0);
         center.addView(waitingHeadline, headlineParams);
 
-        waitingSubline = text("在发送端输入这台电视的 IP。连接成功后自动进入全屏，复杂诊断默认隐藏。", 15, COLOR_MUTED, Typeface.NORMAL);
+        waitingSubline = text("在发送端输入这台电视的 IP。连接成功后自动进入全屏，复杂诊断默认隐藏。", 13, COLOR_MUTED, Typeface.NORMAL);
         waitingSubline.setGravity(Gravity.CENTER);
-        waitingSubline.setMaxWidth(dp(720));
-        waitingSubline.setPadding(0, dp(14), 0, 0);
+        waitingSubline.setMaxWidth(wdp(760));
+        waitingSubline.setPadding(0, wdp(12), 0, 0);
         center.addView(waitingSubline);
 
         LinearLayout metricStrip = new LinearLayout(this);
         metricStrip.setGravity(Gravity.CENTER);
         metricStrip.setOrientation(LinearLayout.HORIZONTAL);
-        metricStrip.setPadding(dp(12), dp(12), dp(12), dp(12));
+        metricStrip.setPadding(wdp(8), wdp(8), wdp(8), wdp(8));
         metricStrip.setBackground(rounded(0x8A08120F, 0x333EE49A, 1, 26));
         localIpValue = metricValue("本机 IP", localIp);
         videoPortValue = metricValue("视频端口", String.valueOf(VIDEO_PORT));
         audioPortValue = metricValue("音频端口", String.valueOf(AUDIO_PORT));
         inputPortValue = metricValue("输入端口", String.valueOf(INPUT_RELAY_PORT));
-        metricStrip.addView(localIpValue, metricItemParams(250));
-        metricStrip.addView(videoPortValue, metricItemParams(170));
-        metricStrip.addView(audioPortValue, metricItemParams(170));
-        metricStrip.addView(inputPortValue, metricItemParams(170));
+        metricStrip.addView(localIpValue, metricItemParams(230));
+        metricStrip.addView(videoPortValue, metricItemParams(145));
+        metricStrip.addView(audioPortValue, metricItemParams(145));
+        metricStrip.addView(inputPortValue, metricItemParams(145));
         LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        stripParams.setMargins(0, dp(48), 0, 0);
+        stripParams.setMargins(0, wdp(30), 0, 0);
         center.addView(metricStrip, stripParams);
 
         FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
@@ -424,7 +425,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.CENTER
         );
-        centerParams.setMargins(0, 0, 0, dp(18));
+        centerParams.setMargins(0, 0, 0, compactWaitingLayout() ? wdp(190) : wdp(86));
         layer.addView(center, centerParams);
 
         LinearLayout bottom = new LinearLayout(this);
@@ -438,7 +439,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.BOTTOM
         );
-        bottomParams.setMargins(dp(48), 0, dp(48), dp(44));
+        bottomParams.setMargins(wdp(48), 0, wdp(48), wdp(38));
         layer.addView(bottom, bottomParams);
 
         return layer;
@@ -486,23 +487,25 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextColor(color);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, wsp(sp));
         view.setTypeface(Typeface.DEFAULT, style);
         view.setIncludeFontPadding(false);
+        view.setLineSpacing(0.0f, 1.05f);
         return view;
     }
 
     private TextView chip(String value, int color, int fillColor) {
-        TextView view = text(value, 14, color, Typeface.BOLD);
+        TextView view = text(value, 12, color, Typeface.BOLD);
         view.setGravity(Gravity.CENTER);
-        view.setPadding(dp(18), dp(9), dp(18), dp(9));
+        view.setPadding(wdp(16), wdp(8), wdp(16), wdp(8));
         view.setBackground(rounded(fillColor, 0x554EE89F, 1, 24));
         return view;
     }
 
     private TextView metricValue(String label, String value) {
-        TextView view = text(label + "\n" + value, 20, COLOR_TEXT, Typeface.BOLD);
-        view.setPadding(dp(18), dp(12), dp(18), dp(12));
+        TextView view = text(label + "\n" + value, 16, COLOR_TEXT, Typeface.BOLD);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setPadding(wdp(14), wdp(9), wdp(14), wdp(9));
         view.setBackground(rounded(COLOR_FIELD, 0x0020D47D, 0, 16));
         return view;
     }
@@ -510,14 +513,16 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private LinearLayout infoCard(String label, String title, String body) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(20), dp(18), dp(20), dp(18));
+        card.setPadding(wdp(17), wdp(14), wdp(17), wdp(14));
         card.setBackground(rounded(COLOR_PANEL_SOFT, 0x6632E88E, 1, 22));
-        card.addView(text(label, 13, COLOR_ACCENT, Typeface.BOLD));
-        TextView titleView = text(title, 20, COLOR_TEXT, Typeface.BOLD);
-        titleView.setPadding(0, dp(10), 0, 0);
+        card.addView(text(label, 11, COLOR_ACCENT, Typeface.BOLD));
+        TextView titleView = text(title, 17, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, wdp(8), 0, 0);
+        titleView.setMaxLines(2);
         card.addView(titleView);
-        TextView bodyView = text(body, 13, COLOR_MUTED, Typeface.NORMAL);
-        bodyView.setPadding(0, dp(8), 0, 0);
+        TextView bodyView = text(body, 11, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setPadding(0, wdp(7), 0, 0);
+        bodyView.setMaxLines(3);
         card.addView(bodyView);
         return card;
     }
@@ -527,7 +532,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, dp(14), 0, 0);
+        row.setPadding(0, wdp(10), 0, 0);
         streamPreviewFps = smallMetric("画面", "--");
         streamPreviewLoss = smallMetric("丢包", "--");
         streamPreviewAudio = smallMetric("声音", "--");
@@ -539,8 +544,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     private TextView smallMetric(String label, String value) {
-        TextView view = text(label + "\n" + value, 14, COLOR_TEXT, Typeface.BOLD);
-        view.setPadding(dp(12), dp(10), dp(12), dp(10));
+        TextView view = text(label + "\n" + value, 11, COLOR_TEXT, Typeface.BOLD);
+        view.setPadding(wdp(10), wdp(8), wdp(10), wdp(8));
         view.setBackground(rounded(0xB20A1713, 0, 0, 14));
         return view;
     }
@@ -565,25 +570,53 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     private LinearLayout.LayoutParams metricItemParams(int widthDp) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(widthDp), LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.setMargins(dp(6), 0, dp(6), 0);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(wdp(widthDp), LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(wdp(5), 0, wdp(5), 0);
         return params;
     }
 
     private LinearLayout.LayoutParams weightedCardParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        params.setMargins(dp(10), 0, dp(10), 0);
+        params.setMargins(wdp(9), 0, wdp(9), 0);
         return params;
     }
 
     private LinearLayout.LayoutParams equalSmallMetricParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        params.setMargins(dp(4), 0, dp(4), 0);
+        params.setMargins(wdp(3), 0, wdp(3), 0);
         return params;
     }
 
     private int dp(float value) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics()));
+    }
+
+    private int wdp(float value) {
+        return dp(value * waitingUiScale());
+    }
+
+    private int wsp(float value) {
+        return Math.max(9, Math.round(value * waitingUiScale()));
+    }
+
+    private float waitingUiScale() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        int shortSide = Math.min(metrics.widthPixels, metrics.heightPixels);
+        if (shortSide <= 720) {
+            return 0.64f;
+        }
+        if (shortSide <= 1080) {
+            return 0.76f;
+        }
+        if (shortSide <= 1440) {
+            return 0.88f;
+        }
+        return 1.0f;
+    }
+
+    private boolean compactWaitingLayout() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        return Math.min(metrics.widthPixels, metrics.heightPixels) <= 1200;
     }
 
     private static String resolveLocalIpv4Address() {
