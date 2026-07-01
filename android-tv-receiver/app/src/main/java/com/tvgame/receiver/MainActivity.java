@@ -336,12 +336,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ));
+        layer.setClipChildren(false);
+        layer.setClipToPadding(false);
 
         LinearLayout brandRow = new LinearLayout(this);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         BrandMarkView brandMark = new BrandMarkView(this);
-        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(p(68), p(68));
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(p(70), p(70));
         brandRow.addView(brandMark, markParams);
 
         LinearLayout brandCopy = new LinearLayout(this);
@@ -351,9 +353,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
         brandCopyParams.setMargins(p(22), 0, 0, 0);
-        TextView title = designText("TVGame 接收端", 34, COLOR_TEXT, Typeface.BOLD);
-        TextView subtitle = designText("局域网游戏串流", 20, COLOR_MUTED, Typeface.NORMAL);
-        subtitle.setPadding(0, p(10), 0, 0);
+        TextView title = designText("TVGame 接收端", 32, COLOR_TEXT, Typeface.BOLD);
+        TextView subtitle = designText("局域网游戏串流", 18, COLOR_MUTED, Typeface.NORMAL);
+        subtitle.setPadding(0, p(9), 0, 0);
         brandCopy.addView(title);
         brandCopy.addView(subtitle);
         brandRow.addView(brandCopy, brandCopyParams);
@@ -362,44 +364,46 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         LinearLayout chipRow = new LinearLayout(this);
         chipRow.setOrientation(LinearLayout.HORIZONTAL);
         chipRow.setGravity(Gravity.CENTER_VERTICAL);
-        topStatusChip = designChip("●  监听中", COLOR_ACCENT, 0x7714A96F);
-        chipRow.addView(topStatusChip, designRowParams(132, -1, 14));
-        chipRow.addView(designChip("Android 11+", COLOR_TEXT, 0x1614A96F), designRowParams(160, -1, 14));
-        chipRow.addView(designChip("按比例显示", COLOR_TEXT, 0x1614A96F), designRowParams(168, -1, 0));
-        placeDesign(layer, chipRow, 1384, 125, 456, 58);
+        chipRow.setClipChildren(false);
+        chipRow.setClipToPadding(false);
+        topStatusChip = designChip("●  监听中", COLOR_ACCENT, 0x9A14A96F);
+        chipRow.addView(topStatusChip, designRowParams(126, -1, 14));
+        chipRow.addView(designChip("Android 11+", COLOR_TEXT, 0x1414A96F), designRowParams(156, -1, 14));
+        chipRow.addView(designChip("按比例显示", COLOR_TEXT, 0x1414A96F), designRowParams(166, -1, 0));
+        placeDesign(layer, chipRow, 1370, 123, 492, 58);
 
         BrandMarkView heroMark = new BrandMarkView(this);
-        placeDesign(layer, heroMark, 904, 296, 112, 112);
+        placeDesign(layer, heroMark, 904, 294, 114, 114);
 
-        waitingHeadline = designText("等待电脑发送画面", 48, COLOR_TEXT, Typeface.BOLD);
+        waitingHeadline = designText("等待电脑发送画面", 46, COLOR_TEXT, Typeface.BOLD);
         waitingHeadline.setGravity(Gravity.CENTER);
-        placeDesign(layer, waitingHeadline, 0, 452, WAIT_DESIGN_WIDTH, 62);
+        placeDesign(layer, waitingHeadline, 0, 452, WAIT_DESIGN_WIDTH, 60);
 
-        waitingSubline = designText("在发送端输入这台电视的 IP。连接成功后自动进入全屏，默认隐藏复杂日志，只在需要时显示诊断浮层。", 24, COLOR_MUTED, Typeface.NORMAL);
+        waitingSubline = designText("在发送端输入这台电视的 IP。连接成功后自动进入全屏，默认隐藏复杂日志，只在需要时显示诊断浮层。", 22, COLOR_MUTED, Typeface.NORMAL);
         waitingSubline.setGravity(Gravity.CENTER);
         waitingSubline.setMaxLines(2);
-        placeDesign(layer, waitingSubline, 430, 535, 1060, 76);
+        placeDesign(layer, waitingSubline, 455, 533, 1010, 76);
 
         LinearLayout metricStrip = new LinearLayout(this);
         metricStrip.setGravity(Gravity.CENTER);
         metricStrip.setOrientation(LinearLayout.HORIZONTAL);
         metricStrip.setPadding(p(18), p(16), p(18), p(16));
-        metricStrip.setBackground(designRounded(0x9A08120F, 0x553EE49A, 2, 58));
-        localIpValue = designMetricValue(localIp, 42);
-        videoPortValue = designMetricValue(String.valueOf(VIDEO_PORT), 30);
-        audioPortValue = designMetricValue(String.valueOf(AUDIO_PORT), 30);
-        inputPortValue = designMetricValue(String.valueOf(INPUT_RELAY_PORT), 30);
+        metricStrip.setBackground(designRounded(0x8F08120F, 0x9FC8DDD3, 2, 58));
+        localIpValue = designMetricValue(localIp, 40);
+        videoPortValue = designMetricValue(String.valueOf(VIDEO_PORT), 29);
+        audioPortValue = designMetricValue(String.valueOf(AUDIO_PORT), 29);
+        inputPortValue = designMetricValue(String.valueOf(INPUT_RELAY_PORT), 29);
         metricStrip.addView(designMetricCard("本机 IP", localIpValue), designRowParams(350, -1, 26));
         metricStrip.addView(designMetricCard("视频端口", videoPortValue), designRowParams(230, -1, 26));
         metricStrip.addView(designMetricCard("音频端口", audioPortValue), designRowParams(230, -1, 26));
         metricStrip.addView(designMetricCard("输入端口", inputPortValue), designRowParams(230, -1, 0));
-        placeDesign(layer, metricStrip, 390, 670, 1140, 132);
+        placeDesign(layer, metricStrip, 390, 670, 1140, 130);
 
         placeDesign(
             layer,
             designInfoCard("推荐操作", "发送端手动输入 IP", "手动输入更稳定，自动搜索仅作为辅助入口。"),
             92,
-            858,
+            852,
             510,
             148
         );
@@ -407,11 +411,11 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             layer,
             designInfoCard("输入回传", "手柄与键鼠", "识别到输入设备后回传到电脑端输入桥。"),
             705,
-            858,
+            852,
             510,
             148
         );
-        placeDesign(layer, designStreamPreviewCard(), 1310, 842, 520, 172);
+        placeDesign(layer, designStreamPreviewCard(), 1310, 842, 520, 166);
 
         return layer;
     }
@@ -479,7 +483,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     private TextView designChip(String value, int color, int fillColor) {
-        TextView view = designText(value, 22, color, Typeface.BOLD);
+        TextView view = designText(value, 20, color, Typeface.BOLD);
         view.setGravity(Gravity.CENTER);
         view.setBackground(designRounded(fillColor, 0x554EE89F, 2, 28));
         return view;
@@ -498,8 +502,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         card.setPadding(p(22), 0, p(22), 0);
         card.setBackground(designRounded(0xA7091511, 0, 0, 34));
 
-        TextView labelView = designText(label, 19, COLOR_MUTED, Typeface.BOLD);
-        labelView.setPadding(0, 0, 0, p(9));
+        TextView labelView = designText(label, 18, COLOR_MUTED, Typeface.BOLD);
+        labelView.setPadding(0, 0, 0, p(8));
         card.addView(labelView);
         card.addView(valueView);
         return card;
@@ -509,7 +513,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(p(28), p(24), p(28), p(22));
-        card.setBackground(designRounded(COLOR_PANEL_SOFT, 0x8832E88E, 2, 28));
+        card.setBackground(designRounded(0xA317533D, 0xB573F2B0, 2, 28));
 
         TextView labelView = designText(label, 18, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
@@ -519,7 +523,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         titleView.setMaxLines(2);
         card.addView(titleView);
 
-        TextView bodyView = designText(body, 20, COLOR_MUTED, Typeface.NORMAL);
+        TextView bodyView = designText(body, 19, COLOR_MUTED, Typeface.NORMAL);
         bodyView.setPadding(0, p(12), 0, 0);
         bodyView.setMaxLines(2);
         card.addView(bodyView);
@@ -530,29 +534,29 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(p(28), p(24), p(28), p(22));
-        card.setBackground(designRounded(0xB6122A22, 0xAA73F2B0, 2, 28));
+        card.setBackground(designRounded(0xA317533D, 0xB573F2B0, 2, 28));
 
         TextView labelView = designText("串流浮层预览", 18, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
 
-        TextView titleView = designText("诊断默认隐藏", 30, COLOR_TEXT, Typeface.BOLD);
+        TextView titleView = designText("诊断默认隐藏", 29, COLOR_TEXT, Typeface.BOLD);
         titleView.setPadding(0, p(12), 0, 0);
         card.addView(titleView);
 
-        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 19, COLOR_TEXT, Typeface.BOLD);
+        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 18, COLOR_TEXT, Typeface.BOLD);
         bodyView.setPadding(0, p(12), 0, 0);
         card.addView(bodyView);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, p(22), 0, 0);
-        streamPreviewFps = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewLoss = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewAudio = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
-        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 70, 18));
-        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 70, 18));
-        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 70, 0));
+        row.setPadding(0, p(18), 0, 0);
+        streamPreviewFps = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewLoss = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewAudio = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
+        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 64, 18));
+        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 64, 18));
+        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 64, 0));
         card.addView(row);
         return card;
     }
@@ -564,8 +568,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         item.setPadding(p(16), 0, p(16), 0);
         item.setBackground(designRounded(0xB20A1713, 0, 0, 18));
 
-        TextView labelView = designText(label, 17, COLOR_MUTED, Typeface.NORMAL);
-        labelView.setPadding(0, 0, 0, p(7));
+        TextView labelView = designText(label, 16, COLOR_MUTED, Typeface.NORMAL);
+        labelView.setPadding(0, 0, 0, p(6));
         item.addView(labelView);
         item.addView(valueView);
         return item;
@@ -798,28 +802,28 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             fillPaint.setColor(COLOR_BG);
             canvas.drawRect(0, 0, width, height, fillPaint);
 
-            fillPaint.setColor(0x3A10A767);
-            canvas.drawCircle(ox - 110 * scale, oy + 350 * scale, 360 * scale, fillPaint);
-            fillPaint.setColor(0x361EDB88);
-            canvas.drawCircle(ox + 1530 * scale, oy + 530 * scale, 350 * scale, fillPaint);
-            fillPaint.setColor(0x231C6B4A);
-            canvas.drawCircle(ox + 930 * scale, oy + 1055 * scale, 390 * scale, fillPaint);
+            fillPaint.setColor(0x4410A767);
+            canvas.drawCircle(ox - 86 * scale, oy + 365 * scale, 392 * scale, fillPaint);
+            fillPaint.setColor(0x351EDB88);
+            canvas.drawCircle(ox + 1495 * scale, oy + 535 * scale, 385 * scale, fillPaint);
+            fillPaint.setColor(0x261C6B4A);
+            canvas.drawCircle(ox + 890 * scale, oy + 1052 * scale, 455 * scale, fillPaint);
 
             rect.set(ox + 34 * scale, oy + 70 * scale, ox + 1886 * scale, oy + 1048 * scale);
-            fillPaint.setColor(0xB907110F);
+            fillPaint.setColor(0xA807110F);
             canvas.drawRoundRect(rect, 60 * scale, 60 * scale, fillPaint);
             strokePaint.setStrokeWidth(Math.max(1.0f, 1.5f * scale));
-            strokePaint.setColor(0x2E3EE49A);
+            strokePaint.setColor(0x383EE49A);
             canvas.drawRoundRect(rect, 60 * scale, 60 * scale, strokePaint);
 
             RectF gridRect = new RectF(
-                ox + 300 * scale,
-                oy + 175 * scale,
-                ox + 1620 * scale,
-                oy + 835 * scale
+                ox + 305 * scale,
+                oy + 176 * scale,
+                ox + 1618 * scale,
+                oy + 836 * scale
             );
             gridPaint.setStrokeWidth(Math.max(1.0f, 1.0f * scale));
-            gridPaint.setColor(0x163EE49A);
+            gridPaint.setColor(0x1B73F2B0);
             float step = 64 * scale;
             for (float x = gridRect.left; x <= gridRect.right; x += step) {
                 canvas.drawLine(x, gridRect.top, x, gridRect.bottom, gridPaint);
