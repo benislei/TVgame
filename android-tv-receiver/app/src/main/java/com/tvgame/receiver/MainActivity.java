@@ -59,6 +59,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final float VIDEO_ASPECT_RATIO = 16.0f / 9.0f;
     private static final float WAIT_DESIGN_WIDTH = 1920.0f;
     private static final float WAIT_DESIGN_HEIGHT = 1080.0f;
+    private static final float WAIT_FRAME_LEFT = 34.0f;
+    private static final float WAIT_FRAME_TOP = 70.0f;
+    private static final float WAIT_FRAME_RIGHT = 1886.0f;
+    private static final float WAIT_FRAME_BOTTOM = 1048.0f;
+    private static final float WAIT_FRAME_WIDTH = WAIT_FRAME_RIGHT - WAIT_FRAME_LEFT;
+    private static final float WAIT_FRAME_HEIGHT = WAIT_FRAME_BOTTOM - WAIT_FRAME_TOP;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
     private static final int BUTTON_A = 1 << 0;
     private static final int BUTTON_B = 1 << 1;
@@ -377,7 +383,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
         waitingHeadline = designText("等待电脑发送画面", 46, COLOR_TEXT, Typeface.BOLD);
         waitingHeadline.setGravity(Gravity.CENTER);
-        placeDesign(layer, waitingHeadline, 0, 452, WAIT_DESIGN_WIDTH, 60);
+        placeDesign(layer, waitingHeadline, WAIT_FRAME_LEFT, 452, WAIT_FRAME_WIDTH, 60);
 
         waitingSubline = designText("在发送端输入这台电视的 IP。连接成功后自动进入全屏，默认隐藏复杂日志，只在需要时显示诊断浮层。", 22, COLOR_MUTED, Typeface.NORMAL);
         waitingSubline.setGravity(Gravity.CENTER);
@@ -460,7 +466,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
     private FrameLayout.LayoutParams designFrame(float x, float y, float width, float height) {
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(p(width), p(height));
-        params.setMargins(stageLeftPx() + p(x), stageTopPx() + p(y), 0, 0);
+        params.setMargins(stageLeftPx() + p(x - WAIT_FRAME_LEFT), stageTopPx() + p(y - WAIT_FRAME_TOP), 0, 0);
         return params;
     }
 
@@ -597,17 +603,17 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private int stageLeftPx() {
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         float scale = waitStageScale();
-        return Math.round((metrics.widthPixels - WAIT_DESIGN_WIDTH * scale) / 2.0f);
+        return Math.round((metrics.widthPixels - WAIT_FRAME_WIDTH * scale) / 2.0f);
     }
 
     private int stageTopPx() {
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         float scale = waitStageScale();
-        return Math.round((metrics.heightPixels - WAIT_DESIGN_HEIGHT * scale) / 2.0f);
+        return Math.round((metrics.heightPixels - WAIT_FRAME_HEIGHT * scale) / 2.0f);
     }
 
     private static float stageScale(int width, int height) {
-        return Math.min(width / WAIT_DESIGN_WIDTH, height / WAIT_DESIGN_HEIGHT);
+        return Math.min(width / WAIT_FRAME_WIDTH, height / WAIT_FRAME_HEIGHT);
     }
 
     private boolean hasFreshVideo(long nowMs) {
@@ -797,30 +803,23 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             int width = getWidth();
             int height = getHeight();
             float scale = stageScale(width, height);
-            float ox = (width - WAIT_DESIGN_WIDTH * scale) / 2.0f;
-            float oy = (height - WAIT_DESIGN_HEIGHT * scale) / 2.0f;
+            float ox = (width - WAIT_FRAME_WIDTH * scale) / 2.0f;
+            float oy = (height - WAIT_FRAME_HEIGHT * scale) / 2.0f;
             fillPaint.setColor(COLOR_BG);
             canvas.drawRect(0, 0, width, height, fillPaint);
 
             fillPaint.setColor(0x3610A767);
-            canvas.drawCircle(ox - 86 * scale, oy + 365 * scale, 390 * scale, fillPaint);
+            canvas.drawCircle(ox + (-86 - WAIT_FRAME_LEFT) * scale, oy + (365 - WAIT_FRAME_TOP) * scale, 390 * scale, fillPaint);
             fillPaint.setColor(0x2E1EDB88);
-            canvas.drawCircle(ox + 1495 * scale, oy + 535 * scale, 385 * scale, fillPaint);
+            canvas.drawCircle(ox + (1495 - WAIT_FRAME_LEFT) * scale, oy + (535 - WAIT_FRAME_TOP) * scale, 385 * scale, fillPaint);
             fillPaint.setColor(0x151C6B4A);
-            canvas.drawCircle(ox + 890 * scale, oy + 1115 * scale, 455 * scale, fillPaint);
-
-            rect.set(ox + 34 * scale, oy + 70 * scale, ox + 1886 * scale, oy + 1048 * scale);
-            fillPaint.setColor(0xA807110F);
-            canvas.drawRoundRect(rect, 60 * scale, 60 * scale, fillPaint);
-            strokePaint.setStrokeWidth(Math.max(1.0f, 1.5f * scale));
-            strokePaint.setColor(0x383EE49A);
-            canvas.drawRoundRect(rect, 60 * scale, 60 * scale, strokePaint);
+            canvas.drawCircle(ox + (890 - WAIT_FRAME_LEFT) * scale, oy + (1115 - WAIT_FRAME_TOP) * scale, 455 * scale, fillPaint);
 
             RectF gridRect = new RectF(
-                ox + 305 * scale,
-                oy + 176 * scale,
-                ox + 1618 * scale,
-                oy + 836 * scale
+                ox + (305 - WAIT_FRAME_LEFT) * scale,
+                oy + (176 - WAIT_FRAME_TOP) * scale,
+                ox + (1618 - WAIT_FRAME_LEFT) * scale,
+                oy + (836 - WAIT_FRAME_TOP) * scale
             );
             gridPaint.setStrokeWidth(Math.max(1.0f, 1.0f * scale));
             gridPaint.setColor(0x1673F2B0);
