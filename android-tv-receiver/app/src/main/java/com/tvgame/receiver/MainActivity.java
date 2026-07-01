@@ -512,19 +512,19 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private LinearLayout designInfoCard(String label, String title, String body) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(p(28), p(24), p(28), p(22));
-        card.setBackground(designRounded(0xA317533D, 0xB573F2B0, 2, 28));
+        card.setPadding(p(28), p(22), p(28), p(18));
+        card.setBackground(designRounded(0x7017533D, 0xA873F2B0, 2, 28));
 
-        TextView labelView = designText(label, 18, COLOR_ACCENT, Typeface.BOLD);
+        TextView labelView = designText(label, 16, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
 
-        TextView titleView = designText(title, 30, COLOR_TEXT, Typeface.BOLD);
-        titleView.setPadding(0, p(12), 0, 0);
+        TextView titleView = designText(title, 26, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(10), 0, 0);
         titleView.setMaxLines(2);
         card.addView(titleView);
 
-        TextView bodyView = designText(body, 19, COLOR_MUTED, Typeface.NORMAL);
-        bodyView.setPadding(0, p(12), 0, 0);
+        TextView bodyView = designText(body, 16, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setPadding(0, p(10), 0, 0);
         bodyView.setMaxLines(2);
         card.addView(bodyView);
         return card;
@@ -533,30 +533,30 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private LinearLayout designStreamPreviewCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(p(28), p(24), p(28), p(22));
-        card.setBackground(designRounded(0xA317533D, 0xB573F2B0, 2, 28));
+        card.setPadding(p(28), p(22), p(28), p(18));
+        card.setBackground(designRounded(0x7017533D, 0xA873F2B0, 2, 28));
 
-        TextView labelView = designText("串流浮层预览", 18, COLOR_ACCENT, Typeface.BOLD);
+        TextView labelView = designText("串流浮层预览", 16, COLOR_ACCENT, Typeface.BOLD);
         card.addView(labelView);
 
-        TextView titleView = designText("诊断默认隐藏", 29, COLOR_TEXT, Typeface.BOLD);
-        titleView.setPadding(0, p(12), 0, 0);
+        TextView titleView = designText("诊断默认隐藏", 25, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(10), 0, 0);
         card.addView(titleView);
 
-        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 18, COLOR_TEXT, Typeface.BOLD);
-        bodyView.setPadding(0, p(12), 0, 0);
+        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 16, COLOR_TEXT, Typeface.BOLD);
+        bodyView.setPadding(0, p(10), 0, 0);
         card.addView(bodyView);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, p(18), 0, 0);
-        streamPreviewFps = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewLoss = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
-        streamPreviewAudio = designText("--", 23, COLOR_TEXT, Typeface.BOLD);
-        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 64, 18));
-        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 64, 18));
-        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 64, 0));
+        row.setPadding(0, p(14), 0, 0);
+        streamPreviewFps = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewLoss = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewAudio = designText("--", 21, COLOR_TEXT, Typeface.BOLD);
+        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 58, 18));
+        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 58, 18));
+        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 58, 0));
         card.addView(row);
         return card;
     }
@@ -568,8 +568,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         item.setPadding(p(16), 0, p(16), 0);
         item.setBackground(designRounded(0xB20A1713, 0, 0, 18));
 
-        TextView labelView = designText(label, 16, COLOR_MUTED, Typeface.NORMAL);
-        labelView.setPadding(0, 0, 0, p(6));
+        TextView labelView = designText(label, 14, COLOR_MUTED, Typeface.NORMAL);
+        labelView.setPadding(0, 0, 0, p(5));
         item.addView(labelView);
         item.addView(valueView);
         return item;
@@ -802,12 +802,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             fillPaint.setColor(COLOR_BG);
             canvas.drawRect(0, 0, width, height, fillPaint);
 
-            fillPaint.setColor(0x4410A767);
-            canvas.drawCircle(ox - 86 * scale, oy + 365 * scale, 392 * scale, fillPaint);
-            fillPaint.setColor(0x351EDB88);
+            fillPaint.setColor(0x3610A767);
+            canvas.drawCircle(ox - 86 * scale, oy + 365 * scale, 390 * scale, fillPaint);
+            fillPaint.setColor(0x2E1EDB88);
             canvas.drawCircle(ox + 1495 * scale, oy + 535 * scale, 385 * scale, fillPaint);
-            fillPaint.setColor(0x261C6B4A);
-            canvas.drawCircle(ox + 890 * scale, oy + 1052 * scale, 455 * scale, fillPaint);
+            fillPaint.setColor(0x151C6B4A);
+            canvas.drawCircle(ox + 890 * scale, oy + 1115 * scale, 455 * scale, fillPaint);
 
             rect.set(ox + 34 * scale, oy + 70 * scale, ox + 1886 * scale, oy + 1048 * scale);
             fillPaint.setColor(0xA807110F);
@@ -823,7 +823,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 oy + 836 * scale
             );
             gridPaint.setStrokeWidth(Math.max(1.0f, 1.0f * scale));
-            gridPaint.setColor(0x1B73F2B0);
+            gridPaint.setColor(0x1673F2B0);
             float step = 64 * scale;
             for (float x = gridRect.left; x <= gridRect.right; x += step) {
                 canvas.drawLine(x, gridRect.top, x, gridRect.bottom, gridPaint);
