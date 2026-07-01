@@ -57,6 +57,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final long VIDEO_FRESH_MS = 1500;
     private static final long VIDEO_STALL_MIN_PACKETS = 60;
     private static final float VIDEO_ASPECT_RATIO = 16.0f / 9.0f;
+    private static final float WAIT_DESIGN_WIDTH = 1920.0f;
+    private static final float WAIT_DESIGN_HEIGHT = 1080.0f;
     private static final float GAMEPAD_AXIS_DEADZONE = 0.35f;
     private static final int BUTTON_A = 1 << 0;
     private static final int BUTTON_B = 1 << 1;
@@ -120,7 +122,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private float gamepadLt;
     private float gamepadRt;
     private int gamepadButtons;
-    private boolean overlayVisible;
+    private boolean overlayVisible = false;
     private final View.OnKeyListener gamepadKeyListener = new View.OnKeyListener() {
         @Override
         public boolean onKey(View view, int keyCode, KeyEvent event) {
@@ -140,9 +142,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         stats.deviceLabel = buildDeviceLabel();
         stats.receiverAdvice = buildReceiverAdvice();
-        localIp = resolveLocalIpv4Address();
         discoveryBroadcaster = new DiscoveryBroadcaster(stats);
         discoveryBroadcaster.start();
+        localIp = resolveLocalIpv4Address();
         String configuredInputRelayHost = resolveInputRelayHost();
         if (configuredInputRelayHost.length() > 0) {
             setInputRelayHost(configuredInputRelayHost);
@@ -168,7 +170,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
 
         FrameLayout root = new FrameLayout(this);
         rootView = root;
-        root.setBackgroundColor(COLOR_BG);
+        root.setBackgroundColor(0xFF000000);
         root.setFocusable(true);
         root.setFocusableInTouchMode(true);
         root.setOnKeyListener(gamepadKeyListener);
@@ -339,7 +341,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         BrandMarkView brandMark = new BrandMarkView(this);
-        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(wdp(48), wdp(48));
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(p(68), p(68));
         brandRow.addView(brandMark, markParams);
 
         LinearLayout brandCopy = new LinearLayout(this);
@@ -348,99 +350,68 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        brandCopyParams.setMargins(wdp(12), 0, 0, 0);
-        TextView title = text("TVGame 接收端", 22, COLOR_TEXT, Typeface.BOLD);
-        TextView subtitle = text("局域网游戏串流", 12, COLOR_MUTED, Typeface.NORMAL);
-        subtitle.setPadding(0, wdp(5), 0, 0);
+        brandCopyParams.setMargins(p(22), 0, 0, 0);
+        TextView title = designText("TVGame 接收端", 34, COLOR_TEXT, Typeface.BOLD);
+        TextView subtitle = designText("局域网游戏串流", 20, COLOR_MUTED, Typeface.NORMAL);
+        subtitle.setPadding(0, p(10), 0, 0);
         brandCopy.addView(title);
         brandCopy.addView(subtitle);
         brandRow.addView(brandCopy, brandCopyParams);
-
-        FrameLayout.LayoutParams brandParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP | Gravity.START
-        );
-        brandParams.setMargins(wdp(48), wdp(38), 0, 0);
-        layer.addView(brandRow, brandParams);
+        placeDesign(layer, brandRow, 94, 112, 620, 88);
 
         LinearLayout chipRow = new LinearLayout(this);
         chipRow.setOrientation(LinearLayout.HORIZONTAL);
         chipRow.setGravity(Gravity.CENTER_VERTICAL);
-        topStatusChip = chip("监听中", COLOR_ACCENT, COLOR_ACCENT_SOFT);
-        chipRow.addView(topStatusChip);
-        chipRow.addView(chip("Android 11+", COLOR_TEXT, 0x2214A96F), marginLeft(wdp(9)));
-        chipRow.addView(chip("按比例显示", COLOR_TEXT, 0x2214A96F), marginLeft(wdp(9)));
-        FrameLayout.LayoutParams chipsParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP | Gravity.END
-        );
-        chipsParams.setMargins(0, wdp(42), wdp(52), 0);
-        layer.addView(chipRow, chipsParams);
+        topStatusChip = designChip("●  监听中", COLOR_ACCENT, 0x7714A96F);
+        chipRow.addView(topStatusChip, designRowParams(132, -1, 14));
+        chipRow.addView(designChip("Android 11+", COLOR_TEXT, 0x1614A96F), designRowParams(160, -1, 14));
+        chipRow.addView(designChip("按比例显示", COLOR_TEXT, 0x1614A96F), designRowParams(168, -1, 0));
+        placeDesign(layer, chipRow, 1384, 125, 456, 58);
 
-        LinearLayout center = new LinearLayout(this);
-        center.setOrientation(LinearLayout.VERTICAL);
-        center.setGravity(Gravity.CENTER_HORIZONTAL);
         BrandMarkView heroMark = new BrandMarkView(this);
-        center.addView(heroMark, new LinearLayout.LayoutParams(wdp(68), wdp(68)));
+        placeDesign(layer, heroMark, 904, 296, 112, 112);
 
-        waitingHeadline = text("等待电脑发送画面", 26, COLOR_TEXT, Typeface.BOLD);
+        waitingHeadline = designText("等待电脑发送画面", 48, COLOR_TEXT, Typeface.BOLD);
         waitingHeadline.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams headlineParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        headlineParams.setMargins(0, wdp(18), 0, 0);
-        center.addView(waitingHeadline, headlineParams);
+        placeDesign(layer, waitingHeadline, 0, 452, WAIT_DESIGN_WIDTH, 62);
 
-        waitingSubline = text("在发送端输入这台电视的 IP。连接成功后自动进入全屏，复杂诊断默认隐藏。", 13, COLOR_MUTED, Typeface.NORMAL);
+        waitingSubline = designText("在发送端输入这台电视的 IP。连接成功后自动进入全屏，默认隐藏复杂日志，只在需要时显示诊断浮层。", 24, COLOR_MUTED, Typeface.NORMAL);
         waitingSubline.setGravity(Gravity.CENTER);
-        waitingSubline.setMaxWidth(wdp(760));
-        waitingSubline.setPadding(0, wdp(12), 0, 0);
-        center.addView(waitingSubline);
+        waitingSubline.setMaxLines(2);
+        placeDesign(layer, waitingSubline, 430, 535, 1060, 76);
 
         LinearLayout metricStrip = new LinearLayout(this);
         metricStrip.setGravity(Gravity.CENTER);
         metricStrip.setOrientation(LinearLayout.HORIZONTAL);
-        metricStrip.setPadding(wdp(8), wdp(8), wdp(8), wdp(8));
-        metricStrip.setBackground(rounded(0x8A08120F, 0x333EE49A, 1, 26));
-        localIpValue = metricValue("本机 IP", localIp);
-        videoPortValue = metricValue("视频端口", String.valueOf(VIDEO_PORT));
-        audioPortValue = metricValue("音频端口", String.valueOf(AUDIO_PORT));
-        inputPortValue = metricValue("输入端口", String.valueOf(INPUT_RELAY_PORT));
-        metricStrip.addView(localIpValue, metricItemParams(230));
-        metricStrip.addView(videoPortValue, metricItemParams(145));
-        metricStrip.addView(audioPortValue, metricItemParams(145));
-        metricStrip.addView(inputPortValue, metricItemParams(145));
-        LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        stripParams.setMargins(0, wdp(30), 0, 0);
-        center.addView(metricStrip, stripParams);
+        metricStrip.setPadding(p(18), p(16), p(18), p(16));
+        metricStrip.setBackground(designRounded(0x9A08120F, 0x553EE49A, 2, 58));
+        localIpValue = designMetricValue(localIp, 42);
+        videoPortValue = designMetricValue(String.valueOf(VIDEO_PORT), 30);
+        audioPortValue = designMetricValue(String.valueOf(AUDIO_PORT), 30);
+        inputPortValue = designMetricValue(String.valueOf(INPUT_RELAY_PORT), 30);
+        metricStrip.addView(designMetricCard("本机 IP", localIpValue), designRowParams(350, -1, 26));
+        metricStrip.addView(designMetricCard("视频端口", videoPortValue), designRowParams(230, -1, 26));
+        metricStrip.addView(designMetricCard("音频端口", audioPortValue), designRowParams(230, -1, 26));
+        metricStrip.addView(designMetricCard("输入端口", inputPortValue), designRowParams(230, -1, 0));
+        placeDesign(layer, metricStrip, 390, 670, 1140, 132);
 
-        FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
+        placeDesign(
+            layer,
+            designInfoCard("推荐操作", "发送端手动输入 IP", "手动输入更稳定，自动搜索仅作为辅助入口。"),
+            92,
+            858,
+            510,
+            148
         );
-        centerParams.setMargins(0, 0, 0, compactWaitingLayout() ? wdp(190) : wdp(86));
-        layer.addView(center, centerParams);
-
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        bottom.setGravity(Gravity.CENTER);
-        bottom.addView(infoCard("推荐操作", "发送端手动输入 IP", "手动输入更稳定，自动搜索仅作为辅助入口。"), weightedCardParams());
-        bottom.addView(infoCard("输入回传", "手柄与键鼠", "识别到输入设备后回传到电脑端输入桥。"), weightedCardParams());
-        bottom.addView(streamPreviewCard(), weightedCardParams());
-        FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM
+        placeDesign(
+            layer,
+            designInfoCard("输入回传", "手柄与键鼠", "识别到输入设备后回传到电脑端输入桥。"),
+            705,
+            858,
+            510,
+            148
         );
-        bottomParams.setMargins(wdp(48), 0, wdp(48), wdp(38));
-        layer.addView(bottom, bottomParams);
+        placeDesign(layer, designStreamPreviewCard(), 1310, 842, 520, 172);
 
         return layer;
     }
@@ -451,32 +422,188 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             waitingLayer.setVisibility(videoActive ? View.GONE : View.VISIBLE);
         }
         if (topStatusChip != null) {
-            topStatusChip.setText(videoActive ? "接收中" : "监听中");
+            topStatusChip.setText(videoActive ? "●  接收中" : "●  监听中");
         }
         if (waitingHeadline != null) {
             waitingHeadline.setText(stats.videoFrames > 0 ? "等待电脑继续发送画面" : "等待电脑发送画面");
         }
         if (localIpValue != null) {
-            localIpValue.setText("本机 IP\n" + localIp);
+            localIpValue.setText(localIp);
         }
         if (videoPortValue != null) {
-            videoPortValue.setText("视频端口\n" + VIDEO_PORT);
+            videoPortValue.setText(String.valueOf(VIDEO_PORT));
         }
         if (audioPortValue != null) {
-            audioPortValue.setText("音频端口\n" + AUDIO_PORT);
+            audioPortValue.setText(String.valueOf(AUDIO_PORT));
         }
         if (inputPortValue != null) {
-            inputPortValue.setText("输入端口\n" + INPUT_RELAY_PORT);
+            inputPortValue.setText(String.valueOf(INPUT_RELAY_PORT));
         }
         if (streamPreviewFps != null) {
-            streamPreviewFps.setText("画面\n" + (stats.videoFrames > 0 ? "已收到" : "--"));
+            streamPreviewFps.setText(stats.videoFrames > 0 ? "已收到" : "--");
         }
         if (streamPreviewLoss != null) {
-            streamPreviewLoss.setText("丢包\n" + (stats.videoRtpLossPackets > 0 ? String.valueOf(stats.videoRtpLossPackets) : "--"));
+            streamPreviewLoss.setText(stats.videoRtpLossPackets > 0 ? String.valueOf(stats.videoRtpLossPackets) : "--");
         }
         if (streamPreviewAudio != null) {
-            streamPreviewAudio.setText("声音\n" + (stats.audioPackets > 0 ? "正常" : "--"));
+            streamPreviewAudio.setText(stats.audioPackets > 0 ? "正常" : "--");
         }
+    }
+
+    private void placeDesign(FrameLayout parent, View child, float x, float y, float width, float height) {
+        parent.addView(child, designFrame(x, y, width, height));
+    }
+
+    private FrameLayout.LayoutParams designFrame(float x, float y, float width, float height) {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(p(width), p(height));
+        params.setMargins(stageLeftPx() + p(x), stageTopPx() + p(y), 0, 0);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams designRowParams(float width, float height, float marginRight) {
+        int resolvedHeight = height < 0 ? LinearLayout.LayoutParams.MATCH_PARENT : p(height);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(p(width), resolvedHeight);
+        params.setMargins(0, 0, p(marginRight), 0);
+        return params;
+    }
+
+    private TextView designText(String value, float px, int color, int style) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextColor(color);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, p(px));
+        view.setTypeface(Typeface.DEFAULT, style);
+        view.setIncludeFontPadding(false);
+        view.setLineSpacing(0.0f, 1.05f);
+        return view;
+    }
+
+    private TextView designChip(String value, int color, int fillColor) {
+        TextView view = designText(value, 22, color, Typeface.BOLD);
+        view.setGravity(Gravity.CENTER);
+        view.setBackground(designRounded(fillColor, 0x554EE89F, 2, 28));
+        return view;
+    }
+
+    private TextView designMetricValue(String value, float px) {
+        TextView view = designText(value, px, COLOR_TEXT, Typeface.BOLD);
+        view.setGravity(Gravity.START);
+        return view;
+    }
+
+    private LinearLayout designMetricCard(String label, TextView valueView) {
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(p(22), 0, p(22), 0);
+        card.setBackground(designRounded(0xA7091511, 0, 0, 34));
+
+        TextView labelView = designText(label, 19, COLOR_MUTED, Typeface.BOLD);
+        labelView.setPadding(0, 0, 0, p(9));
+        card.addView(labelView);
+        card.addView(valueView);
+        return card;
+    }
+
+    private LinearLayout designInfoCard(String label, String title, String body) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(p(28), p(24), p(28), p(22));
+        card.setBackground(designRounded(COLOR_PANEL_SOFT, 0x8832E88E, 2, 28));
+
+        TextView labelView = designText(label, 18, COLOR_ACCENT, Typeface.BOLD);
+        card.addView(labelView);
+
+        TextView titleView = designText(title, 30, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(12), 0, 0);
+        titleView.setMaxLines(2);
+        card.addView(titleView);
+
+        TextView bodyView = designText(body, 20, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setPadding(0, p(12), 0, 0);
+        bodyView.setMaxLines(2);
+        card.addView(bodyView);
+        return card;
+    }
+
+    private LinearLayout designStreamPreviewCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(p(28), p(24), p(28), p(22));
+        card.setBackground(designRounded(0xB6122A22, 0xAA73F2B0, 2, 28));
+
+        TextView labelView = designText("串流浮层预览", 18, COLOR_ACCENT, Typeface.BOLD);
+        card.addView(labelView);
+
+        TextView titleView = designText("诊断默认隐藏", 30, COLOR_TEXT, Typeface.BOLD);
+        titleView.setPadding(0, p(12), 0, 0);
+        card.addView(titleView);
+
+        TextView bodyView = designText("按菜单键或 F1 可切换诊断浮层。", 19, COLOR_TEXT, Typeface.BOLD);
+        bodyView.setPadding(0, p(12), 0, 0);
+        card.addView(bodyView);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, p(22), 0, 0);
+        streamPreviewFps = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewLoss = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
+        streamPreviewAudio = designText("--", 25, COLOR_TEXT, Typeface.BOLD);
+        row.addView(designSmallMetric("画面", streamPreviewFps), designRowParams(138, 70, 18));
+        row.addView(designSmallMetric("丢包", streamPreviewLoss), designRowParams(138, 70, 18));
+        row.addView(designSmallMetric("声音", streamPreviewAudio), designRowParams(138, 70, 0));
+        card.addView(row);
+        return card;
+    }
+
+    private LinearLayout designSmallMetric(String label, TextView valueView) {
+        LinearLayout item = new LinearLayout(this);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setPadding(p(16), 0, p(16), 0);
+        item.setBackground(designRounded(0xB20A1713, 0, 0, 18));
+
+        TextView labelView = designText(label, 17, COLOR_MUTED, Typeface.NORMAL);
+        labelView.setPadding(0, 0, 0, p(7));
+        item.addView(labelView);
+        item.addView(valueView);
+        return item;
+    }
+
+    private GradientDrawable designRounded(int color, int strokeColor, float strokePx, float radiusPx) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(p(radiusPx));
+        if (strokePx > 0) {
+            drawable.setStroke(Math.max(1, p(strokePx)), strokeColor);
+        }
+        return drawable;
+    }
+
+    private int p(float designPx) {
+        return Math.round(designPx * waitStageScale());
+    }
+
+    private float waitStageScale() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        return stageScale(metrics.widthPixels, metrics.heightPixels);
+    }
+
+    private int stageLeftPx() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float scale = waitStageScale();
+        return Math.round((metrics.widthPixels - WAIT_DESIGN_WIDTH * scale) / 2.0f);
+    }
+
+    private int stageTopPx() {
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        float scale = waitStageScale();
+        return Math.round((metrics.heightPixels - WAIT_DESIGN_HEIGHT * scale) / 2.0f);
+    }
+
+    private static float stageScale(int width, int height) {
+        return Math.min(width / WAIT_DESIGN_WIDTH, height / WAIT_DESIGN_HEIGHT);
     }
 
     private boolean hasFreshVideo(long nowMs) {
@@ -665,29 +792,40 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             super.onDraw(canvas);
             int width = getWidth();
             int height = getHeight();
+            float scale = stageScale(width, height);
+            float ox = (width - WAIT_DESIGN_WIDTH * scale) / 2.0f;
+            float oy = (height - WAIT_DESIGN_HEIGHT * scale) / 2.0f;
             fillPaint.setColor(COLOR_BG);
             canvas.drawRect(0, 0, width, height, fillPaint);
 
-            fillPaint.setColor(0x4810A767);
-            canvas.drawCircle(width * 0.18f, height * 0.18f, width * 0.22f, fillPaint);
-            fillPaint.setColor(0x321EDB88);
-            canvas.drawCircle(width * 0.74f, height * 0.38f, width * 0.18f, fillPaint);
-            fillPaint.setColor(0x221C6B4A);
-            canvas.drawCircle(width * 0.52f, height * 0.84f, width * 0.24f, fillPaint);
+            fillPaint.setColor(0x3A10A767);
+            canvas.drawCircle(ox - 110 * scale, oy + 350 * scale, 360 * scale, fillPaint);
+            fillPaint.setColor(0x361EDB88);
+            canvas.drawCircle(ox + 1530 * scale, oy + 530 * scale, 350 * scale, fillPaint);
+            fillPaint.setColor(0x231C6B4A);
+            canvas.drawCircle(ox + 930 * scale, oy + 1055 * scale, 390 * scale, fillPaint);
 
-            rect.set(width * 0.10f, height * 0.12f, width * 0.90f, height * 0.88f);
+            rect.set(ox + 34 * scale, oy + 70 * scale, ox + 1886 * scale, oy + 1048 * scale);
             fillPaint.setColor(0xB907110F);
-            canvas.drawRoundRect(rect, dpFor(getContext(), 38), dpFor(getContext(), 38), fillPaint);
-            strokePaint.setColor(0x333EE49A);
-            canvas.drawRoundRect(rect, dpFor(getContext(), 38), dpFor(getContext(), 38), strokePaint);
+            canvas.drawRoundRect(rect, 60 * scale, 60 * scale, fillPaint);
+            strokePaint.setStrokeWidth(Math.max(1.0f, 1.5f * scale));
+            strokePaint.setColor(0x2E3EE49A);
+            canvas.drawRoundRect(rect, 60 * scale, 60 * scale, strokePaint);
 
-            gridPaint.setColor(0x123EE49A);
-            float step = dpFor(getContext(), 42);
-            for (float x = rect.left + step; x < rect.right; x += step) {
-                canvas.drawLine(x, rect.top + dpFor(getContext(), 18), x, rect.bottom - dpFor(getContext(), 18), gridPaint);
+            RectF gridRect = new RectF(
+                ox + 300 * scale,
+                oy + 175 * scale,
+                ox + 1620 * scale,
+                oy + 835 * scale
+            );
+            gridPaint.setStrokeWidth(Math.max(1.0f, 1.0f * scale));
+            gridPaint.setColor(0x163EE49A);
+            float step = 64 * scale;
+            for (float x = gridRect.left; x <= gridRect.right; x += step) {
+                canvas.drawLine(x, gridRect.top, x, gridRect.bottom, gridPaint);
             }
-            for (float y = rect.top + step; y < rect.bottom; y += step) {
-                canvas.drawLine(rect.left + dpFor(getContext(), 18), y, rect.right - dpFor(getContext(), 18), y, gridPaint);
+            for (float y = gridRect.top; y <= gridRect.bottom; y += step) {
+                canvas.drawLine(gridRect.left, y, gridRect.right, y, gridPaint);
             }
         }
     }

@@ -480,8 +480,8 @@ public final class StatsModelInputHarness {
 test('MainActivity uses a compact smaller overlay by default', () => {
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
-  assert.match(source, /overlay\.setTextSize\(12\)/);
-  assert.match(source, /overlay\.setPadding\(8,\s*6,\s*8,\s*6\)/);
+  assert.match(source, /overlay\.setTextSize\(TypedValue\.COMPLEX_UNIT_SP,\s*10\)/);
+  assert.match(source, /overlay\.setPadding\(dp\(10\),\s*dp\(8\),\s*dp\(10\),\s*dp\(8\)\)/);
   assert.match(source, /stats\.renderCompact\(\)/);
   assert.doesNotMatch(source, /stats\.render\(\)/);
 });
@@ -768,7 +768,8 @@ test('MainActivity toggles overlay with MENU or F1 without forwarding those keys
   const source = readProjectFile(`${javaRoot}/MainActivity.java`);
 
   assert.match(source, /import\s+android\.view\.View/);
-  assert.match(source, /boolean\s+overlayVisible\s*=\s*true/);
+  assert.match(source, /boolean\s+overlayVisible\s*=\s*false/);
+  assert.match(source, /overlay\.setVisibility\(View\.GONE\)/);
   assert.match(source, /isOverlayToggleKey\(keyCode\)/);
   assert.match(source, /KeyEvent\.KEYCODE_MENU/);
   assert.match(source, /KeyEvent\.KEYCODE_F1/);
