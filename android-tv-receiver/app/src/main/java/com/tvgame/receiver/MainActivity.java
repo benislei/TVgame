@@ -28,6 +28,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
@@ -52,6 +53,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private static final int COLOR_AMBER = 0xFFE8BD65;
     private static final int COLOR_BORDER = 0x443EE49A;
     private static final long STOP_JOIN_MS = 400;
+    private static final long BACK_EXIT_WINDOW_MS = 1800;
     private static final long VIDEO_HEALTH_SAMPLE_MS = 500;
     private static final long VIDEO_STALL_RESTART_MS = 1200;
     private static final long VIDEO_FRESH_MS = 1500;
@@ -129,6 +131,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private float gamepadRt;
     private int gamepadButtons;
     private boolean overlayVisible = false;
+    private long lastBackPressedAtMs;
     private final View.OnKeyListener gamepadKeyListener = new View.OnKeyListener() {
         @Override
         public boolean onKey(View view, int keyCode, KeyEvent event) {
@@ -260,6 +263,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                return handleBackExit();
+            }
+            return true;
+        }
         if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0 && isOverlayToggleKey(keyCode)) {
             toggleOverlay();
             return true;
@@ -333,6 +342,22 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         if (overlay != null) {
             overlay.setVisibility(overlayVisible ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private boolean handleBackExit() {
+        long nowMs = System.currentTimeMillis();
+        if (nowMs - lastBackPressedAtMs <= BACK_EXIT_WINDOW_MS) {
+            finishAndRemoveTask();
+            return true;
+        }
+
+        lastBackPressedAtMs = nowMs;
+        Toast.makeText(
+            this,
+            "\u518d\u6309\u4e00\u6b21\u8fd4\u56de\u9000\u51fa TVGame \u63a5\u6536\u7aef",
+            Toast.LENGTH_SHORT
+        ).show();
+        return true;
     }
 
     private FrameLayout buildWaitingLayer() {

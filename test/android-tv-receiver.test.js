@@ -130,10 +130,25 @@ test('Android TV manifest exposes Chinese Leanback app with required permissions
   assert.match(manifest, /android\.intent\.category\.LEANBACK_LAUNCHER/);
   assert.match(manifest, /android:screenOrientation="landscape"/);
   assert.match(manifest, /android:usesCleartextTraffic="true"/);
+  assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
+  assert.match(manifest, /android:roundIcon="@mipmap\/ic_launcher_round"/);
   assert.match(manifest, /android:label="电视游戏接收端"/);
   assert.match(manifest, /android:theme="@style\/AppTheme"/);
   assert.match(manifest, /android:name="com\.tvgame\.receiver\.INPUT_RELAY_HOST"/);
   assert.match(manifest, /android:value="\$\{inputRelayHost\}"/);
+});
+
+test('Android TV launcher icon resources use TVGame brand PNGs for TV launchers', () => {
+  const densities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
+
+  for (const density of densities) {
+    for (const iconName of ['ic_launcher.png', 'ic_launcher_round.png']) {
+      const relativePath = `android-tv-receiver/app/src/main/res/mipmap-${density}/${iconName}`;
+      assertFileExists(relativePath);
+      const bytes = fs.readFileSync(path.join(root, relativePath));
+      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    }
+  }
 });
 
 test('InputClient sends safe newline-delimited UTF-8 input JSON on a background thread', () => {
@@ -743,6 +758,20 @@ test('MainActivity consumes USB gamepad key events so the TV UI does not handle 
   assert.match(source, /isGamepadButtonKey\(keyCode\)/);
   assert.match(source, /if\s*\(\s*handleGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+true/);
   assert.match(source, /if\s*\(\s*!isGamepadKeyEvent\(event\)\s*\)[\s\S]*?return\s+false/);
+});
+
+test('MainActivity exits the TV receiver only after a quick second Back press', () => {
+  const source = readProjectFile(`${javaRoot}/MainActivity.java`);
+
+  assert.match(source, /import\s+android\.widget\.Toast/);
+  assert.match(source, /BACK_EXIT_WINDOW_MS\s*=\s*1800/);
+  assert.match(source, /long\s+lastBackPressedAtMs/);
+  assert.match(source, /if\s*\(\s*keyCode\s*==\s*KeyEvent\.KEYCODE_BACK\s*\)/);
+  assert.match(source, /return\s+handleBackExit\(\)/);
+  assert.match(source, /private\s+boolean\s+handleBackExit\(\)/);
+  assert.match(source, /finishAndRemoveTask\(\)/);
+  assert.match(source, /Toast\.makeText/);
+  assert.match(source, /\\u518d\\u6309\\u4e00\\u6b21\\u8fd4\\u56de\\u9000\\u51fa TVGame \\u63a5\\u6536\\u7aef/);
 });
 
 test('MainActivity sends USB gamepad buttons as raw virtual-controller state', () => {
